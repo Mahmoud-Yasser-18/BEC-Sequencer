@@ -397,6 +397,72 @@ class Sequence:
         root_events = [event for event in self.all_events if event.parent is None]
         for root_event in root_events:
             root_event.print_event_hierarchy(level, indent)
+    def plot_all(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None):
+        if channels_to_plot is None:
+            channels_to_plot = [channel.name for channel in self.channels]
+        else:
+            invalid_channels = [name for name in channels_to_plot if not any(channel.name == name for channel in self.channels)]
+            if invalid_channels:
+                raise ValueError(f"Invalid channel names: {', '.join(invalid_channels)}")
+        
+        if start_time is None or end_time is None:
+            all_time_points = sorted(set(event.start_time for event in self.all_events) | set(event.end_time for event in self.all_events))
+            if start_time is None:
+                start_time = all_time_points[0]
+            if end_time is None:
+                end_time = all_time_points[-1]
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        y_offset = 0
+
+        for channel_name in channels_to_plot:
+            channel = next(channel for channel in self.channels if channel.name == channel_name)
+            events = sorted(channel.events, key=lambda event: event.start_time)
+            
+            time_points: List[float] = []
+            values: List[float] = []
+            last_value = channel.reset_value
+            
+            for event in events:
+                if event.start_time > end_time:
+                    break
+                if event.end_time < start_time:
+                    continue
+                
+                if event.start_time > start_time and (not time_points or time_points[-1] < start_time):
+                    time_points.append(start_time)
+                    values.append(last_value + y_offset)
+                
+                if time_points and event.start_time > time_points[-1]:
+                    time_points.append(event.start_time)
+                    values.append(last_value + y_offset)
+                
+                current_time = max(start_time, event.start_time)
+                while current_time <= min(end_time, event.end_time):
+                    time_points.append(current_time)
+                    last_value = event.behavior.get_value_at_time(current_time - event.start_time)
+                    values.append(last_value + y_offset)
+                    current_time += resolution
+                
+                if current_time > event.end_time:
+                    last_value = event.behavior.get_value_at_time(event.end_time - event.start_time)
+                    time_points.append(event.end_time)
+                    values.append(last_value + y_offset)
+            
+            if not time_points or time_points[-1] < end_time:
+                time_points.append(end_time)
+                values.append(last_value + y_offset)
+            
+            ax.plot(time_points, values, label=channel.name)
+            y_offset += 10  # Translate the y values for each channel by an offset
+
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Value")
+        ax.legend()
+        ax.grid(True)
+        plt.tight_layout()
+        plt.show()
 
     def plot(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None):
         if channels_to_plot is None:
@@ -662,6 +728,112 @@ class Sequence:
         plt.tight_layout()
         plt.show()
 
+    def plot_with_event_tree(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None):
+        if channels_to_plot is None:
+            channels_to_plot = [channel.name for channel in self.channels]
+        else:
+            invalid_channels = [name for name in channels_to_plot if not any(channel.name == name for channel in self.channels)]
+            if invalid_channels:
+                raise ValueError(f"Invalid channel names: {', '.join(invalid_channels)}")
+        
+        if start_time is None or end_time is None:
+            all_time_points = sorted(set(event.start_time for event in self.all_events) | set(event.end_time for event in self.all_events))
+            if start_time is None:
+                start_time = all_time_points[0]
+            if end_time is None:
+                end_time = all_time_points[-1]
+        
+        fig, ax = plt.subplots(figsize=(15, 8))
+
+        y_offset = 0
+        channel_positions = {channel.name: y_offset + i * 10 for i, channel in enumerate(self.channels)}
+
+        # Plot channels
+        for channel_name in channels_to_plot:
+            channel = next(channel for channel in self.channels if channel.name == channel_name)
+            events = sorted(channel.events, key=lambda event: event.start_time)
+            
+            time_points: List[float] = []
+            values: List[float] = []
+            last_value = channel.reset_value
+            
+            for event in events:
+                if event.start_time > end_time:
+                    break
+                if event.end_time < start_time:
+                    continue
+                
+                if event.start_time > start_time and (not time_points or time_points[-1] < start_time):
+                    time_points.append(start_time)
+                    values.append(last_value + channel_positions[channel.name])
+                
+                if time_points and event.start_time > time_points[-1]:
+                    time_points.append(event.start_time)
+                    values.append(last_value + channel_positions[channel.name])
+                
+                current_time = max(start_time, event.start_time)
+                while current_time <= min(end_time, event.end_time):
+                    time_points.append(current_time)
+                    last_value = event.behavior.get_value_at_time(current_time - event.start_time)
+                    values.append(last_value + channel_positions[channel.name])
+                    current_time += resolution
+                
+                if current_time > event.end_time:
+                    last_value = event.behavior.get_value_at_time(event.end_time - event.start_time)
+                    time_points.append(event.end_time)
+                    values.append(last_value + channel_positions[channel.name])
+            
+            if not time_points or time_points[-1] < end_time:
+                time_points.append(end_time)
+                values.append(last_value + channel_positions[channel.name])
+            
+            ax.plot(time_points, values, label=channel.name)
+
+        # Plot event tree
+        all_times = sorted(set(event.start_time for event in self.all_events) | set(event.end_time for event in self.all_events))
+
+        def draw_event(event, level=0, parent_pos=None):
+            # Plot the event
+            channel_pos = channel_positions[event.channel.name]
+            event_pos = (event.start_time, channel_pos)
+            ax.plot(event_pos[0], event_pos[1], 'o', color=color_map(level))
+            
+            # Annotate the event with its level
+            ax.text(event_pos[0], event_pos[1], f'Level {level}', ha='right', va='bottom', fontsize=8, color='black')
+
+            # Draw arrow from parent to current event
+            if parent_pos is not None:
+                arrow_width = max(20.0 / (5*level + 1), 0.1)  # Decrease arrow width with level, ensuring minimum width
+                ax.annotate("", xy=event_pos, xytext=parent_pos, 
+                            arrowprops=dict(arrowstyle="->", lw=arrow_width, color=color_map(level)))
+
+            # Draw event's children
+            for child in event.children:
+                draw_event(child, level + 1, event_pos)
+
+        # Draw all root events
+        root_events = [event for event in self.all_events if event.parent is None]
+        max_level = max(len(event.children) for event in root_events)
+        color_map = cm.get_cmap('tab10', max_level + 1)
+
+        for root_event in root_events:
+            draw_event(root_event)
+
+        # Set axis limits
+        ax.set_xlim(min(all_times) - 1, max(all_times) + 1)
+        ax.set_ylim(-10, len(self.channels) * 10)
+
+        # Set axis labels and title
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Channel")
+        ax.set_title("Event Tree Diagram with Channel Plots")
+        ax.set_yticks(list(channel_positions.values()))
+        ax.set_yticklabels(list(channel_positions.keys()))
+
+        # Add grid
+        ax.grid(True)
+        plt.tight_layout()
+        plt.show()
 
 
 
@@ -681,7 +853,10 @@ if __name__ == '__main__':
     event6 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10),relative_time=11, reference_time="end", parent_event=event4)
     sequence.print_event_tree()
     sequence.plot_event_tree()
-    # sequence.delete_event(start_time=20,channel_name="Analog1")
+    sequence.plot_all()
+    sequence.plot_with_event_tree()
+    # sequence.delete_event
+    # (start_time=20,channel_name="Analog1")
     # sequence.delete_event(start_time=5,channel_name="Digital1")
     # sequence.delete_event(start_time=16,channel_name="Analog1")
     # sequence.print_event_tree()
@@ -689,7 +864,9 @@ if __name__ == '__main__':
     sequence.add_event_in_middle(parent_channel_name="Digital1",parent_start_time=5,child_events=[(7,"Digital1")],relative_time=3,reference_time="end",behavior=Jump(5),channel_name="Digital1")
     sequence.print_event_tree()
     sequence.plot_event_tree()
-
+    sequence.plot_all()
+    sequence.plot_with_event_tree()
+    
 
 
 
