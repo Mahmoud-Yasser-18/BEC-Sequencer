@@ -365,14 +365,15 @@ class Sequence:
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
 
+        # Handle children reassignment
         if event.parent is None:
             for child in event.children:
                 child.parent = None
-                child.update_times(0)
         else:
             parent = event.parent
             for child in event.children:
                 child.parent = parent
+                parent.children.append(child)
                 if child.reference_time == 'start':
                     new_start_time = parent.start_time + child.relative_time
                 elif child.reference_time == 'end':
@@ -381,19 +382,14 @@ class Sequence:
                     raise ValueError("Invalid reference_time. Use 'start' or 'end'.")
                 delta = new_start_time - child.start_time
                 child.update_times(delta)
-                parent.children.append(child)
         
-        print(len(event.channel.events))
+        
+        # Remove the event from channel and sequence
+        parent.children.remove(event)    
+        event.children.clear()
         event.channel.events.remove(event)
-        print(len(event.channel.events))
-
-        print(len(self.all_events))
         self.all_events.remove(event)
-        print(len(self.all_events))
         
-        event.parent = None
-        event.children = []
-
         # Re-sort all_events to maintain correct order
         self.all_events.sort(key=lambda event: event.start_time)
 
@@ -683,13 +679,16 @@ if __name__ == '__main__':
     event4 = sequence.add_event("Digital1", Jump(1), relative_time=-10, reference_time="end", parent_event=event2)
     event5 = sequence.add_event("Digital1", Jump(0), relative_time=2, reference_time="start", parent_event=event4)
     event6 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10),relative_time=11, reference_time="end", parent_event=event4)
-
+    sequence.print_event_tree()
     sequence.plot_event_tree()
     # sequence.delete_event(start_time=20,channel_name="Analog1")
     # sequence.delete_event(start_time=5,channel_name="Digital1")
-    sequence.delete_event(start_time=7,channel_name="Digital1")
+    # sequence.delete_event(start_time=16,channel_name="Analog1")
+    # sequence.print_event_tree()
+    # sequence.plot_event_tree()
+    sequence.add_event_in_middle(parent_channel_name="Digital1",parent_start_time=5,child_events=[(7,"Digital1")],relative_time=3,reference_time="end",behavior=Jump(5),channel_name="Digital1")
+    sequence.print_event_tree()
     sequence.plot_event_tree()
-    # sequence.add_event_in_middle(parent_channel_name="Analog1",parent_start_time=10,child_events=[(20,"Digital1")],relative_time=3,reference_time="end",behavior=Ramp(5, RampType.LINEAR, 5, 10),channel_name="Analog1")
 
 
 
