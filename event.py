@@ -795,17 +795,18 @@ class Sequence:
         def draw_event(event, level=0, parent_pos=None):
             # Plot the event
             channel_pos = channel_positions[event.channel.name]
-            event_pos = (event.start_time, channel_pos)
+            event_value = event.behavior.get_value_at_time(0) + channel_pos
+            event_pos = (event.start_time, event_value)
             ax.plot(event_pos[0], event_pos[1], 'o', color=color_map(level))
             
             # Annotate the event with its level
             ax.text(event_pos[0], event_pos[1], f'Level {level}', ha='right', va='bottom', fontsize=8, color='black')
 
-            # Draw arrow from parent to current event
+            # Draw dotted arrow from parent to current event
             if parent_pos is not None:
                 arrow_width = max(20.0 / (5*level + 1), 0.1)  # Decrease arrow width with level, ensuring minimum width
                 ax.annotate("", xy=event_pos, xytext=parent_pos, 
-                            arrowprops=dict(arrowstyle="->", lw=arrow_width, color=color_map(level)))
+                            arrowprops=dict(arrowstyle="->", lw=arrow_width, linestyle='dotted', color=color_map(level)))
 
             # Draw event's children
             for child in event.children:
