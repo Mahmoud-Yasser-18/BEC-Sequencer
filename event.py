@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Callable, List, Optional, Union
 import matplotlib.pyplot as plt
-
+import copy
 
 import matplotlib.cm as cm
 
@@ -85,6 +85,12 @@ class Channel:
             f"   events={self.events}\n"
             f")"
         )
+    def check_for_overlapping_events(self):
+        for i in range(len(self.events) - 1):
+            current_event = self.events[i]
+            next_event = self.events[i + 1]
+            if current_event.end_time > next_event.start_time:
+                raise ValueError(f"Events {current_event} and {next_event} on channel {self.name} overlap.")
 
 class Analog_Channel(Channel):
     def __init__(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10):
@@ -284,14 +290,15 @@ class Sequence:
         return None
     
     def add_event_in_middle(self, parent_start_time: float, parent_channel_name: str, child_events: List[tuple], relative_time: float, reference_time: str, behavior: EventBehavior, channel_name: str) -> Event:
-        parent_event = self.find_event_by_time_and_channel(parent_start_time, parent_channel_name)
+        temp_sequence = copy.deepcopy(self)
+        parent_event = temp_sequence.find_event_by_time_and_channel(parent_start_time, parent_channel_name)
         if parent_event is None:
             raise ValueError(f"Parent event not found for start_time {parent_start_time} and channel {parent_channel_name}")
 
-        new_event = self.add_event(channel_name, behavior, relative_time=relative_time, reference_time=reference_time, parent_event=parent_event)
+        new_event = temp_sequence.add_event(channel_name, behavior, relative_time=relative_time, reference_time=reference_time, parent_event=parent_event)
 
         for child_start_time, child_channel_name in child_events:
-            child_event = self.find_event_by_time_and_channel(child_start_time, child_channel_name)
+            child_event = temp_sequence.find_event_by_time_and_channel(child_start_time, child_channel_name)
             if child_event is None:
                 raise ValueError(f"Child event not found for start_time {child_start_time} and channel {child_channel_name}")
             if child_event.parent != parent_event:
@@ -311,6 +318,21 @@ class Sequence:
             delta = new_start_time - child_event.start_time
             child_event.update_times(delta)
 
+        for channel in temp_sequence.channels:
+            channel.check_for_overlapping_events()
+
+        # Apply the changes to the original sequence if no overlaps are found
+        parent_event = self.find_event_by_time_and_channel(parent_start_time, parent_channel_name)
+        new_event = self.add_event(channel_name, behavior, relative_time=relative_time, reference_time=reference_time, parent_event=parent_event)
+
+        for child_start_time, child_channel_name in child_events:
+            child_event = self.find_event_by_time_and_channel(child_start_time, child_channel_name)
+            parent_event.children.remove(child_event)
+            child_event.parent = new_event
+            new_event.children.append(child_event)
+            delta = (new_event.start_time + child_event.relative_time) - child_event.start_time
+            child_event.update_times(delta)
+
         return new_event
 
     def get_all_events(self) -> List[Event]:
@@ -321,7 +343,8 @@ class Sequence:
             print(f"Event: {event.behavior} on {event.channel.name} at {event.start_time}")
 
     def update_event_absolute_time(self, start_time: float, channel_name: str, new_start_time: float):
-        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        temp_sequence = copy.deepcopy(self)
+        event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
         if event.parent is not None:
@@ -330,10 +353,19 @@ class Sequence:
         delta = new_start_time - event.start_time
         event.update_times(delta)
 
+        for channel in temp_sequence.channels:
+            channel.check_for_overlapping_events()
+
+        # Apply the changes to the original sequence if no overlaps are found
+        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        delta = new_start_time - event.start_time
+        event.update_times(delta)
         self.all_events.sort(key=lambda event: event.start_time)
 
+
     def update_event_relative_time(self, start_time: float, channel_name: str, new_relative_time: float, new_reference_time: Optional[str] = None):
-        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        temp_sequence = copy.deepcopy(self)
+        event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
         if event.parent is None:
@@ -353,14 +385,20 @@ class Sequence:
         event.reference_time = new_reference_time
         event.update_times(delta)
 
+        for channel in temp_sequence.channels:
+            channel.check_for_overlapping_events()
+
+        # Apply the changes to the original sequence if no overlaps are found
+        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        event.update_relative_time(new_relative_time, new_reference_time)
         self.all_events.sort(key=lambda event: event.start_time)
 
     def delete_event(self, start_time: float, channel_name: str):
-        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        temp_sequence = copy.deepcopy(self)
+        event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
 
-        # Handle children reassignment
         if event.parent is None:
             for child in event.children:
                 child.parent = None
@@ -377,21 +415,46 @@ class Sequence:
                     raise ValueError("Invalid reference_time. Use 'start' or 'end'.")
                 delta = new_start_time - child.start_time
                 child.update_times(delta)
-        
-        
-        # Remove the event from channel and sequence
-        parent.children.remove(event)    
+                
         event.children.clear()
+        
+        event.channel.events.remove(event)
+        temp_sequence.all_events.remove(event)
+        
+        for channel in temp_sequence.channels:
+            channel.check_for_overlapping_events()
+
+        # Apply the changes to the original sequence if no overlaps are found
+        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        if event.parent is None:
+            for child in event.children:
+                child.parent = None
+        else:
+            parent = event.parent
+            for child in event.children:
+                child.parent = parent
+                parent.children.append(child)
+                if child.reference_time == 'start':
+                    new_start_time = parent.start_time + child.relative_time
+                elif child.reference_time == 'end':
+                    new_start_time = parent.end_time + child.relative_time
+                else:
+                    raise ValueError("Invalid reference_time. Use 'start' or 'end'.")
+                delta = new_start_time - child.start_time
+                child.update_times(delta)
+                
+        event.children.clear()
+        
         event.channel.events.remove(event)
         self.all_events.remove(event)
         
-        # Re-sort all_events to maintain correct order
         self.all_events.sort(key=lambda event: event.start_time)
 
 
 
     def edit_behavior(self, start_time: float, channel_name: str, **kwargs):
-        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        temp_sequence = copy.deepcopy(self)
+        event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
         
@@ -407,7 +470,6 @@ class Sequence:
             
             if 'ramp_type' in kwargs:
                 event.behavior.ramp_type = kwargs['ramp_type']
-                # Update the function based on ramp type
                 if event.behavior.ramp_type == RampType.LINEAR:
                     event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration)
                 elif event.behavior.ramp_type == RampType.QUADRATIC:
@@ -425,15 +487,12 @@ class Sequence:
             if 'end_value' in kwargs:
                 event.behavior.end_value = kwargs['end_value']
 
-            # Update end_time based on new duration
             event.end_time = event.start_time + event.behavior.duration
 
-            # Check for conflicts with other events
             for other_event in event.channel.events:
                 if other_event is not event and not (event.end_time < other_event.start_time or event.start_time > other_event.end_time):
                     raise ValueError(f"Edited event conflicts with existing event {other_event.behavior} from {other_event.start_time} to {other_event.end_time} on channel {event.channel.name}")
 
-            # Update children if duration changed
             if duration_change != 0:
                 for child in event.children:
                     if child.reference_time == 'start':
@@ -441,9 +500,54 @@ class Sequence:
                     elif child.reference_time == 'end':
                         child.update_times(duration_change)
 
-        # Re-sort events to maintain order
-        self.all_events.sort(key=lambda event: event.start_time)
+        for channel in temp_sequence.channels:
+            channel.check_for_overlapping_events()
 
+        # Apply the changes to the original sequence if no overlaps are found
+        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        if isinstance(event.behavior, Jump):
+            if 'target_value' in kwargs:
+                event.behavior.target_value = kwargs['target_value']
+        elif isinstance(event.behavior, Ramp):
+            duration_change = 0
+            if 'duration' in kwargs:
+                new_duration = kwargs['duration']
+                duration_change = new_duration - event.behavior.duration
+                event.behavior.duration = new_duration
+            
+            if 'ramp_type' in kwargs:
+                event.behavior.ramp_type = kwargs['ramp_type']
+                if event.behavior.ramp_type == RampType.LINEAR:
+                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration)
+                elif event.behavior.ramp_type == RampType.QUADRATIC:
+                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration) ** 2
+                elif event.behavior.ramp_type == RampType.EXPONENTIAL:
+                    event.behavior.func = lambda t: event.behavior.start_value * (event.behavior.end_value / event.behavior.start_value) ** (t / event.behavior.duration)
+                elif event.behavior.ramp_type == RampType.LOGARITHMIC:
+                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (math.log10(t + 1) / math.log10(event.behavior.duration + 1))
+                elif event.behavior.ramp_type == RampType.GENERIC and 'func' in kwargs:
+                    event.behavior.func = kwargs['func']
+            
+            if 'start_value' in kwargs:
+                event.behavior.start_value = kwargs['start_value']
+            
+            if 'end_value' in kwargs:
+                event.behavior.end_value = kwargs['end_value']
+
+            event.end_time = event.start_time + event.behavior.duration
+
+            for other_event in event.channel.events:
+                if other_event is not event and not (event.end_time < other_event.start_time or event.start_time > other_event.end_time):
+                    raise ValueError(f"Edited event conflicts with existing event {other_event.behavior} from {other_event.start_time} to {other_event.end_time} on channel {event.channel.name}")
+
+            if duration_change != 0:
+                for child in event.children:
+                    if child.reference_time == 'start':
+                        child.update_times(duration_change)
+                    elif child.reference_time == 'end':
+                        child.update_times(duration_change)
+
+        self.all_events.sort(key=lambda event: event.start_time)
 
 
     def print_event_tree(self, level: int = 0, indent: str = "    "):
@@ -907,7 +1011,7 @@ if __name__ == '__main__':
     sequence.plot_with_event_tree()
 
     # Edit behavior
-    sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
+    sequence.update_event_relative_time(start_time=16, channel_name="Analog1",new_relative_time=9)
     
     sequence.print_event_tree()
     sequence.plot_with_event_tree()
