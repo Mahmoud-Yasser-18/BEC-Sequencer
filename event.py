@@ -1011,7 +1011,9 @@ if __name__ == '__main__':
     sequence.plot_with_event_tree()
 
     # Edit behavior
-    sequence.update_event_relative_time(start_time=16, channel_name="Analog1",new_relative_time=9)
+    sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
     
     sequence.print_event_tree()
     sequence.plot_with_event_tree()
+    sequence.to_json("seq_data.json")
+
