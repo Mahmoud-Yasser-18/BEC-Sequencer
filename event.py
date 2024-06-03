@@ -196,12 +196,7 @@ class Event:
                 else:
                     raise ValueError(f"Events on channel {channel.name} overlap with existing event {event.behavior} from {event.start_time} to {event.end_time}.")
 
-    def reassign_children(self, new_parent: 'Event', delta: float):
-        for child in self.children:
-            child.parent = new_parent
-            child.update_times(delta)
-            new_parent.children.append(child)
-        self.children = []
+
 
     def __gt__(self, other: 'Event') -> bool:
         return self.start_time > other.start_time
