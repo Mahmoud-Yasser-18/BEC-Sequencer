@@ -388,6 +388,64 @@ class Sequence:
         # Re-sort all_events to maintain correct order
         self.all_events.sort(key=lambda event: event.start_time)
 
+
+
+    def edit_behavior(self, start_time: float, channel_name: str, **kwargs):
+        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        if event is None:
+            raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
+        
+        if isinstance(event.behavior, Jump):
+            if 'target_value' in kwargs:
+                event.behavior.target_value = kwargs['target_value']
+        elif isinstance(event.behavior, Ramp):
+            duration_change = 0
+            if 'duration' in kwargs:
+                new_duration = kwargs['duration']
+                duration_change = new_duration - event.behavior.duration
+                event.behavior.duration = new_duration
+            
+            if 'ramp_type' in kwargs:
+                event.behavior.ramp_type = kwargs['ramp_type']
+                # Update the function based on ramp type
+                if event.behavior.ramp_type == RampType.LINEAR:
+                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration)
+                elif event.behavior.ramp_type == RampType.QUADRATIC:
+                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration) ** 2
+                elif event.behavior.ramp_type == RampType.EXPONENTIAL:
+                    event.behavior.func = lambda t: event.behavior.start_value * (event.behavior.end_value / event.behavior.start_value) ** (t / event.behavior.duration)
+                elif event.behavior.ramp_type == RampType.LOGARITHMIC:
+                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (math.log10(t + 1) / math.log10(event.behavior.duration + 1))
+                elif event.behavior.ramp_type == RampType.GENERIC and 'func' in kwargs:
+                    event.behavior.func = kwargs['func']
+            
+            if 'start_value' in kwargs:
+                event.behavior.start_value = kwargs['start_value']
+            
+            if 'end_value' in kwargs:
+                event.behavior.end_value = kwargs['end_value']
+
+            # Update end_time based on new duration
+            event.end_time = event.start_time + event.behavior.duration
+
+            # Check for conflicts with other events
+            for other_event in event.channel.events:
+                if other_event is not event and not (event.end_time < other_event.start_time or event.start_time > other_event.end_time):
+                    raise ValueError(f"Edited event conflicts with existing event {other_event.behavior} from {other_event.start_time} to {other_event.end_time} on channel {event.channel.name}")
+
+            # Update children if duration changed
+            if duration_change != 0:
+                for child in event.children:
+                    if child.reference_time == 'start':
+                        child.update_times(duration_change)
+                    elif child.reference_time == 'end':
+                        child.update_times(duration_change)
+
+        # Re-sort events to maintain order
+        self.all_events.sort(key=lambda event: event.start_time)
+
+
+
     def print_event_tree(self, level: int = 0, indent: str = "    "):
         root_events = [event for event in self.all_events if event.parent is None]
         for root_event in root_events:
@@ -832,9 +890,6 @@ class Sequence:
         plt.show()
 
 
-
-
-
 if __name__ == '__main__':
     sequence = Sequence()
     analog_channel = sequence.add_analog_channel("Analog1", 0, 0)
@@ -846,23 +901,13 @@ if __name__ == '__main__':
     event3 = sequence.add_event("Analog1", Jump(0.0), relative_time=5, reference_time="end", parent_event=event2)
     event4 = sequence.add_event("Digital1", Jump(1), relative_time=-10, reference_time="end", parent_event=event2)
     event5 = sequence.add_event("Digital1", Jump(0), relative_time=2, reference_time="start", parent_event=event4)
-    event6 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10),relative_time=11, reference_time="end", parent_event=event4)
-    sequence.print_event_tree()
-    sequence.plot_event_tree()
-    sequence.plot_all()
-    sequence.plot_with_event_tree()
-    # sequence.delete_event
-    # (start_time=20,channel_name="Analog1")
-    # sequence.delete_event(start_time=5,channel_name="Digital1")
-    # sequence.delete_event(start_time=16,channel_name="Analog1")
-    # sequence.print_event_tree()
-    # sequence.plot_event_tree()
-    sequence.add_event_in_middle(parent_channel_name="Digital1",parent_start_time=5,child_events=[(7,"Digital1")],relative_time=3,reference_time="end",behavior=Jump(5),channel_name="Digital1")
-    sequence.print_event_tree()
-    sequence.plot_event_tree()
-    sequence.plot_all()
-    sequence.plot_with_event_tree()
+    event6 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10), relative_time=11, reference_time="end", parent_event=event4)
     
+    sequence.print_event_tree()
+    sequence.plot_with_event_tree()
 
-
-
+    # Edit behavior
+    sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
+    
+    sequence.print_event_tree()
+    sequence.plot_with_event_tree()
