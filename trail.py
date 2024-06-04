@@ -1,35 +1,10 @@
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,  QLabel,
-                             QScrollArea, QAction, QVBoxLayout, QHBoxLayout, QFileDialog)
-from PyQt5.QtWidgets import (
-    QApplication, QMainWindow, QMenu, QAction, QFormLayout, QDialog,
-    QComboBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QPushButton, 
-    QScrollArea, QWidget, QFileDialog
-)
-
-from PyQt5.QtCore import Qt, QRect
-from PyQt5.QtGui import QPainter, QPen
-from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget, 
+                             QScrollArea, QAction, QVBoxLayout, QHBoxLayout, 
+                             QFileDialog, QFormLayout, QDialog, QComboBox, 
+                             QLineEdit, QDialogButtonBox, QMenu)
+from PyQt5.QtCore import Qt, QRect, pyqtSignal
+from PyQt5.QtGui import QPainter, QPen, QIcon
 from event import Sequence, Analog_Channel, Digital_Channel, Event, Jump, Ramp, RampType
-
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
-
-class ChannelLabelWidget(QWidget):
-    def __init__(self, sequence, parent=None):
-        super().__init__(parent)
-        self.sequence = sequence
-        self.initUI()
-    
-    def initUI(self):
-        layout = QVBoxLayout(self)
-        for channel in self.sequence.channels:
-            label = QLabel(channel.name, self)
-            label.setFixedHeight(50)
-            layout.addWidget(label)
-        self.setLayout(layout)
-
-
-
 
 class ChannelDialog(QDialog):
     def __init__(self, parent=None):
@@ -121,9 +96,6 @@ class TimeAxisWidget(QWidget):
             painter.drawLine(x, 20, x, 30)
             painter.drawText(QRect(x - 10, 30, 20, 20), Qt.AlignCenter, str(time))
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QMenu, QApplication
-from PyQt5.QtCore import Qt
-import json
 class AddEventDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -133,9 +105,6 @@ class AddEventDialog(QDialog):
         self.behavior_type = QComboBox(self)
         self.behavior_type.addItems(["Jump", "Ramp"])
         self.layout.addRow("Behavior Type:", self.behavior_type)
-        
-        self.start_time = QLineEdit(self)
-        self.layout.addRow("Start Time:", self.start_time)
         
         self.duration = QLineEdit(self)
         self.layout.addRow("Duration (for Ramp):", self.duration)
@@ -154,7 +123,6 @@ class AddEventDialog(QDialog):
     def get_data(self):
         return {
             "behavior_type": self.behavior_type.currentText(),
-            "start_time": float(self.start_time.text()),
             "duration": float(self.duration.text()) if self.duration.text() else None,
             "relative_time": float(self.relative_time.text()) if self.relative_time.text() else None,
             "reference_time": self.reference_time.text()
@@ -197,11 +165,11 @@ class EventButton(QPushButton):
         dialog = AddEventDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             data = dialog.get_data()
-            behavior = Jump(data["start_time"]) if data["behavior_type"] == "Jump" else Ramp(data["duration"])
+            behavior = Jump(1)
+            print(data)
             child_event = self.sequence.add_event(
                 channel_name=self.event.channel.name,
                 behavior=behavior,
-                start_time=data["start_time"],
                 relative_time=data["relative_time"],
                 reference_time=data["reference_time"],
                 parent_event=self.event
@@ -209,19 +177,20 @@ class EventButton(QPushButton):
             self.parent().parent().refreshUI()
 
     def delete_event(self):
-        self.sequence.delete_event(self.event)
+        self.sequence.delete_event(self.event.start_time,self.event.channel.name)
         self.parent().parent().refreshUI()
 
+
+
 class Events_Viewer_Widget(QWidget):
-    def __init__(self, sequence, scale_factor=10, parent=None):
+    def __init__(self, sequence, scale_factor=100, parent=None):
         super().__init__(parent)
         self.sequence = sequence
         self.scale_factor = scale_factor
         self.initUI()
 
     def initUI(self):
-        layout = QVBoxLayout(self)
-        self.setLayout(layout)
+        self.setLayout(QVBoxLayout())  
         self.refreshUI()
 
     def refreshUI(self):
@@ -242,14 +211,9 @@ class Events_Viewer_Widget(QWidget):
         time_axis = TimeAxisWidget(max_time, self.scale_factor, self)
         layout.addWidget(time_axis)
         
-        for channel in self.sequence.channels:
-            channel_layout = QHBoxLayout()
-            channel_label = QLabel(channel.name, self)
-            channel_layout.addWidget(channel_label)
-            
+        for i, channel in enumerate(self.sequence.channels):
             buttons_container = QWidget(self)
             buttons_container.setFixedHeight(50)
-            buttons_layout = QHBoxLayout(buttons_container)
             previous_end_time = 0.0
             for event in channel.events:
                 start_time = event.start_time
@@ -258,19 +222,15 @@ class Events_Viewer_Widget(QWidget):
                     gap_button = QPushButton('gap', buttons_container)
                     gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
                     gap_button.setEnabled(False)
-                    buttons_layout.addWidget(gap_button)
                 button = EventButton(event, self.scale_factor, self.sequence, buttons_container)
-                buttons_layout.addWidget(button)
                 previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10/self.scale_factor)
             
-            channel_layout.addWidget(buttons_container)
-            layout.addLayout(channel_layout)
-        
+            layout.addWidget(buttons_container)
         self.setLayout(layout)
 
 
 
-class Events_Scroller(QMainWindow):
+class Events_Scroller(QWidget):
     def __init__(self, scale_factor=10):
         super().__init__()
         self.sequence = None
@@ -279,35 +239,80 @@ class Events_Scroller(QMainWindow):
     def initUI(self, scale_factor):
         self.scale_factor = scale_factor
         self.setWindowTitle('Events Scroller')
-        self.setGeometry(100, 100, 800, 600)
-        
-        load_button = QPushButton('Load JSON', self)
-        load_button.clicked.connect(self.load_json)
+        self.setGeometry(500, 500, 500,500)
         
         self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
         
-        layout = QVBoxLayout()
-        layout.addWidget(load_button)
+        layout = QHBoxLayout()
+
         layout.addWidget(self.scroll_area)
         
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
+        self.setLayout(layout)
 
+class ScaleFactorDialog(QDialog):
+    def __init__(self, current_scale_factor, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Set Scale Factor')
+        self.layout = QFormLayout(self)
+        
+        self.scale_factor_edit = QLineEdit(self)
+        self.scale_factor_edit.setText(str(current_scale_factor))
+        self.layout.addRow('Scale Factor:', self.scale_factor_edit)
+        
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttons)
+    
+    def get_scale_factor(self):
+        return int(self.scale_factor_edit.text())
+
+class Rampagedwell(QMainWindow):
+    def __init__(self, scale_factor=10):
+        super().__init__()
+        self.scale_factor = scale_factor
+        self.initUI()
+    
+    def initUI(self):
+        self.setWindowTitle('Main Window')
+        self.setGeometry(800, 800, 800, 800)
+        self.custom_widget = Events_Scroller(self.scale_factor)
+        self.setCentralWidget(self.custom_widget)
+        
+        # Create the menu bar
+        menubar = self.menuBar()
+        file_menu = menubar.addMenu('File')
+        
+        # Add Load JSON action
+        load_action = QAction('Load JSON', self)
+        load_action.triggered.connect(self.load_json)
+        file_menu.addAction(load_action)
+
+        # Add Set Scale Factor action
+        scale_factor_action = QAction('Set Scale Factor', self)
+        scale_factor_action.triggered.connect(self.set_scale_factor)
+        file_menu.addAction(scale_factor_action)
+    
     def load_json(self):
         options = QFileDialog.Options()
         file_name, _ = QFileDialog.getOpenFileName(self, "Load JSON File", "", "JSON Files (*.json);;All Files (*)", options=options)
         if file_name:
-            with open(file_name, 'r') as file:
-                self.sequence = Sequence.from_json(file_name)
-                custom_widget = Events_Viewer_Widget(self.sequence, self.scale_factor, self)
-                self.scroll_area.setWidget(custom_widget)
-
+            self.custom_widget.sequence = Sequence.from_json(file_name)
+            custom_widget = Events_Viewer_Widget(self.custom_widget.sequence, self.scale_factor, self)
+            self.custom_widget.scroll_area.setWidget(custom_widget)
+    
+    def set_scale_factor(self):
+        dialog = ScaleFactorDialog(self.scale_factor, self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.scale_factor = dialog.get_scale_factor()
+            if self.custom_widget.sequence:
+                custom_widget = Events_Viewer_Widget(self.custom_widget.sequence, self.scale_factor, self)
+                self.custom_widget.scroll_area.setWidget(custom_widget)
 
 if __name__ == '__main__':
     scale_factor = 50
     app = QApplication([])
-    window = Events_Scroller(scale_factor)
+    window = Rampagedwell()
     window.show()
     app.exec_()
