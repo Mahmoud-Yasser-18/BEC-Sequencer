@@ -993,6 +993,12 @@ class Sequence:
         plt.tight_layout()
         plt.show()
 
+class SequenceManager:
+    def __init__(self,) -> None:
+        self.main_sequence = Sequence()
+
+
+
 
 if __name__ == '__main__':
     sequence = Sequence()
@@ -1008,12 +1014,11 @@ if __name__ == '__main__':
     event6 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10), relative_time=11, reference_time="end", parent_event=event4)
     
     sequence.print_event_tree()
-    sequence.plot_with_event_tree()
+    # sequence.plot_with_event_tree()
 
-    # Edit behavior
+    # # Edit behavior
     sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
     
     sequence.print_event_tree()
-    sequence.plot_with_event_tree()
-    sequence.to_json("seq_data.json")
-
+    # sequence.plot_with_event_tree()
+    # sequence.to_json("seq_data.json")
