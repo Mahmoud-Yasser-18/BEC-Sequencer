@@ -761,7 +761,7 @@ class Sequence:
                     writer.writerow([event.channel.name, event.start_time, event.end_time, 'Ramp', None, event.behavior.duration, event.behavior.ramp_type.value, event.behavior.start_value, event.behavior.end_value])
 
     @staticmethod
-    def from_json(json_input: Optional[str] = None, file_name: Optional[str] = None) -> 'Sequence':
+    def from_json(file_name: Optional[str] = None,json_input: Optional[str] = None) -> 'Sequence':
         if json_input is not None and file_name is not None:
             raise ValueError("Provide either a JSON string or a file name, not both.")
 
