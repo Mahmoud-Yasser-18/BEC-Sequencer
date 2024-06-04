@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget, 
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,  QLabel,
                              QScrollArea, QAction, QVBoxLayout, QHBoxLayout, 
                              QFileDialog, QFormLayout, QDialog, QComboBox, 
                              QLineEdit, QDialogButtonBox, QMenu)
@@ -180,6 +180,26 @@ class EventButton(QPushButton):
         self.sequence.delete_event(self.event.start_time,self.event.channel.name)
         self.parent().parent().refreshUI()
 
+class ChannelLabelWidget(QWidget):
+    def __init__(self, channels, parent=None):
+        super().__init__(parent)
+        self.channels = channels
+        self.initUI()
+    
+    def initUI(self):
+        layout = QVBoxLayout(self)
+        label = QLabel(" ", self)
+        label.setFixedHeight(50)
+        label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(label)
+        for channel in self.channels:
+            label = QLabel(channel.name, self)
+            label.setFixedHeight(50)
+            label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(label)
+        self.setFixedSize(100, len(self.channels) * 100)
+        self.setLayout(layout)
+        
 
 
 class Events_Viewer_Widget(QWidget):
@@ -239,46 +259,68 @@ class Events_Scroller(QWidget):
     def initUI(self, scale_factor):
         self.scale_factor = scale_factor
         self.setWindowTitle('Events Scroller')
-        self.setGeometry(500, 500, 500,500)
-        
+
+        self.setFixedSize(1400,950)
+
         self.scroll_area = QScrollArea(self)
-        self.scroll_area.setWidgetResizable(True)
+        # self.scroll_area.setWidgetResizable(True)
         
-        layout = QHBoxLayout()
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
+        
+        self.h_layout = QHBoxLayout()
+        self.main_layout.addWidget(self.scroll_area)
 
-        layout.addWidget(self.scroll_area)
-        
-        self.setLayout(layout)
-
-class ScaleFactorDialog(QDialog):
-    def __init__(self, current_scale_factor, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle('Set Scale Factor')
-        self.layout = QFormLayout(self)
-        
-        self.scale_factor_edit = QLineEdit(self)
-        self.scale_factor_edit.setText(str(current_scale_factor))
-        self.layout.addRow('Scale Factor:', self.scale_factor_edit)
-        
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
-        self.layout.addWidget(self.buttons)
+    def load_json(self):
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(self, "Load JSON File", "", "JSON Files (*.json);;All Files (*)", options=options)
+        if file_name:
+            self.sequence = Sequence.from_json(file_name)
+            self.refreshUI()
     
-    def get_scale_factor(self):
-        return int(self.scale_factor_edit.text())
+    def refreshUI(self):
+        if self.sequence:
+            for i in reversed(range(self.h_layout.count())):
+                widget_to_remove = self.h_layout.itemAt(i).widget()
+                self.h_layout.removeWidget(widget_to_remove)
+                widget_to_remove.setParent(None)
+            
+            label_widget = ChannelLabelWidget(self.sequence.channels, self)
+            self.h_layout.addWidget(label_widget)
+            
+            viewer_widget = Events_Viewer_Widget(self.sequence, self.scale_factor, self)
+            self.h_layout.addWidget(viewer_widget)
+            
+            container = QWidget()
+            container.setLayout(self.h_layout)
+            self.scroll_area.setWidget(container)
+
+
+
 
 class Rampagedwell(QMainWindow):
-    def __init__(self, scale_factor=10):
+    def __init__(self, scale_factor=50):
         super().__init__()
         self.scale_factor = scale_factor
         self.initUI()
     
     def initUI(self):
         self.setWindowTitle('Main Window')
-        self.setGeometry(800, 800, 800, 800)
-        self.custom_widget = Events_Scroller(self.scale_factor)
-        self.setCentralWidget(self.custom_widget)
+        self.setGeometry(0,0, 800, 800)
+        self.Events_Scroller_widget = Events_Scroller(self.scale_factor)
+        self.setCentralWidget(self.Events_Scroller_widget)
+
+class Rampagedwell(QMainWindow):
+    def __init__(self, scale_factor=50):
+        super().__init__()
+        self.scale_factor = scale_factor
+        self.initUI()
+    
+    def initUI(self):
+        self.setWindowTitle('Main Window')
+        self.setGeometry(0,0, 800, 800)
+        self.Events_Scroller_widget = Events_Scroller(self.scale_factor)
+        self.setCentralWidget(self.Events_Scroller_widget)
         
         # Create the menu bar
         menubar = self.menuBar()
@@ -295,20 +337,14 @@ class Rampagedwell(QMainWindow):
         file_menu.addAction(scale_factor_action)
     
     def load_json(self):
-        options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(self, "Load JSON File", "", "JSON Files (*.json);;All Files (*)", options=options)
-        if file_name:
-            self.custom_widget.sequence = Sequence.from_json(file_name)
-            custom_widget = Events_Viewer_Widget(self.custom_widget.sequence, self.scale_factor, self)
-            self.custom_widget.scroll_area.setWidget(custom_widget)
+        self.Events_Scroller_widget.load_json()
     
     def set_scale_factor(self):
         dialog = ScaleFactorDialog(self.scale_factor, self)
         if dialog.exec_() == QDialog.Accepted:
             self.scale_factor = dialog.get_scale_factor()
-            if self.custom_widget.sequence:
-                custom_widget = Events_Viewer_Widget(self.custom_widget.sequence, self.scale_factor, self)
-                self.custom_widget.scroll_area.setWidget(custom_widget)
+            self.Events_Scroller_widget.scale_factor = self.scale_factor
+            self.Events_Scroller_widget.refreshUI()
 
 if __name__ == '__main__':
     scale_factor = 50
