@@ -94,7 +94,7 @@ class BaseEventDialog(QDialog):
             jump_target_value = self.target_value_input.text()
             behavior_params = {
                 'behavior_type': behavior_type,
-                'jump_target_value': float(jump_target_value),
+                'jump_target_value': jump_target_value,
                 'ramp_duration': None,
                 'ramp_type': None,
                 'start_value': None,
@@ -108,10 +108,10 @@ class BaseEventDialog(QDialog):
             behavior_params = {
                 'behavior_type': behavior_type,
                 'jump_target_value': None,
-                'ramp_duration': float(ramp_duration),
+                'ramp_duration': ramp_duration,
                 'ramp_type': ramp_type,
-                'start_value': float (start_value),
-                'end_value': float (end_value)
+                'start_value': start_value,
+                'end_value': end_value
             }
         
         return behavior_params
@@ -133,7 +133,7 @@ class RootEventDialog(BaseEventDialog):
         data = {
             'channel': self.channel_combo.currentText(),
             'behavior': self.get_behavior(),
-            'start_time': float(self.start_time_input.text()),
+            'start_time': self.start_time_input.text(),
             'relative_time': None,
             'reference_time': None
         }
@@ -164,7 +164,7 @@ class ChildEventDialog(BaseEventDialog):
             'channel': self.channel_combo.currentText(),
             'behavior': self.get_behavior(),
             'start_time': None,
-            'relative_time': float(self.relative_time_input.text()),
+            'relative_time': self.relative_time_input.text(),
             'reference_time': self.reference_time_combo.currentText()
         }
         return data
