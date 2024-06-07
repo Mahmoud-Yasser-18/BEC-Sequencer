@@ -4,75 +4,9 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,  Q
                              QLineEdit, QDialogButtonBox, QMenu)
 from PyQt5.QtCore import Qt, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QIcon
-from event import Sequence, Analog_Channel, Digital_Channel, Event, Jump, Ramp, RampType
+from sequencer.event import Sequence, Analog_Channel, Digital_Channel, Event, Jump, Ramp, RampType,EventBehavior
+from sequencer.Dialogs import channel_dialog, event_dialog    
 
-class ChannelDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle('Add Channel')
-        self.layout = QFormLayout(self)
-
-        self.type_combo = QComboBox(self)
-        self.type_combo.addItems(['Analog', 'Digital'])
-        self.type_combo.currentIndexChanged.connect(self.update_form)
-
-        self.name_edit = QLineEdit(self)
-        self.card_number_edit = QLineEdit(self)
-        self.channel_number_edit = QLineEdit(self)
-        self.reset_value_edit = QLineEdit(self)
-
-        self.layout.addRow('Type:', self.type_combo)
-        self.layout.addRow('Name:', self.name_edit)
-        self.layout.addRow('Card Number:', self.card_number_edit)
-        self.layout.addRow('Channel Number:', self.channel_number_edit)
-        self.layout.addRow('Reset Value:', self.reset_value_edit)
-
-        # Analog-specific fields
-        self.max_voltage_edit = QLineEdit(self)
-        self.min_voltage_edit = QLineEdit(self)
-        self.layout.addRow('Max Voltage:', self.max_voltage_edit)
-        self.layout.addRow('Min Voltage:', self.min_voltage_edit)
-
-        # Digital-specific fields
-        self.card_id_edit = QLineEdit(self)
-        self.bitpos_edit = QLineEdit(self)
-        self.layout.addRow('Card ID:', self.card_id_edit)
-        self.layout.addRow('Bit Position:', self.bitpos_edit)
-
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
-        self.layout.addWidget(self.buttons)
-        self.update_form(self.type_combo.currentIndex())
-
-    def update_form(self, index):
-        if index == 0:  # Analog
-            self.max_voltage_edit.show()
-            self.min_voltage_edit.show()
-            self.card_id_edit.hide()
-            self.bitpos_edit.hide()
-        elif index == 1:  # Digital
-            self.max_voltage_edit.hide()
-            self.min_voltage_edit.hide()
-            self.card_id_edit.show()
-            self.bitpos_edit.show()
-
-    def get_data(self):
-        data = {
-            'type': self.type_combo.currentText(),
-            'name': self.name_edit.text(),
-            'card_number': int(self.card_number_edit.text()),
-            'channel_number': int(self.channel_number_edit.text()),
-            'reset_value': float(self.reset_value_edit.text())
-        }
-        if data['type'] == 'Analog':
-            data['max_voltage'] = float(self.max_voltage_edit.text())
-            data['min_voltage'] = float(self.min_voltage_edit.text())
-        elif data['type'] == 'Digital':
-            data['card_id'] = int(self.card_id_edit.text())
-            data['bitpos'] = int(self.bitpos_edit.text())
-        return data
-    
 
 class TimeAxisWidget(QWidget):
     def __init__(self, max_time, scale_factor=10, parent=None):
