@@ -1,5 +1,10 @@
+# Filename: synced_table_widget.py
+
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QListWidget, QScrollBar
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem, QListWidget, QScrollBar, QSizePolicy
+)
+from PyQt5.QtCore import Qt
 
 class SyncedTableWidget(QWidget):
     def __init__(self, channels, data):
@@ -14,6 +19,12 @@ class SyncedTableWidget(QWidget):
         for channel in channels:
             self.channel_list.addItem(channel)
 
+        # Calculate the width for the channel list based on the longest channel name
+        longest_channel_name = max(channels, key=len)
+        font_metrics = self.channel_list.fontMetrics()
+        channel_width = font_metrics.horizontalAdvance(longest_channel_name) + 50  # Adding some padding
+        self.channel_list.setFixedWidth(channel_width)
+
         # Create the values table
         self.table = QTableWidget(len(channels), len(data[0]))
         self.table.setHorizontalHeaderLabels([f'Time {i}' for i in range(len(data[0]))])
@@ -22,6 +33,10 @@ class SyncedTableWidget(QWidget):
         for i, channel_data in enumerate(data):
             for j, value in enumerate(channel_data):
                 self.table.setItem(i, j, QTableWidgetItem(str(value)))
+
+        # Ensure both widgets have the same height
+        self.channel_list.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         # Synchronize the vertical scroll bars relatively
         self.scroll_bar1 = self.channel_list.verticalScrollBar()
@@ -38,11 +53,9 @@ class SyncedTableWidget(QWidget):
     def sync_scroll(self, value):
         sender = self.sender()
         if sender == self.scroll_bar1:
-            # Calculate the relative scroll position
             proportion = value / self.scroll_bar1.maximum() if self.scroll_bar1.maximum() != 0 else 0
             self.scroll_bar2.setValue(int(proportion * self.scroll_bar2.maximum()))
         else:
-            # Calculate the relative scroll position
             proportion = value / self.scroll_bar2.maximum() if self.scroll_bar2.maximum() != 0 else 0
             self.scroll_bar1.setValue(int(proportion * self.scroll_bar1.maximum()))
 
