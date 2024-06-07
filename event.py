@@ -1018,7 +1018,9 @@ if __name__ == '__main__':
 
     # # Edit behavior
     sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
-    
+    sequence.to_csv("mohid.csv")
     sequence.print_event_tree()
-    # sequence.plot_with_event_tree()
+    sequence.plot_with_event_tree()
+    sequence.plot()
+    sequence.plot(["Analog1"])
     # sequence.to_json("seq_data.json")

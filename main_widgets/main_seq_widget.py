@@ -260,7 +260,7 @@ class Events_Scroller(QWidget):
         self.scale_factor = scale_factor
         self.setWindowTitle('Events Scroller')
 
-        self.setFixedSize(1400,950)
+        self.setFixedSize(500,500)
 
         self.scroll_area = QScrollArea(self)
         # self.scroll_area.setWidgetResizable(True)
@@ -318,7 +318,7 @@ class Rampagedwell(QMainWindow):
     
     def initUI(self):
         self.setWindowTitle('Main Window')
-        self.setGeometry(0,0, 800, 800)
+        self.setGeometry(0,0, 400,400)
         self.Events_Scroller_widget = Events_Scroller(self.scale_factor)
         self.setCentralWidget(self.Events_Scroller_widget)
         
