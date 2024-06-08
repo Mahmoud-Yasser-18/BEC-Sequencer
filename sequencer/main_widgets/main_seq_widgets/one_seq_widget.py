@@ -63,36 +63,41 @@ class ChannelLabelWidget(QWidget):
         self.channel_right_clicked.emit(self.mapToGlobal(position))
 
 
-
 class EventButton(QPushButton):
-    def __init__(self, event: any, scale_factor: float, sequence: Sequence, parent: Optional[QWidget] = None):
+    addChildEventSignal = pyqtSignal(object)
+    deleteEventSignal = pyqtSignal(object)
+
+    def __init__(self, event, scale_factor, sequence, parent=None):
         super().__init__(parent)
         self.event = event
         self.scale_factor = scale_factor
         self.sequence = sequence
         self.initUI()
 
-    def initUI(self) -> None:
-        self.set_button_geometry()
-        self.set_button_text()
-
-    def set_button_geometry(self) -> None:
-        start_x = int(self.event.start_time * self.scale_factor)
+    def initUI(self):
         if isinstance(self.event.behavior, Ramp):
-            width = int(self.event.behavior.duration * self.scale_factor)
-            self.setGeometry(start_x, 0, width, 50)
-        elif isinstance(self.event.behavior, Jump):
-            self.setGeometry(start_x, 0, 10, 50)
-        else:
-            self.setGeometry(start_x, 0, 50, 50)
-
-    def set_button_text(self) -> None:
-        if isinstance(self.event.behavior, Ramp):
+            duration = self.event.behavior.duration
+            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, int(duration * self.scale_factor), 50)
             self.setText(str(self.event.start_time))
         elif isinstance(self.event.behavior, Jump):
+            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
             self.setText('J')
         else:
-            self.setText('')
+            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 50, 50)
+
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+    def show_context_menu(self, pos):
+        context_menu = QMenu(self)
+        add_child_action = context_menu.addAction("Add Child Event")
+        delete_action = context_menu.addAction("Delete Event")
+
+        action = context_menu.exec_(self.mapToGlobal(pos))
+        if action == add_child_action:
+            self.addChildEventSignal.emit(self.event)
+        elif action == delete_action:
+            self.deleteEventSignal.emit(self.event)
 
 
 class TimeAxisWidget(QWidget):
@@ -137,11 +142,11 @@ class EventsViewerWidget(QWidget):
         scroll_area.setWidgetResizable(True)
 
         container_widget = QWidget()
-        container_layout = QVBoxLayout(container_widget)
+        self.container_layout = QVBoxLayout(container_widget)
 
-        self.refreshUI(container_layout)
+        self.refreshUI(self.container_layout)
 
-        container_widget.setLayout(container_layout)
+        container_widget.setLayout(self.container_layout)
         scroll_area.setWidget(container_widget)
         return scroll_area
 
@@ -181,13 +186,43 @@ class EventsViewerWidget(QWidget):
                 gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
                 gap_button.setEnabled(False)
             button = EventButton(event, self.scale_factor, self.sequence, buttons_container)
+            button.addChildEventSignal.connect(self.add_child_event)
+            button.deleteEventSignal.connect(self.delete_event)
+
             previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10/self.scale_factor)
         
         return buttons_container
+    def add_child_event(self, parent_event):
+        dialog = ChildEventDialog([ch.name for ch in self.sequence.channels])
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            behavior = data['behavior']  # Replace this with actual logic to determine the behavior
+            print( behavior['behavior_type'])
+            if behavior['behavior_type'] == 'Jump':
+                child_event = self.sequence.add_event(
+                    channel_name=data['channel'],
+                    behavior=Jump(data['jump_target_value']),
+                    relative_time=float(data["relative_time"]),
+                    reference_time=data["reference_time"],
+                    parent_event=parent_event
+                )
+            else:
+                child_event = self.sequence.add_event(
+                    channel_name=data['channel'],
+                    behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
+                    relative_time=float(data["relative_time"]),
+                    reference_time=data["reference_time"],
+                    parent_event=parent_event
+                )
+            self.refreshUI(self.container_layout)
+
+    def delete_event(self, event):
+        self.sequence.delete_event(event.start_time, event.channel.name)
+        self.refreshUI(self.container_layout)
 
 
 class SyncedTableWidget(QWidget):
-    def __init__(self, channels: List[str], data: List[List[int]], scale_factor: float = 100.0):
+    def __init__(self, scale_factor: float = 100.0):
         super().__init__()
         self.scale_factor=scale_factor
         self.sequence = Sequence.from_json("sequencer/seq_data.json")
@@ -271,9 +306,8 @@ class SyncedTableWidget(QWidget):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    channels = [f'Channel {i}' for i in range(20)]
-    data = [[j for j in range(100)] for i in range(20)]
 
-    window = SyncedTableWidget(channels, data)
+
+    window = SyncedTableWidget()
     window.show()
     sys.exit(app.exec_())
