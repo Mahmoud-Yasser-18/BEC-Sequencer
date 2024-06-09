@@ -2,6 +2,10 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QVBoxLayout, QMenuBar, QAction
 from PyQt5.QtCore import Qt
 
+from sequencer.main_widgets.main_seq_widgets.one_seq_widget import SyncedTableWidget 
+
+from sequencer.event  import Event  ,   Sequence 
+
 class BaseViewer(QWidget):
     def __init__(self, parent=None):
         super(BaseViewer, self).__init__(parent)
@@ -21,8 +25,10 @@ class BaseViewer(QWidget):
         self.tools_menu.addAction(self.tools_action)
 
 class MainSequenceViewer(BaseViewer):
-    def __init__(self, parent=None):
+    def __init__(self,seq, parent=None):
         super(MainSequenceViewer, self).__init__(parent)
+        self.layout.addWidget(SyncedTableWidget(seq))
+        
 
 class PlotViewer(BaseViewer):
     def __init__(self, parent=None):
@@ -43,14 +49,15 @@ class Imaging(BaseViewer):
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
-        
+        seq= Sequence.from_json("sequencer/seq_data.json")
+
         self.setWindowTitle('PyQt5 GUI')
         self.setGeometry(100, 100, 1000, 800)
         
         self.main_widget = QWidget(self)
         self.main_layout = QGridLayout(self.main_widget)
         
-        self.main_sequence_viewer = MainSequenceViewer(self)
+        self.main_sequence_viewer = MainSequenceViewer(seq,self)
         self.plot_viewer = PlotViewer(self)
         self.sweeper_viewer = SweeperViewer(self)
         self.optimization_window = OptimizationWindow(self)

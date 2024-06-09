@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import copy
 
 import matplotlib.cm as cm
-
+import numpy as np
 
 class RampType(Enum):
     LINEAR = 'linear'
@@ -235,20 +235,30 @@ class Event:
             child.print_event_hierarchy(level + 1, indent)
 
 class Sequence:
-    def __init__(self):
+    def __init__(self,time_resolution: float = 0.000001):
+        
+        # the duration of the smallest time step that can be represented in the sequence
+        self.time_resolution = time_resolution # in seconds 
+
+        # list of all channels in the sequence 
         self.channels: List[Channel] = []
+        # list of all events in the sequence 
         self.all_events: List[Event] = []
 
+
+    # add a new analog channel to the sequence
     def add_analog_channel(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10) -> Analog_Channel:
         channel = Analog_Channel(name, card_number, channel_number, reset, reset_value, default_voltage_func, max_voltage, min_voltage)
         self.channels.append(channel)
         return channel
 
+    # add a new digital channel to the sequence
     def add_digital_channel(self, name: str, card_number: int, channel_number: int, card_id: str, bitpos: int, reset: bool = False, reset_value: float = 0) -> Digital_Channel:
         channel = Digital_Channel(name, card_number, channel_number, card_id, bitpos, reset, reset_value)
         self.channels.append(channel)
         return channel
 
+    # add a new event to the sequence
     def add_event(self, channel_name: str, behavior: EventBehavior, start_time: Optional[float] = None, relative_time: Optional[float] = None, reference_time: str = "start", parent_event: Optional[Event] = None) -> Event:
         if start_time is not None and relative_time is not None:
             raise ValueError("Provide either start_time or relative_time, not both.")
@@ -273,12 +283,13 @@ class Sequence:
         bisect.insort(self.all_events, event)  # Sort by start_time
         return event
 
+    # find a channel by its name 
     def find_channel_by_name(self, name: str) -> Optional[Channel]:
         for channel in self.channels:
             if channel.name == name:
                 return channel
         return None
-    
+    # find an event by its start time and channel name
     def find_event_by_time_and_channel(self, start_time: float, channel_name: str) -> Optional[Event]:
         channel = self.find_channel_by_name(channel_name)
         if channel is None:
@@ -289,6 +300,7 @@ class Sequence:
             return channel.events[index]
         return None
     
+    # add a new event in the middle of the sequence
     def add_event_in_middle(self, parent_start_time: float, parent_channel_name: str, child_events: List[tuple], relative_time: float, reference_time: str, behavior: EventBehavior, channel_name: str) -> Event:
         temp_sequence = copy.deepcopy(self)
         parent_event = temp_sequence.find_event_by_time_and_channel(parent_start_time, parent_channel_name)
@@ -335,13 +347,16 @@ class Sequence:
 
         return new_event
 
+    # add a new event at the end of the sequence
     def get_all_events(self) -> List[Event]:
         return self.all_events
 
+    # print all events in the sequence 
     def print_sequence(self):
         for event in self.all_events:
             print(f"Event: {event.behavior} on {event.channel.name} at {event.start_time}")
 
+    # update the absolute time of an event
     def update_event_absolute_time(self, start_time: float, channel_name: str, new_start_time: float):
         temp_sequence = copy.deepcopy(self)
         event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
@@ -362,7 +377,7 @@ class Sequence:
         event.update_times(delta)
         self.all_events.sort(key=lambda event: event.start_time)
 
-
+    # update the relative time of an event 
     def update_event_relative_time(self, start_time: float, channel_name: str, new_relative_time: float, new_reference_time: Optional[str] = None):
         temp_sequence = copy.deepcopy(self)
         event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
@@ -393,6 +408,7 @@ class Sequence:
         event.update_relative_time(new_relative_time, new_reference_time)
         self.all_events.sort(key=lambda event: event.start_time)
 
+    # delete an event from the sequence
     def delete_event(self, start_time: float, channel_name: str):
         temp_sequence = copy.deepcopy(self)
         event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
@@ -451,7 +467,7 @@ class Sequence:
         self.all_events.sort(key=lambda event: event.start_time)
 
 
-
+    # edit the behavior of an event
     def edit_behavior(self, start_time: float, channel_name: str, **kwargs):
         temp_sequence = copy.deepcopy(self)
         event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
@@ -992,10 +1008,97 @@ class Sequence:
         ax.grid(True)
         plt.tight_layout()
         plt.show()
+    
+    def sequence_dauation(self):
+        return max(
+            (event.start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 0))
+            for event in self.all_events
+        )
+
+
+
+def calculate_sequence_data(sequence: Sequence) -> None:
+
+    all_events = sequence.all_events
+    sequence_duration = sequence.sequence_dauation() 
+    time_points = np.arange(0, sequence_duration, sequence.time_resolution) 
+    update_list = np.zeros(len(time_points)) 
+    print(time_points)
+
+
+    done_events = [] 
+
+
+    
+    for t in range(time_points): 
+        for event in all_events: 
+            
+            
+            if event in done_events: 
+                continue
+
+
+            if event.start_time <= time_points[t] <= event.end_time: 
+                update_list[t]+=1 
+                if  isinstance(event.channel, Digital_Channel):
+                    if isinstance(event.behavior, Jump): 
+                        done_events.append(event)
+                    elif isinstance(event.behavior, Ramp): 
+                        pass
+                
+                
+                elif isinstance(event.channel, Analog_Channel): 
+                    done_events.append(event)
+            else:
+                done_events.append(event)            
+            
+
+            
+
+            
+        
+
+
+
+
+    for event in all_events:
+        if isinstance(event.channel, Analog_Channel):
+            if isinstance(event.behavior, Jump):
+                pass
+            elif isinstance(event.behavior, Ramp):
+                pass
+        
+        
+        
+        
+        elif isinstance(event.channel, Digital_Channel):
+            if isinstance(event.behavior, Jump):
+                pass
+            elif isinstance(event.behavior, Ramp):
+                pass
+        
+    
+
+
+
+    pass 
+
+
+
 
 class SequenceManager:
     def __init__(self,) -> None:
-        self.main_sequence = Sequence()
+        self.main_sequences =[]
+
+
+    def load_main_sequences(self):
+        pass
+
+    def creat_new_main_sequences(self):
+        pass 
+
+    
+        
 
 
 
@@ -1018,9 +1121,10 @@ if __name__ == '__main__':
 
     # # Edit behavior
     sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
-    sequence.to_csv("mohid.csv")
-    sequence.print_event_tree()
-    sequence.plot_with_event_tree()
-    sequence.plot()
-    sequence.plot(["Analog1"])
+    # sequence.to_csv("mohid.csv")
+    # sequence.print_event_tree()
+    # sequence.plot_with_event_tree()
+    # sequence.plot()
+    # sequence.plot(["Analog1"])
+    calculate_sequence_data(sequence)
     # sequence.to_json("seq_data.json")

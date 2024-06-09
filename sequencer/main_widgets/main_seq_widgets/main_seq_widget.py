@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,  Q
                              QLineEdit, QDialogButtonBox, QMenu)
 from PyQt5.QtCore import Qt, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QIcon
-
+import gc
 from sequencer.event import Sequence, Analog_Channel, Digital_Channel, Event, Jump, Ramp, RampType,EventBehavior
 from sequencer.Dialogs.event_dialog import ChildEventDialog, RootEventDialog
 from sequencer.Dialogs.channel_dialog import ChannelDialog
@@ -81,11 +81,15 @@ class EventButton(QPushButton):
                 reference_time=data["reference_time"],
                 parent_event=self.event
             )
-            self.parent().parent().refreshUI()
+            print(self.find_parents()[0])
+            self.find_parents()[0].parent().refreshUI()
+    def find_parents(self):
+        return gc.get_referrers(self)
 
     def delete_event(self):
         self.sequence.delete_event(self.event.start_time,self.event.channel.name)
-        self.parent().parent().refreshUI()
+        print(self.find_parents()[0])
+        self.find_parents()[0].parent().refreshUI()
 
 class ChannelLabelWidget(QWidget):
     def __init__(self, channels, parent=None):

@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,  Q
                              QLineEdit, QDialogButtonBox, QMenu)
 from PyQt5.QtCore import Qt, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QIcon
-
+import gc
 from sequencer.event import Sequence, Analog_Channel, Digital_Channel, Event, Jump, Ramp, RampType,EventBehavior
 from sequencer.Dialogs.event_dialog import ChildEventDialog, RootEventDialog
 from sequencer.Dialogs.channel_dialog import ChannelDialog
@@ -34,37 +34,6 @@ class TimeAxisWidget(QWidget):
             painter.drawLine(x, 20, x, 30)
             painter.drawText(QRect(x - 10, 30, 20, 20), Qt.AlignCenter, str(time))
 
-# class AddEventDialog(QDialog):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.setWindowTitle("Add Child Event")
-#         self.layout = QFormLayout(self)
-        
-#         self.behavior_type = QComboBox(self)
-#         self.behavior_type.addItems(["Jump", "Ramp"])
-#         self.layout.addRow("Behavior Type:", self.behavior_type)
-        
-#         self.duration = QLineEdit(self)
-#         self.layout.addRow("Duration (for Ramp):", self.duration)
-        
-#         self.relative_time = QLineEdit(self)
-#         self.layout.addRow("Relative Time:", self.relative_time)
-        
-#         self.reference_time = QLineEdit(self)
-#         self.layout.addRow("Reference Time:", self.reference_time)
-        
-#         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-#         self.buttons.accepted.connect(self.accept)
-#         self.buttons.rejected.connect(self.reject)
-#         self.layout.addWidget(self.buttons)
-    
-#     def get_data(self):
-#         return {
-#             "behavior_type": self.behavior_type.currentText(),
-#             "duration": float(self.duration.text()) if self.duration.text() else None,
-#             "relative_time": float(self.relative_time.text()) if self.relative_time.text() else None,
-#             "reference_time": self.reference_time.text()
-#         }
 
 class EventButton(QPushButton):
     def __init__(self, event, scale_factor, sequence, parent=None):
@@ -100,23 +69,27 @@ class EventButton(QPushButton):
             self.delete_event()
     
     def add_child_event(self):
-        dialog = ChildEventDialog(self)
+        dialog = ChildEventDialog( [ch.name for ch in self.sequence.channels])
         if dialog.exec_() == QDialog.Accepted:
             data = dialog.get_data()
             behavior = Jump(1)
-            print(data)
+            print(type(data["relative_time"]))
             child_event = self.sequence.add_event(
-                channel_name=self.event.channel.name,
+                channel_name=data['channel'],
                 behavior=behavior,
-                relative_time=data["relative_time"],
+                relative_time=float(data["relative_time"]),
                 reference_time=data["reference_time"],
                 parent_event=self.event
             )
-            self.parent().parent().refreshUI()
+            print(self.find_parents()[0])
+            self.find_parents()[0].parent().refreshUI()
+    def find_parents(self):
+        return gc.get_referrers(self)
 
     def delete_event(self):
         self.sequence.delete_event(self.event.start_time,self.event.channel.name)
-        self.parent().parent().refreshUI()
+        print(self.find_parents()[0])
+        self.find_parents()[0].parent().refreshUI()
 
 class ChannelLabelWidget(QWidget):
     def __init__(self, channels, parent=None):

@@ -56,6 +56,7 @@ class ChannelLabelWidget(QWidget):
         self.container_widget.setFixedSize(100, len(self.channels) * 100)
 
         scroll_area.setWidget(self.container_widget)
+        # scroll_area.setFixedWidth(100)
         scroll_area.setFixedSize(150, len(self.channels) * 100)
         return scroll_area
 
@@ -136,10 +137,11 @@ class EventsViewerWidget(QWidget):
         self.scroll_area = self.create_scroll_area()
         main_layout.addWidget(self.scroll_area)
         self.setLayout(main_layout)
+        self.scroll_area.setFixedWidth(800)
 
     def create_scroll_area(self) -> QScrollArea:
         scroll_area = QScrollArea(self)
-        scroll_area.setWidgetResizable(True)
+        # scroll_area.setWidgetResizable(True)
 
         container_widget = QWidget()
         self.container_layout = QVBoxLayout(container_widget)
@@ -159,7 +161,7 @@ class EventsViewerWidget(QWidget):
         )
 
         num_channels = len(self.sequence.channels)
-        self.setFixedSize(int(max_time * self.scale_factor) + 50, num_channels * 100)
+        self.setFixedSize(int(max_time * self.scale_factor) + 50, num_channels *100)
         time_axis = TimeAxisWidget(max_time, self.scale_factor, self)
         layout.addWidget(time_axis)
 
@@ -222,10 +224,10 @@ class EventsViewerWidget(QWidget):
 
 
 class SyncedTableWidget(QWidget):
-    def __init__(self, scale_factor: float = 100.0):
+    def __init__(self,sequence, scale_factor: float = 100.0):
         super().__init__()
         self.scale_factor=scale_factor
-        self.sequence = Sequence.from_json("sequencer/seq_data.json")
+        self.sequence = sequence
         self.layout_main = QHBoxLayout()
         
         self.setup_ui()
@@ -237,8 +239,8 @@ class SyncedTableWidget(QWidget):
 
         self.channel_list.channel_right_clicked.connect(self.show_context_menu)
 
-        self.channel_list.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        self.data_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        # self.channel_list.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        # self.data_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
         self.scroll_bar2 = self.data_table.scroll_area.verticalScrollBar()
@@ -306,8 +308,8 @@ class SyncedTableWidget(QWidget):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
+    seq= Sequence.from_json("sequencer/seq_data.json")
 
-
-    window = SyncedTableWidget()
+    window = SyncedTableWidget(seq)
     window.show()
     sys.exit(app.exec_())
