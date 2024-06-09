@@ -34,6 +34,10 @@ class Jump(EventBehavior):
     def __repr__(self) -> str:
         return f"Jump({self.target_value})"
 
+
+
+
+
 class Ramp(EventBehavior):
     def __init__(self, duration: float, ramp_type: RampType = RampType.LINEAR, start_value: float = 0, end_value: float = 1, func: Optional[Callable[[float], float]] = None):
         self.duration = duration
@@ -52,6 +56,7 @@ class Ramp(EventBehavior):
         elif self.ramp_type == RampType.LOGARITHMIC:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (math.log10(t + 1) / math.log10(self.duration + 1))
 
+    
     def get_value_at_time(self, t: float) -> float:
         if 0 <= t <= self.duration:
             return self.func(t)
@@ -93,11 +98,18 @@ class Channel:
                 raise ValueError(f"Events {current_event} and {next_event} on channel {self.name} overlap.")
 
 class Analog_Channel(Channel):
-    def __init__(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10):
+    def __init__(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10,LIMIT=65535, RANGE=20, OFFSET=10):
         super().__init__(name, card_number, channel_number, reset, reset_value)
-        self.default_voltage_func = default_voltage_func
+        self.default_voltage_func = default_voltage_func  # Should map from whatever value to a value between -10 to 10 
         self.max_voltage = max_voltage
         self.min_voltage = min_voltage
+        self.LIMIT=LIMIT
+        self.RANGE=RANGE
+        self.OFFSET=OFFSET
+
+    def discretize(self,val) : # Should map from -10:10 to 0:65535
+        return (val + self.OFFSET)/self.RANGE * self.LIMIT
+  
 
     def __repr__(self) -> str:
         return (
@@ -1015,182 +1027,6 @@ class Sequence:
             for event in self.all_events
         )
 
-import time
-
-def calculate_sequence_data(sequence: Sequence) -> None:
-
-    all_events = sequence.all_events
-    sequence_duration = sequence.sequence_dauation() 
-    time_points = np.arange(0, sequence_duration, sequence.time_resolution) 
-    update_list = np.zeros(len(time_points)) 
-
-
-    done_events = []
-
-
-    channel_card = []
-    channel_number = []
-    channel_value = [] 
-
-
-    start_time = time.time() 
-
-
-    # The inefficient way to do this is to loop through all the events and check if the time point is within the event time range 
-    for t in range(len(time_points)): 
-        for event in all_events: 
-            
-            
-            if event in done_events: 
-                continue
-
-
-            if event.start_time <= time_points[t] <= event.end_time: 
-                update_list[t]+=1 
-                if  isinstance(event.channel, Digital_Channel):
-                    channel_card.append(event.channel.card_number)
-                    channel_number.append(event.channel.channel_number)
-                    channel_value.append(event.behavior.target_value)
-                    done_events.append(event)
-
-                elif isinstance(event.channel, Analog_Channel): 
-                    
-                    if isinstance(event.behavior, Jump): 
-                        channel_card.append(event.channel.card_number)
-                        channel_number.append(event.channel.channel_number)
-                        channel_value.append(event.behavior.target_value)
-                        done_events.append(event)
-                    elif isinstance(event.behavior, Ramp): 
-                        channel_card.append(event.channel.card_number)
-                        channel_number.append(event.channel.channel_number)
-                        channel_value.append(event.behavior.func(time_points[t] - event.start_time))
-                        
-                        
-            elif time_points[t] > event.end_time:
-                # ramp is done 
-                done_events.append(event)            
-    total_time = time.time() - start_time 
-    
-
-    print("sequence duration: ", sequence_duration)
-    print(f"Total time taken: {total_time}")        
-    return update_list, channel_card, channel_number, channel_value
-
-
-import copy 
-from copy import deepcopy 
-def calculate_time_ranges(all_events):
-
-    time_ranges = []
-    
-
-
-    # Initialize variables
-    current_time = 0
-    active_events = []
-    all_times = sorted(set([event.start_time for event in all_events] + [event.end_time for event in all_events]))
-
-    # Iterate over all significant times
-    for time in all_times:
-        # Create a tuple for the time range and the active events before updating the active events
-        if current_time != time:
-            time_ranges.append(((current_time, time), active_events.copy()))
-        
-        # Remove events that have ended at or before the current time
-        active_events = [event for event in active_events if event.end_time > time]
-
-        # Add events that are starting at the current time
-        starting_events = [event for event in all_events if event.start_time == time and event.end_time != time]
-        active_events.extend(starting_events)
-
-        # Handle instantaneous events
-        instant_events = [event for event in all_events if event.start_time == event.end_time == time]
-        if instant_events:
-            time_ranges.append(((time, time), active_events + instant_events))
-
-        current_time = time
-
-    return time_ranges
-
-
-
-def do_long_range():
-    pass 
-            
-            
-
-def calculate_sequence_data_eff(sequence: Sequence) -> None:
-    
-
-    channel_card = np.array([])
-    channel_number = np.array([])
-    channel_value= np.array([])
-    update_list = np.array([]) 
-
-    all_events = copy.deepcopy(sequence.all_events)
-    time_ranges=calculate_time_ranges(all_events)
-
-    start_time = time.time()
-
-    for time_range in time_ranges:
-        if time_range[-1]:
-            update_list=np.append(update_list,np.ones(int(np.rint((sequence.time_resolution+time_range[0][1]-time_range[0][0])/sequence.time_resolution)))*len(time_range[-1]))
-            
-            if time_range[0][0]==time_range[0][1]:
-                
-                time_axis = np.array([time_range[0][0]])
-            else :
-                time_axis = np.arange(time_range[0][0],sequence.time_resolution+ time_range[0][1], sequence.time_resolution)
-
-
-            temp_channel_card_list =[] 
-            temp_channel_number_list =[] 
-            temp_channel_value_list =[]
-            
-            for event in time_range[-1]: 
-                
-                temp_channel_card_list.append(np.ones_like(time_axis)*event.channel.card_number)
-                temp_channel_number_list.append(np.ones_like(time_axis)*event.channel.channel_number)
-                
-                if isinstance(event.behavior, Jump):
-                    temp_channel_value_list.append(event.behavior.target_value)
-                
-                elif isinstance(event.behavior, Ramp) and isinstance(event.channel, Analog_Channel): 
-                    temp_channel_value_list.append(event.behavior.func(time_axis - event.start_time))  
-            
-            # stacked_temp_channel_card_list = np.vstack((l for l in temp_channel_card_list))
-            # stacked_temp_channel_number_list = np.vstack((l for l in temp_channel_number_list))
-            # stacked_temp_channel_value_list = np.vstack((l for l in temp_channel_value_list))
-
-            stacked_temp_channel_card_list = np.vstack( list(temp_channel_card_list))
-            stacked_temp_channel_number_list = np.vstack( list(temp_channel_number_list))
-            stacked_temp_channel_value_list = np.vstack( list(temp_channel_value_list))
-
-            stacked_temp_channel_card_list = stacked_temp_channel_card_list.T
-            stacked_temp_channel_number_list = stacked_temp_channel_number_list.T
-            stacked_temp_channel_value_list = stacked_temp_channel_value_list.T
-            
-            stacked_temp_channel_card_list=stacked_temp_channel_card_list.flatten()
-            stacked_temp_channel_number_list=stacked_temp_channel_number_list.flatten()
-            stacked_temp_channel_value_list=stacked_temp_channel_value_list.flatten()
-            
-            channel_card=np.append(channel_card,stacked_temp_channel_card_list)
-            channel_number=np.append(channel_number,stacked_temp_channel_number_list)
-            channel_value=np.append(channel_value,stacked_temp_channel_value_list)
-
-        else: 
-            
-            update_list=np.append(update_list,time_range[0][0]-time_range[0][1])
-
-        
-    total_time = time.time() - start_time 
-    
-
-    print("sequence duration: ", sequence.sequence_dauation())
-    print(f"Total time taken: {total_time}")        
-
-
-    return update_list, channel_card, channel_number, channel_value
 
 
 
@@ -1258,7 +1094,7 @@ if __name__ == '__main__':
     sequence.plot()
     update2_list, channel2_card, channel2_number, channel2_value = calculate_sequence_data_eff(sequence)
 
-    plt.plot(update2_list)
+    # plt.plot(update2_list)
     #plt.plot(channel2_card)
     #plt.plot(channel2_number)
     plt.plot(channel2_value)
