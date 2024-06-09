@@ -190,29 +190,18 @@ class ADwin_Driver:
         self.DEVICENUMBER = 0x1
         self.RAISE_EXCEPTIONS = 1 
 
-
-        self.adw.Process_Status(1)
-        # 1 : Process is running.
-        # 0 : Process is not running, that means, it has not been loaded, started or stopped.
-        # <0:Process is being stopped, that means, it has received Stop_Process, but still waits for the last event.
-
-        
         self.queue = []
-        
         self.current_index = 0
+        self.processdelay = 1000         
         
-        self.processdelay= 1000         
-
-        
-        self.updatelist=[] 
-        self.chnum=[]
-        self.chval=[]
+        self.updatelist = [] 
+        self.chnum = []
+        self.chval = []
         
         self.adw = ADwin.ADwin(self.DEVICENUMBER, self.RAISE_EXCEPTIONS)
         print("Booting ADwin-system... ")
         
         BTL = self.adw.ADwindir + "adwin" + self.PROCESSORTYPE + ".btl"
-
         self.adw.Boot(BTL)
 
         print("ADwin booted\n")
@@ -226,9 +215,7 @@ class ADwin_Driver:
             self.adw.Load_Process(process_file)
             print("Process loaded\n")
 
-   
-   
-    def add_to_queue(self,sequence: Sequence):
+    def add_to_queue(self, sequence: Sequence):
         update_list, channel_card, channel_number, channel_value = calculate_sequence_data_eff(sequence)
         self.queue.append({
             "update_list": update_list,
@@ -237,29 +224,43 @@ class ADwin_Driver:
             "channel_value": channel_value
         })
 
-    
-    def load_ADwin_Data(self,index):
+    def load_ADwin_Data(self, index):
         update_list, channel_card, channel_number, channel_value = self.queue[index]
         
-        self.adw.Set_Par(Index=1,Value=len(update_list))
-        self.adw.Set_Par(Index=2,Value=self.processdelay)
-        self.adw.Set_Par(Index=3,Value= max(update_list))
-        self.adw.SetData_Double(Data=update_list,DataNo=1,Startindex=1,Count=len(update_list))
-        self.adw.SetData_Double(Data=channel_number,DataNo=2,Startindex=1,Count=len(channel_number))
-        self.adw.SetData_Double(Data=channel_value,DataNo=3,Startindex=1,Count=len(channel_value))
-        self.adw.SetData_Double(Data=channel_card,DataNo=4,Startindex=1,Count=len(channel_card))
-
-
-    
-
+        self.adw.Set_Par(Index=1, Value=len(update_list))
+        self.adw.Set_Par(Index=2, Value=self.processdelay)
+        self.adw.Set_Par(Index=3, Value=max(update_list))
+        self.adw.SetData_Double(Data=update_list, DataNo=1, Startindex=1, Count=len(update_list))
+        self.adw.SetData_Double(Data=channel_number, DataNo=2, Startindex=1, Count=len(channel_number))
+        self.adw.SetData_Double(Data=channel_value, DataNo=3, Startindex=1, Count=len(channel_value))
+        self.adw.SetData_Double(Data=channel_card, DataNo=4, Startindex=1, Count=len(channel_card))
 
     def start_process(self, process_number):
         self.adw.Start_Process(process_number)
 
-
-    def initiate_experiment(self,process_number=1):
-        self.load_ADwin_Data()
+    def initiate_experiment(self, process_number=1, index=0):
+        self.load_ADwin_Data(index)
         self.start_process(process_number)
+    
+    def is_process_running(self) -> bool:
+        status = self.adw.Process_Status(1)
+        # 1: Process is running.
+        # 0: Process is not running.
+        # <0: Process is being stopped.
+        return status > 0
+    
+    def wait_for_process_to_complete(self, poll_interval=1):
+        while self.is_process_running():
+            print("Waiting for the current process to complete...")
+            time.sleep(poll_interval)
+
+    def initiate_all_experiments(self, process_number=1):
+        for i in range(len(self.queue)):
+            print(f"Initiating experiment {i + 1}/{len(self.queue)}")
+            self.wait_for_process_to_complete()
+            self.initiate_experiment(process_number, index=i)
+            print(f"Experiment {i + 1} initiated.")
+
 
 
 if __name__ == "__main__":
