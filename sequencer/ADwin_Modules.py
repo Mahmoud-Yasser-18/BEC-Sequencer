@@ -197,12 +197,8 @@ class ADwin_Driver:
         # <0:Process is being stopped, that means, it has received Stop_Process, but still waits for the last event.
 
         
-        self.queue = [{
-            "update_list": [],
-            "channel_card": [],
-            "channel_number": [],
-            "channel_value": []
-        }]
+        self.queue = []
+        
         self.current_index = 0
         
         self.processdelay= 1000         
