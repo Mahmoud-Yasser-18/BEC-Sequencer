@@ -5,7 +5,7 @@ import csv
 import math
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Callable, List, Optional, Union
+from typing import Callable, List, Optional, Union,Tuple
 import matplotlib.pyplot as plt
 import copy
 
@@ -1015,7 +1015,7 @@ class Sequence:
             for event in self.all_events
         )
 
-
+import time
 
 def calculate_sequence_data(sequence: Sequence) -> None:
 
@@ -1023,14 +1023,21 @@ def calculate_sequence_data(sequence: Sequence) -> None:
     sequence_duration = sequence.sequence_dauation() 
     time_points = np.arange(0, sequence_duration, sequence.time_resolution) 
     update_list = np.zeros(len(time_points)) 
-    print(time_points)
 
 
-    done_events = [] 
+    done_events = []
 
 
-    
-    for t in range(time_points): 
+    channel_card = []
+    channel_number = []
+    channel_value = [] 
+
+
+    start_time = time.time() 
+
+
+    # The inefficient way to do this is to loop through all the events and check if the time point is within the event time range 
+    for t in range(len(time_points)): 
         for event in all_events: 
             
             
@@ -1041,47 +1048,150 @@ def calculate_sequence_data(sequence: Sequence) -> None:
             if event.start_time <= time_points[t] <= event.end_time: 
                 update_list[t]+=1 
                 if  isinstance(event.channel, Digital_Channel):
+                    channel_card.append(event.channel.card_number)
+                    channel_number.append(event.channel.channel_number)
+                    channel_value.append(event.behavior.target_value)
+                    done_events.append(event)
+
+                elif isinstance(event.channel, Analog_Channel): 
+                    
                     if isinstance(event.behavior, Jump): 
+                        channel_card.append(event.channel.card_number)
+                        channel_number.append(event.channel.channel_number)
+                        channel_value.append(event.behavior.target_value)
                         done_events.append(event)
                     elif isinstance(event.behavior, Ramp): 
-                        pass
-                
-                
-                elif isinstance(event.channel, Analog_Channel): 
-                    done_events.append(event)
-            else:
+                        channel_card.append(event.channel.card_number)
+                        channel_number.append(event.channel.channel_number)
+                        channel_value.append(event.behavior.func(time_points[t] - event.start_time))
+                        
+                        
+            elif time_points[t] > event.end_time:
+                # ramp is done 
                 done_events.append(event)            
-            
+    total_time = time.time() - start_time 
+    
 
-            
-
-            
-        
-
-
+    print("sequence duration: ", sequence_duration)
+    print(f"Total time taken: {total_time}")        
+    return update_list, channel_card, channel_number, channel_value
 
 
-    for event in all_events:
-        if isinstance(event.channel, Analog_Channel):
-            if isinstance(event.behavior, Jump):
-                pass
-            elif isinstance(event.behavior, Ramp):
-                pass
-        
-        
-        
-        
-        elif isinstance(event.channel, Digital_Channel):
-            if isinstance(event.behavior, Jump):
-                pass
-            elif isinstance(event.behavior, Ramp):
-                pass
-        
+import copy 
+from copy import deepcopy 
+def calculate_time_ranges(all_events):
+
+    time_ranges = []
     
 
 
+    # Initialize variables
+    current_time = 0
+    active_events = []
+    all_times = sorted(set([event.start_time for event in all_events] + [event.end_time for event in all_events]))
 
+    # Iterate over all significant times
+    for time in all_times:
+        # Create a tuple for the time range and the active events before updating the active events
+        if current_time != time:
+            time_ranges.append(((current_time, time), active_events.copy()))
+        
+        # Remove events that have ended at or before the current time
+        active_events = [event for event in active_events if event.end_time > time]
+
+        # Add events that are starting at the current time
+        starting_events = [event for event in all_events if event.start_time == time and event.end_time != time]
+        active_events.extend(starting_events)
+
+        # Handle instantaneous events
+        instant_events = [event for event in all_events if event.start_time == event.end_time == time]
+        if instant_events:
+            time_ranges.append(((time, time), active_events + instant_events))
+
+        current_time = time
+
+    return time_ranges
+
+
+
+def do_long_range():
     pass 
+            
+            
+
+def calculate_sequence_data_eff(sequence: Sequence) -> None:
+    
+
+    channel_card = np.array([])
+    channel_number = np.array([])
+    channel_value= np.array([])
+    update_list = np.array([]) 
+
+    all_events = copy.deepcopy(sequence.all_events)
+    time_ranges=calculate_time_ranges(all_events)
+
+    start_time = time.time()
+
+    for time_range in time_ranges:
+        if time_range[-1]:
+            update_list=np.append(update_list,np.ones(int(np.rint((sequence.time_resolution+time_range[0][1]-time_range[0][0])/sequence.time_resolution)))*len(time_range[-1]))
+            
+            if time_range[0][0]==time_range[0][1]:
+                
+                time_axis = np.array([time_range[0][0]])
+            else :
+                time_axis = np.arange(time_range[0][0],sequence.time_resolution+ time_range[0][1], sequence.time_resolution)
+
+
+            temp_channel_card_list =[] 
+            temp_channel_number_list =[] 
+            temp_channel_value_list =[]
+            
+            for event in time_range[-1]: 
+                
+                temp_channel_card_list.append(np.ones_like(time_axis)*event.channel.card_number)
+                temp_channel_number_list.append(np.ones_like(time_axis)*event.channel.channel_number)
+                
+                if isinstance(event.behavior, Jump):
+                    temp_channel_value_list.append(event.behavior.target_value)
+                
+                elif isinstance(event.behavior, Ramp) and isinstance(event.channel, Analog_Channel): 
+                    temp_channel_value_list.append(event.behavior.func(time_axis - event.start_time))  
+            
+            # stacked_temp_channel_card_list = np.vstack((l for l in temp_channel_card_list))
+            # stacked_temp_channel_number_list = np.vstack((l for l in temp_channel_number_list))
+            # stacked_temp_channel_value_list = np.vstack((l for l in temp_channel_value_list))
+
+            stacked_temp_channel_card_list = np.vstack( list(temp_channel_card_list))
+            stacked_temp_channel_number_list = np.vstack( list(temp_channel_number_list))
+            stacked_temp_channel_value_list = np.vstack( list(temp_channel_value_list))
+
+            stacked_temp_channel_card_list = stacked_temp_channel_card_list.T
+            stacked_temp_channel_number_list = stacked_temp_channel_number_list.T
+            stacked_temp_channel_value_list = stacked_temp_channel_value_list.T
+            
+            stacked_temp_channel_card_list=stacked_temp_channel_card_list.flatten()
+            stacked_temp_channel_number_list=stacked_temp_channel_number_list.flatten()
+            stacked_temp_channel_value_list=stacked_temp_channel_value_list.flatten()
+            
+            channel_card=np.append(channel_card,stacked_temp_channel_card_list)
+            channel_number=np.append(channel_number,stacked_temp_channel_number_list)
+            channel_value=np.append(channel_value,stacked_temp_channel_value_list)
+
+        else: 
+            
+            update_list=np.append(update_list,time_range[0][0]-time_range[0][1])
+
+        
+    total_time = time.time() - start_time 
+    
+
+    print("sequence duration: ", sequence.sequence_dauation())
+    print(f"Total time taken: {total_time}")        
+
+
+    return update_list, channel_card, channel_number, channel_value
+
 
 
 
@@ -1104,9 +1214,9 @@ class SequenceManager:
 
 
 if __name__ == '__main__':
-    sequence = Sequence()
-    analog_channel = sequence.add_analog_channel("Analog1", 0, 0)
-    digital_channel = sequence.add_digital_channel("Digital1", 1, 1, "card1", 0)
+    sequence = Sequence(time_resolution=0.000001)
+    analog_channel = sequence.add_analog_channel("Analog1", 2, 2)
+    digital_channel = sequence.add_digital_channel("Digital1", 2, 2, "card1", 0)
 
     # Create events for testing
     event1 = sequence.add_event("Analog1", Jump(1.0), start_time=0)
@@ -1114,17 +1224,43 @@ if __name__ == '__main__':
     event3 = sequence.add_event("Analog1", Jump(0.0), relative_time=5, reference_time="end", parent_event=event2)
     event4 = sequence.add_event("Digital1", Jump(1), relative_time=-10, reference_time="end", parent_event=event2)
     event5 = sequence.add_event("Digital1", Jump(0), relative_time=2, reference_time="start", parent_event=event4)
+    event5 = sequence.add_event("Digital1", Jump(5), start_time=12)
     event6 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10), relative_time=11, reference_time="end", parent_event=event4)
     
-    sequence.print_event_tree()
+    # sequence.print_event_tree()
     # sequence.plot_with_event_tree()
+    # print (sequence.all_events)
+
+
 
     # # Edit behavior
-    sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
+    # sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
     # sequence.to_csv("mohid.csv")
     # sequence.print_event_tree()
     # sequence.plot_with_event_tree()
-    # sequence.plot()
     # sequence.plot(["Analog1"])
-    calculate_sequence_data(sequence)
-    # sequence.to_json("seq_data.json")
+    # print("Efficient way: ")
+    # for item in calculate_time_ranges(sequence.all_events):
+    #     print(item)
+    
+
+    # sequence.plot()
+
+
+
+    #update_list, channel_card, channel_number, channel_value= calculate_sequence_data(sequence)
+    #plt.plot(update_list)
+    #plt.plot(channel_card) 
+    #plt.plot(channel_number)
+    #plt.plot(channel_value)
+
+
+    sequence.plot()
+    update2_list, channel2_card, channel2_number, channel2_value = calculate_sequence_data_eff(sequence)
+
+    plt.plot(update2_list)
+    #plt.plot(channel2_card)
+    #plt.plot(channel2_number)
+    plt.plot(channel2_value)
+
+    plt.show()
