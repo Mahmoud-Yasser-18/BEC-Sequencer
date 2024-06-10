@@ -39,11 +39,12 @@ class Jump(EventBehavior):
 
 
 class Ramp(EventBehavior):
-    def __init__(self, duration: float, ramp_type: RampType = RampType.LINEAR, start_value: float = 0, end_value: float = 1, func: Optional[Callable[[float], float]] = None):
+    def __init__(self, duration: float, ramp_type: RampType = RampType.LINEAR, start_value: float = 0, end_value: float = 1, func: Optional[Callable[[float], float]] = None,resolution=0.001):
         self.duration = duration
         self.ramp_type = ramp_type
         self.start_value = start_value
         self.end_value = end_value
+        self.resolution=resolution
         
         if func:
             self.func = func
@@ -247,7 +248,7 @@ class Event:
             child.print_event_hierarchy(level + 1, indent)
 
 class Sequence:
-    def __init__(self,time_resolution: float = 0.000001):
+    def __init__(self,time_resolution: float = 0.001):
         
         # the duration of the smallest time step that can be represented in the sequence
         self.time_resolution = time_resolution # in seconds 

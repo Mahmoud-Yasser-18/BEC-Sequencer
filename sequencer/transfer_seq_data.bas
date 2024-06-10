@@ -1,3 +1,16 @@
+'<ADbasic Header, Headerversion 001.001>
+' Process_Number                 = 1
+' Initial_Processdelay           = 3000
+' Eventsource                    = Timer
+' Control_long_Delays_for_Stop   = No
+' Priority                       = High
+' Version                        = 1
+' ADbasic_Version                = 6.4.0
+' Optimize                       = Yes
+' Optimize_Level                 = 1
+' Stacksize                      = 1000
+' Info_Last_Save                 = DESKTOP-IAC6L9U  DESKTOP-IAC6L9U\Mahmoud Yasser
+'<Header End>
 
 'June 28th 2021
 'This file takes the results of the sequences coded in Matlab and transfers them to the ADwin channels at the set times.
@@ -5,7 +18,7 @@
 
 #include adwinpro_all.inc
 
-#define SIZE 500000 'size of the data arrays
+#define SIZE 50000000 'size of the data arrays
 
 #define d_io 1 'the digital I/O card is set to module number 1
 #define a_out1 2'one of the analog outs is module 2
@@ -41,7 +54,7 @@ dim num_updates as long 'tracks running total of number of updates to signal val
 dim ch as long 'the channel to be updated
 dim state as long 'the updated value
 
-'Note that the output voltage range of the DACs for the AOUT8/16 modules is set to Â±10V bipolar and can't be
+'Note that the output voltage range of the DACs for the AOUT8/16 modules is set to ±10V bipolar and can't be
 'changed (ADwin Pro II hardware manual, page 96)
 '8 output channels, 16 bit resolution, < 3 us settling time
 
