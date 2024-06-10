@@ -32,8 +32,7 @@
 
 'For mapping analog voltage values to a bit pattern:
 #define LIMIT 65535 'at most can have 16 bit value written to DAC
-#define RANGE 20
-#define OFFSET 10
+
 
 
 
@@ -41,7 +40,7 @@
 dim Data_1[SIZE] as long 'this array is used to step through Data_2 and Data_3; it indicates how many channels are to be updated per run of the EVENT section
 'negative values indicate a wait/hold of the signal value (delay before changing)?
 dim Data_2[SIZE] as long 'indicates the channels to be updated
-dim Data_3[SIZE] as float 'indicates the values of the channels; in a 1:1 correspondence with Data_2
+dim Data_3[SIZE] as long 'indicates the values of the channels; in a 1:1 correspondence with Data_2
 'Data_4 will be used for reset to zero stuff?
 
 'reset to zero stuff?
@@ -54,17 +53,13 @@ dim num_updates as long 'tracks running total of number of updates to signal val
 dim ch as long 'the channel to be updated
 dim state as long 'the updated value
 
-'Note that the output voltage range of the DACs for the AOUT8/16 modules is set to ±10V bipolar and can't be
+'Note that the output voltage range of the DACs for the AOUT8/16 modules is set to ï¿½10V bipolar and can't be
 'changed (ADwin Pro II hardware manual, page 96)
 '8 output channels, 16 bit resolution, < 3 us settling time
 
 '***************************************************
 'convert continuous voltage value in specified range to an n bit value, where LIMIT = 2^n - 1
-function discretize(val) as float
-  
-  discretize = (val + OFFSET)/RANGE * LIMIT
-  
-endfunction
+
 
 
 
@@ -134,7 +129,7 @@ EVENT:
          
       if((ch >=33) AND (ch <=47)) then 'we have an analog channel
         'check if out of of range although this should have been done in matlab
-        if(discretize(Data_3[num_updates]) > LIMIT) then
+        if(Data_3[num_updates] > LIMIT) then
           P2_Set_LED(a_out1,1);
         else
           analog_write(ch, Data_3[num_updates]) 
@@ -179,20 +174,20 @@ sub analog_write(achannel, avalue)
   ' if statement for each module i.e. analog card
   if((achannel>=33) AND (achannel<=40)) then
     'write the channel value; the sync functions called above actually start the D/A conversion process
-    P2_Write_DAC(a_out1,achannel-32,discretize(avalue))
+    P2_Write_DAC(a_out1,achannel-32,avalue)
   endif
   'analog card 2 with channels 41-48 (this is OUR numbering choice, not the device's -  must convert)   
   if((achannel>=41) AND (achannel<=48)) then
     'subtract since module/card designates channels with numbers 1-8.
-    P2_Write_DAC(a_out2,achannel-40,discretize(avalue))
+    P2_Write_DAC(a_out2,achannel-40,avalue)
   endif 
   'analog card 3 with channels 49-56
   if((achannel>=49) AND (achannel<=56)) then
-    P2_Write_DAC(a_out3,achannel-48,discretize(avalue)) 'subtract since module/card designates channels with numbers 1-8.
+    P2_Write_DAC(a_out3,achannel-48,avalue) 'subtract since module/card designates channels with numbers 1-8.
   endif
   'analog card 4 with channels 57-64
   if((achannel>=57) AND (achannel<=64)) then
-    P2_Write_DAC(a_out4,achannel-56,discretize(avalue)) 'subtract since module/card designates channels with numbers 1-8.
+    P2_Write_DAC(a_out4,achannel-56,avalue) 'subtract since module/card designates channels with numbers 1-8.
   endif  
  
 endsub

@@ -151,11 +151,11 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
                     if isinstance(event.channel, Digital_Channel):
                         temp_channel_value_list.append(event.behavior.target_value)
                     else :                         
-                        temp_channel_value_list.append(event.channel.default_voltage_func(event.behavior.target_value))
+                        temp_channel_value_list.append(event.channel.discretize(event.channel.default_voltage_func(event.behavior.target_value)))
                 
                 elif isinstance(event.behavior, Ramp) and isinstance(event.channel, Analog_Channel): 
                     
-                    temp_channel_value_list.append((event.channel.default_voltage_func(event.behavior.func(time_axis - event.start_time))))  
+                    temp_channel_value_list.append(event.channel.discretize(event.channel.default_voltage_func(event.behavior.func(time_axis - event.start_time))))  
                     
 
             stacked_temp_channel_card_list = np.vstack( list(temp_channel_card_list))
@@ -268,7 +268,7 @@ class ADwin_Driver:
         update_list= list(self.queue[index]["update_list"].astype('int') )*repeat
         channel_card= list(self.queue[index]["channel_card"].astype('int') )*repeat
         # channel_number= list(self.queue[index]["channel_number"].astype('int') )*repeat
-        channel_value= list(self.queue[index]["channel_value"])*repeat
+        channel_value= list(self.queue[index]["channel_value"].astype('int'))*repeat
 
         channel_number= self.queue[index]["channel_number"] 
         channel_number=channel_number*0 + 33
@@ -280,7 +280,7 @@ class ADwin_Driver:
         self.adw.Set_Par(Index=3, Value=int(max(update_list)))
         self.adw.SetData_Long(Data=update_list, DataNo=1, Startindex=1, Count=len(update_list))
         self.adw.SetData_Long(Data=channel_number, DataNo=2, Startindex=1, Count=len(channel_number))
-        self.adw.SetData_Float(Data=channel_value, DataNo=3, Startindex=1, Count=len(channel_value))
+        self.adw.SetData_Long(Data=channel_value, DataNo=3, Startindex=1, Count=len(channel_value))
         #self.adw.SetData_Long(Data=list(channel_card.astype('int')), DataNo=4, Startindex=1, Count=len(channel_card))
 
         total_time = time.time() - start_time2
@@ -318,7 +318,7 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     sequence = Sequence(time_resolution=0.001)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
-    time_unit = 0.00001
+    time_unit = 0.1
     event1 = sequence.add_event("Analog1", Jump(0), start_time=0)
     event2 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*1)
     event3 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*2)
@@ -328,7 +328,7 @@ if __name__ == "__main__":
 
     adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
     adwin_driver.add_to_queue(sequence)
-    adwin_driver.initiate_all_experiments(repeat=100000)
+    adwin_driver.initiate_all_experiments(repeat=100)
     update_list, channel_card, channel_number, channel_value = calculate_sequence_data_eff(sequence,adwin_driver)
     print(len(channel_value))
     # print(np.sum(update_list[update_list > 0]))
