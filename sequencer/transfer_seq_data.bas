@@ -106,7 +106,7 @@ EVENT:
   'If Data_1[event_count] is positive, the value controls the update channel loop
   curr_delay = DELAY
   if(Data_1[event_count] < 0) then
-    curr_delay = DELAY*(-1*Data_1[event_count])
+    curr_delay = (-1*Data_1[event_count])
   endif
   Processdelay = curr_delay
  
