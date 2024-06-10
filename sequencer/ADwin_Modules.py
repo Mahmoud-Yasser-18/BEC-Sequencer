@@ -112,8 +112,8 @@ def calculate_time_ranges(all_events):
 def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
     
     
-    time_resolution = adwin_driver.proceessdelay_unit*adwin_driver.processdelay
-    print("Time resolution: ", time_resolution)
+    time_resolution = adwin_driver.proceessdelay_unit*adwin_driver.processdelay # 10**-9 * 1000 = 1 micro seconds
+    #print("Time resolution: ", time_resolution)
 
     channel_card = np.array([])
     channel_number = np.array([])
@@ -136,6 +136,7 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
                 time_axis = np.arange(time_range[0][0],time_resolution+ time_range[0][1], time_resolution)
 
 
+            #print("len of time axis: ", len(time_axis))
             temp_channel_card_list =[] 
             temp_channel_number_list =[] 
             temp_channel_value_list =[]
@@ -178,16 +179,16 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
             time_to_be_delayed = time_range[0][1]-time_range[0][0]
             
 
-            # print("Time to be delayed: ", time_to_be_delayed)
-            # print("Max cycles Time: ", adwin_driver.MAX_CYCLES_time)
+            #print("Time to be delayed: ", time_to_be_delayed)
+            #print("Max cycles Time: ", adwin_driver.MAX_CYCLES_time)
             number_of_delays = np.floor(time_to_be_delayed / adwin_driver.MAX_CYCLES_time)
-            # print("Number of delays: ", number_of_delays)
-            # print(time_to_be_delayed % adwin_driver.MAX_CYCLES_time)
+            #print("Number of delays: ", number_of_delays)
+            #print(time_to_be_delayed % adwin_driver.MAX_CYCLES_time)
             reminder_of_delays =np.array(( time_to_be_delayed % adwin_driver.MAX_CYCLES_time))
-            # print("Reminder of delays: ", reminder_of_delays)
+            #print("Reminder of delays: ", reminder_of_delays)
 
             if reminder_of_delays:
-                array_of_delays= np.append(-1* np.ones(int(number_of_delays))*adwin_driver.MAX_CYCLES,-1*reminder_of_delays/(time_resolution))
+                array_of_delays= np.append(-1* np.ones(int(number_of_delays))*adwin_driver.MAX_CYCLES,-1*int(reminder_of_delays/(adwin_driver.proceessdelay_unit)))
             else:
                 array_of_delays=-1* np.ones(int(number_of_delays))*adwin_driver.MAX_CYCLES
             # print("array_of_delays: ", array_of_delays)
@@ -198,8 +199,8 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
     total_time = time.time() - start_time2 
     
 
-    print("sequence duration: ", sequence.sequence_dauation())
-    print(f"Total time taken: {total_time}")        
+    # print("sequence duration: ", sequence.sequence_dauation())
+    # print(f"Total time taken: {total_time}")        
 
 
     return update_list, channel_card, channel_number, channel_value
@@ -228,9 +229,9 @@ class ADwin_Driver:
         
         
         # the philosophy of changing the process delay is to be able to allow the user to change the cycle time of the ADwin system if so many channels are being changed at the same time
-        self.processdelay = 1000
+        self.processdelay = processdelay
         
-        self.MAX_CYCLES = int(2**31/  self.processdelay) # if we want to follow the old logic of putting everything in the units of process delay
+        self.MAX_CYCLES = int(2**31-1) # if we want to follow the old logic of putting everything in the units of process delay
         self.MAX_CYCLES_time = self.proceessdelay_unit*2**31 # The maximum time of a delay in seconds that can be achieved with the current process delay
         
         
@@ -318,23 +319,26 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     sequence = Sequence(time_resolution=0.001)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
-    time_unit = 0.1
+    time_unit = 1
     event1 = sequence.add_event("Analog1", Jump(0), start_time=0)
     event2 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*1)
     event3 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*2)
     event4 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
     event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=0), start_time=time_unit*4)
-    event6 = sequence.add_event("Analog1", Jump(0), start_time=time_unit*6)
+    event6 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*9)
 
-    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
+    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000000)
     adwin_driver.add_to_queue(sequence)
-    adwin_driver.initiate_all_experiments(repeat=100)
-    update_list, channel_card, channel_number, channel_value = calculate_sequence_data_eff(sequence,adwin_driver)
-    print(len(channel_value))
+    adwin_driver.initiate_all_experiments(repeat=1)
+    
+    
+
+
     # print(np.sum(update_list[update_list > 0]))
     # print(np.sum(channel_number))
 
-    print(len(update_list))
+    # print(update_list)
+    
     # print(update_list)
     # plt.plot(update_list)
     # plt.plot(channel_card) 
