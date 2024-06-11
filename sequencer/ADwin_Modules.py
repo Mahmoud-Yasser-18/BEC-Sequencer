@@ -120,6 +120,10 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
     channel_value= np.array([])
     update_list = np.array([]) 
 
+
+    processdelay_times = []    
+    processdelay_value_list = []    
+
     all_events = deepcopy(sequence.all_events)
     time_ranges=calculate_time_ranges(all_events)
 
@@ -127,15 +131,35 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
 
     for time_range in time_ranges:
         if time_range[-1]:
-            update_list=np.append(update_list,np.ones(int(np.rint((time_resolution+time_range[0][1]-time_range[0][0])/time_resolution)))*len(time_range[-1]))
-            
             if time_range[0][0]==time_range[0][1]:
                 
                 time_axis = np.array([time_range[0][0]])
+                update_list=np.append(update_list,np.ones(int(np.rint((time_resolution+time_range[0][1]-time_range[0][0])/time_resolution)))*len(time_range[-1]))
+
             else :
-                time_axis = np.arange(time_range[0][0],time_resolution+ time_range[0][1], time_resolution)
+                print("time range: ", time_range[0][0]-time_range[0][1])
+                print("time resolution before: ", time_resolution)
+                max_resolution = 2
+                for event in time_range[-1]: 
+                    if isinstance(event.behavior, Ramp) and isinstance(event.channel, Analog_Channel): 
+                        if max_resolution > event.behavior.resolution:
+                            max_resolution = event.behavior.resolution
+                print("Max resolution: ", max_resolution)
+                time_resolution = max_resolution
+                print("time resolution before: ", time_resolution)
+
+                time_axis = np.arange(time_range[0][0], time_resolution+time_range[0][1], time_resolution)
+                
+                len_update_list_temp =len(update_list)
+                update_list=np.append(update_list,np.ones(int(np.rint((time_resolution+time_range[0][1]-time_range[0][0])/time_resolution)))*len(time_range[-1]))
+
+                processdelay_times.append(len_update_list_temp+1)
+                processdelay_times.append(len(update_list))
+                processdelay_value_list.append(int(time_resolution/adwin_driver.proceessdelay_unit))
 
 
+
+            
             #print("len of time axis: ", len(time_axis))
             temp_channel_card_list =[] 
             temp_channel_number_list =[] 
@@ -155,7 +179,6 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
                         temp_channel_value_list.append(event.channel.discretize(event.channel.default_voltage_func(event.behavior.target_value)))
                 
                 elif isinstance(event.behavior, Ramp) and isinstance(event.channel, Analog_Channel): 
-                    
                     temp_channel_value_list.append(event.channel.discretize(event.channel.default_voltage_func(event.behavior.func(time_axis - event.start_time))))  
                     
 
@@ -201,9 +224,11 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
 
     # print("sequence duration: ", sequence.sequence_dauation())
     # print(f"Total time taken: {total_time}")        
+    # processdelay_times.append(0)
+    # processdelay_times.append(0)
+    # processdelay_value_list.append(adwin_driver.processdelay)
 
-
-    return update_list, channel_card, channel_number, channel_value
+    return update_list, channel_card, channel_number, channel_value,processdelay_times,processdelay_value_list
 
 
 class ADwin_Driver:
@@ -254,12 +279,14 @@ class ADwin_Driver:
             print("Process loaded\n")
 
     def add_to_queue(self, sequence: Sequence):
-        update_list, channel_card, channel_number, channel_value = calculate_sequence_data_eff(sequence,self)
+        update_list, channel_card, channel_number, channel_value,processdelay_times,processdelay_value_list = calculate_sequence_data_eff(sequence,self)
         self.queue.append({
             "update_list": update_list,
             "channel_card": channel_card,
             "channel_number": channel_number,
-            "channel_value": channel_value
+            "channel_value": channel_value,
+            "processdelay_times": processdelay_times,
+            "processdelay_value_list": processdelay_value_list
         })
 
     def load_ADwin_Data(self, index,repeat=1):
@@ -270,6 +297,10 @@ class ADwin_Driver:
         channel_card= list(self.queue[index]["channel_card"].astype('int') )*repeat
         # channel_number= list(self.queue[index]["channel_number"].astype('int') )*repeat
         channel_value= list(self.queue[index]["channel_value"].astype('int'))*repeat
+
+        processdelay_times= self.queue[index]["processdelay_times"]
+        processdelay_value_list= self.queue[index]["processdelay_value_list"]
+
 
         channel_number= self.queue[index]["channel_number"] 
         channel_number=channel_number*0 + 33
@@ -282,6 +313,9 @@ class ADwin_Driver:
         self.adw.SetData_Long(Data=update_list, DataNo=1, Startindex=1, Count=len(update_list))
         self.adw.SetData_Long(Data=channel_number, DataNo=2, Startindex=1, Count=len(channel_number))
         self.adw.SetData_Long(Data=channel_value, DataNo=3, Startindex=1, Count=len(channel_value))
+        
+        self.adw.SetData_Long(Data=processdelay_times, DataNo=9, Startindex=1, Count=len(processdelay_times))
+        self.adw.SetData_Long(Data=processdelay_value_list, DataNo=10, Startindex=1, Count=len(processdelay_value_list))
         #self.adw.SetData_Long(Data=list(channel_card.astype('int')), DataNo=4, Startindex=1, Count=len(channel_card))
 
         total_time = time.time() - start_time2
@@ -320,29 +354,55 @@ if __name__ == "__main__":
     sequence = Sequence(time_resolution=0.001)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
     time_unit = 1
-    event1 = sequence.add_event("Analog1", Jump(0), start_time=0)
-    event2 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*1)
-    event3 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*2)
-    event4 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
-    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=0), start_time=time_unit*4)
-    event6 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*9)
+    # event1 = sequence.add_event("Analog1", Jump(0), start_time=0)
+    # event2 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*1)
+    # event3 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*2)
+    # event4 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
+    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*3,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.1), start_time=time_unit*4)
+    # event6 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*8)
+    # event6 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*9)
+    # event6 = sequence.add_event("Analog1", Jump(2.5), start_time=time_unit*10)
+    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*2,ramp_type=RampType.LINEAR,start_value=3,end_value=0,resolution=0.1), start_time=time_unit*4)
+    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.01), start_time=time_unit*11)
+    # event6 = sequence.add_event("Analog1", Jump(0), start_time=time_unit*13)
 
-    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000000)
+    event1 = sequence.add_event("Analog1", Jump(3), start_time=0)
+    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.01), start_time=time_unit*1)
+    event1 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
+    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=0,resolution=0.1), start_time=time_unit*4)
+    event1 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*6)
+    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LOGARITHMIC,start_value=2,end_value=3,resolution=0.1), start_time=time_unit*7)
+
+
+    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
     adwin_driver.add_to_queue(sequence)
+    update_list, channel_card, channel_number, channel_value,processdelay_times,processdelay_value_list=calculate_sequence_data_eff(sequence,adwin_driver)
+    print(processdelay_times)
+    print(processdelay_value_list)
+    print(len(update_list))
+    # print(channel_value)
+    print("channel value: ", channel_value)
     adwin_driver.initiate_all_experiments(repeat=1)
-    
-    
 
+
+
+    LIMIT=65535
+    RANGE=20
+    OFFSET=10
+
+    # plt.scatter(np.arange(len(channel_value)),(channel_value-LIMIT/2)/LIMIT*RANGE)
+    # plt.show()
+
+    # plt.scatter(np.arange(len(update_list)),update_list)
+    # plt.show()
 
     # print(np.sum(update_list[update_list > 0]))
     # print(np.sum(channel_number))
 
     # print(update_list)
-    
-    # print(update_list)
-    # plt.plot(update_list)
+    print(len(channel_value))
+    print(update_list)
     # plt.plot(channel_card) 
     # plt.plot(channel_number)
     # plt.scatter(np.arange(10),channel_value[:10])
-    # plt.show()
 
