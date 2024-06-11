@@ -23,7 +23,7 @@ def calculate_sequence_data(sequence: Sequence) -> None:
     done_events = []
 
 
-    channel_card = []
+
     channel_number = []
     channel_value = [] 
 
@@ -43,7 +43,7 @@ def calculate_sequence_data(sequence: Sequence) -> None:
             if event.start_time <= time_points[t] <= event.end_time: 
                 update_list[t]+=1 
                 if  isinstance(event.channel, Digital_Channel):
-                    channel_card.append(event.channel.card_number)
+
                     channel_number.append(event.channel.channel_number)
                     channel_value.append(event.behavior.target_value)
                     done_events.append(event)
@@ -51,12 +51,12 @@ def calculate_sequence_data(sequence: Sequence) -> None:
                 elif isinstance(event.channel, Analog_Channel): 
                     
                     if isinstance(event.behavior, Jump): 
-                        channel_card.append(event.channel.card_number)
+
                         channel_number.append(event.channel.channel_number)
                         channel_value.append(event.behavior.target_value)
                         done_events.append(event)
                     elif isinstance(event.behavior, Ramp): 
-                        channel_card.append(event.channel.card_number)
+
                         channel_number.append(event.channel.channel_number)
                         channel_value.append(event.behavior.func(time_points[t] - event.start_time))
                         
@@ -69,7 +69,12 @@ def calculate_sequence_data(sequence: Sequence) -> None:
 
     print("sequence duration: ", sequence_duration)
     print(f"Total time taken: {total_time}")        
-    return update_list, channel_card, channel_number, channel_value
+    return update_list, channel_number, channel_value
+
+
+
+def encode_channel(type, channel,card ):
+    return type * 10000 +   channel* 100 +card
 
 
 def calculate_time_ranges(all_events):
@@ -115,7 +120,7 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
     time_resolution = adwin_driver.proceessdelay_unit*adwin_driver.processdelay # 10**-9 * 1000 = 1 micro seconds
     #print("Time resolution: ", time_resolution)
 
-    channel_card = np.array([])
+
     channel_number = np.array([])
     channel_value= np.array([])
     update_list = np.array([]) 
@@ -161,15 +166,15 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
 
             
             #print("len of time axis: ", len(time_axis))
-            temp_channel_card_list =[] 
+
             temp_channel_number_list =[] 
             temp_channel_value_list =[]
             
             for event in time_range[-1]: 
 
                 
-                temp_channel_card_list.append(np.ones_like(time_axis)*event.channel.card_number)
-                temp_channel_number_list.append(np.ones_like(time_axis)*event.channel.channel_number)
+
+                temp_channel_number_list.append(np.ones_like(time_axis)* encode_channel(type=0 if isinstance(event.channel,Analog_Channel)else 1,channel=event.channel.channel_number,card=event.channel.card_number))
                 
                 if isinstance(event.behavior, Jump):
                 
@@ -182,19 +187,19 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
                     temp_channel_value_list.append(event.channel.discretize(event.channel.default_voltage_func(event.behavior.func(time_axis - event.start_time))))  
                     
 
-            stacked_temp_channel_card_list = np.vstack( list(temp_channel_card_list))
+            
             stacked_temp_channel_number_list = np.vstack( list(temp_channel_number_list))
             stacked_temp_channel_value_list = np.vstack( list(temp_channel_value_list))
 
-            stacked_temp_channel_card_list = stacked_temp_channel_card_list.T
+            
             stacked_temp_channel_number_list = stacked_temp_channel_number_list.T
             stacked_temp_channel_value_list = stacked_temp_channel_value_list.T
             
-            stacked_temp_channel_card_list=stacked_temp_channel_card_list.flatten()
+            
             stacked_temp_channel_number_list=stacked_temp_channel_number_list.flatten()
             stacked_temp_channel_value_list=stacked_temp_channel_value_list.flatten()
             
-            channel_card=np.append(channel_card,stacked_temp_channel_card_list)
+
             channel_number=np.append(channel_number,stacked_temp_channel_number_list)
             channel_value=np.append(channel_value,stacked_temp_channel_value_list)
 
@@ -228,7 +233,7 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
     # processdelay_times.append(0)
     # processdelay_value_list.append(adwin_driver.processdelay)
 
-    return update_list, channel_card, channel_number, channel_value,processdelay_times,processdelay_value_list
+    return update_list, channel_number, channel_value,processdelay_times,processdelay_value_list
 
 
 class ADwin_Driver:
@@ -279,10 +284,10 @@ class ADwin_Driver:
             print("Process loaded\n")
 
     def add_to_queue(self, sequence: Sequence):
-        update_list, channel_card, channel_number, channel_value,processdelay_times,processdelay_value_list = calculate_sequence_data_eff(sequence,self)
+        update_list, channel_number, channel_value,processdelay_times,processdelay_value_list = calculate_sequence_data_eff(sequence,self)
         self.queue.append({
             "update_list": update_list,
-            "channel_card": channel_card,
+
             "channel_number": channel_number,
             "channel_value": channel_value,
             "processdelay_times": processdelay_times,
@@ -292,19 +297,19 @@ class ADwin_Driver:
     def load_ADwin_Data(self, index,repeat=1):
         
         
-        repeat = repeat
-        update_list= list(self.queue[index]["update_list"].astype('int') )*repeat
-        channel_card= list(self.queue[index]["channel_card"].astype('int') )*repeat
-        # channel_number= list(self.queue[index]["channel_number"].astype('int') )*repeat
-        channel_value= list(self.queue[index]["channel_value"].astype('int'))*repeat
+        
+        update_list= list(self.queue[index]["update_list"].astype('int') )
+
+        channel_number= list(self.queue[index]["channel_number"].astype('int') )
+        channel_value= list(self.queue[index]["channel_value"].astype('int'))
 
         processdelay_times= self.queue[index]["processdelay_times"]
         processdelay_value_list= self.queue[index]["processdelay_value_list"]
 
 
-        channel_number= self.queue[index]["channel_number"] 
-        channel_number=channel_number*0 + 33
-        channel_number=list(channel_number.astype('int'))*repeat
+        #channel_number= self.queue[index]["channel_number"] 
+        # channel_number=channel_number*0 + 33
+        # channel_number=list(channel_number.astype('int'))
         
         start_time2 = time.time()
         self.adw.Set_Par(Index=1, Value=len(update_list))
@@ -316,7 +321,7 @@ class ADwin_Driver:
         
         self.adw.SetData_Long(Data=processdelay_times, DataNo=9, Startindex=1, Count=len(processdelay_times))
         self.adw.SetData_Long(Data=processdelay_value_list, DataNo=10, Startindex=1, Count=len(processdelay_value_list))
-        #self.adw.SetData_Long(Data=list(channel_card.astype('int')), DataNo=4, Startindex=1, Count=len(channel_card))
+
 
         total_time = time.time() - start_time2
         print(f"Total time taken to load data: {total_time}")
@@ -351,8 +356,9 @@ import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
-    sequence = Sequence(time_resolution=0.001)
+    sequence = Sequence(time_resolution=0.01)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
+    analog_channel = sequence.add_analog_channel("Analog2", 3, 5)
     time_unit = 1
     # event1 = sequence.add_event("Analog1", Jump(0), start_time=0)
     # event2 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*1)
@@ -371,12 +377,20 @@ if __name__ == "__main__":
     event1 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
     event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=0,resolution=0.1), start_time=time_unit*4)
     event1 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*6)
-    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LOGARITHMIC,start_value=2,end_value=3,resolution=0.1), start_time=time_unit*7)
+    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=2,end_value=3,resolution=0.1), start_time=time_unit*7)
+
+
+    event1 = sequence.add_event("Analog2", Jump(3), start_time=0)
+    event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=1,resolution=0.01), start_time=time_unit*1)
+    event1 = sequence.add_event("Analog2", Jump(3), start_time=time_unit*3)
+    event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.1), start_time=time_unit*4)
+    event1 = sequence.add_event("Analog2", Jump(2), start_time=time_unit*6)
+    event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=2,end_value=5,resolution=0.1), start_time=time_unit*7)
 
 
     adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
     adwin_driver.add_to_queue(sequence)
-    update_list, channel_card, channel_number, channel_value,processdelay_times,processdelay_value_list=calculate_sequence_data_eff(sequence,adwin_driver)
+    update_list, channel_number, channel_value,processdelay_times,processdelay_value_list=calculate_sequence_data_eff(sequence,adwin_driver)
     print(processdelay_times)
     print(processdelay_value_list)
     print(len(update_list))
@@ -402,7 +416,7 @@ if __name__ == "__main__":
     # print(update_list)
     print(len(channel_value))
     print(update_list)
-    # plt.plot(channel_card) 
+
     # plt.plot(channel_number)
     # plt.scatter(np.arange(10),channel_value[:10])
 

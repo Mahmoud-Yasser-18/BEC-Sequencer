@@ -34,6 +34,7 @@
 #define LIMIT 65535 'at most can have 16 bit value written to DAC
 
 
+Import Math.lic 
 
 
 'these arrays are predefined globals in ADbasic, but they must be declared before use
@@ -59,6 +60,13 @@ dim state as long 'the updated value
 dim process_delay_count1 as long
 dim process_delay_count2 as long
 dim flag_process_delay as long
+
+
+dim type as long 
+dim card as long 
+dim channel as long
+dim type_card_channel as long
+
 'Note that the output voltage range of the DACs for the AOUT8/16 modules is set to �10V bipolar and can't be
 'changed (ADwin Pro II hardware manual, page 96)
 '8 output channels, 16 bit resolution, < 3 us settling time
@@ -146,26 +154,9 @@ EVENT:
        
       'get the channel number: corresponds to analog or digital outs    
       ch = Data_2[num_updates]
+      state = Data_3[num_updates] 
+      generic_write(ch, state) 
       
-      if((ch >= 1) AND (ch <= 32)) then 'we have a digital channel
-        'write to corresponding channel
-        ch = ch - 1 'numbering starts at 0 for dig card
-        state = Data_3[num_updates] 'get the value to be written
-            
-        'write the 32 bit code to the digital card
-        P2_Dig_Write_Latch(d_io, state)
-
-      endif
-         
-      if((ch >=33) AND (ch <=47)) then 'we have an analog channel
-        'check if out of of range although this should have been done in matlab
-        if(Data_3[num_updates] > LIMIT) then
-          P2_Set_LED(a_out1,1);
-        else
-          analog_write(ch, Data_3[num_updates]) 
-        endif
-      
-      endif
       
       Inc(num_updates)
       
@@ -200,24 +191,31 @@ FINISH:
   
   '***************************************************
  
-sub analog_write(achannel, avalue) 
+  
+sub generic_write(type_card_channel, avalue) 
   ' if statement for each module i.e. analog card
-  if((achannel>=33) AND (achannel<=40)) then
-    'write the channel value; the sync functions called above actually start the D/A conversion process
-    P2_Write_DAC(a_out1,achannel-32,avalue)
-  endif
-  'analog card 2 with channels 41-48 (this is OUR numbering choice, not the device's -  must convert)   
-  if((achannel>=41) AND (achannel<=48)) then
-    'subtract since module/card designates channels with numbers 1-8.
-    P2_Write_DAC(a_out2,achannel-40,avalue)
+
+  ' Extract x by dividing the encoded number by 10^4
+  type = type_card_channel / 10000
+
+  ' Extract y by dividing by 100, then taking modulo 100
+  
+  ' Extract z by taking modulo 100
+  card  = Mod (type_card_channel ,100)
+  
+  if (type=0) then 
+    channel= Mod ((type_card_channel / 100) , 100)
+    P2_Write_DAC(card,channel,avalue)
+  else 
+    P2_Dig_Write_Latch(card, avalue)
   endif 
-  'analog card 3 with channels 49-56
-  if((achannel>=49) AND (achannel<=56)) then
-    P2_Write_DAC(a_out3,achannel-48,avalue) 'subtract since module/card designates channels with numbers 1-8.
-  endif
-  'analog card 4 with channels 57-64
-  if((achannel>=57) AND (achannel<=64)) then
-    P2_Write_DAC(a_out4,achannel-56,avalue) 'subtract since module/card designates channels with numbers 1-8.
-  endif  
+
+      
  
 endsub
+
+
+
+
+  
+
