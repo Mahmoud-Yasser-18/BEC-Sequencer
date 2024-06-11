@@ -182,7 +182,7 @@ FINISH:
   '  P2_Digout(d_io, 0, 1) '3D MOT single pass MOGlabs; leave on
   '  P2_Digout(d_io, 1, 0) 'camera trigger
   '  P2_Digout(d_io, 2, 0) 'just testing for now
-  P2_Dig_Write_Latch(d_io, 000b)
+  'P2_Dig_Write_Latch(d_io, 000b)
   
   'reset to default values; hard coded ch vals just for now for testing/until we know desired "end state" signal behaviour
   'analog_write(33, 0)  '3D mot coils are active low; this leaves them off when we finish
@@ -199,7 +199,7 @@ FINISH:
   'P2_SYNC_ALL(0111b) # this is wierd
   
   '***************************************************
-  'should check if analog value is between -10 and 10 V in matlab code before writing to final list
+ 
 sub analog_write(achannel, avalue) 
   ' if statement for each module i.e. analog card
   if((achannel>=33) AND (achannel<=40)) then
