@@ -42,8 +42,11 @@ dim Data_1[SIZE] as long 'this array is used to step through Data_2 and Data_3; 
 dim Data_2[SIZE] as long 'indicates the channels to be updated
 dim Data_3[SIZE] as long 'indicates the values of the channels; in a 1:1 correspondence with Data_2
 'Data_4 will be used for reset to zero stuff?
-
 'reset to zero stuff?
+
+dim Data_9[SIZE] as long
+dim Data_10[SIZE] as long
+
 
 'declaration of local variables
 dim i as long 'loop index
@@ -53,6 +56,9 @@ dim num_updates as long 'tracks running total of number of updates to signal val
 dim ch as long 'the channel to be updated
 dim state as long 'the updated value
 
+dim process_delay_count1 as long
+dim process_delay_count2 as long
+dim flag_process_delay as long
 'Note that the output voltage range of the DACs for the AOUT8/16 modules is set to �10V bipolar and can't be
 'changed (ADwin Pro II hardware manual, page 96)
 '8 output channels, 16 bit resolution, < 3 us settling time
@@ -72,7 +78,9 @@ INIT:
     
   event_count = 1
   num_updates = 1
-        
+  process_delay_count1 = 1
+  process_delay_count2 = 1
+  flag_process_delay  = 0
 
 
   'set the necessary digital channels to be output channels
@@ -97,19 +105,41 @@ INIT:
 
 
 EVENT:
-  'works with SYNC_ENABLE to ensure simultaneous updates are indeed simultaneous
   P2_SYNC_ALL(0111b) 
+  
+  'works with SYNC_ENABLE to ensure simultaneous updates are indeed simultaneous
     
   'update Processdelay... should do at beginning of EVENT section!
   'a negative value in Data_1 indicates we should hold values for the absolute value of Data_1[event_count] number of base delays
   'we update Processdelay accordingly
   'If Data_1[event_count] is positive, the value controls the update channel loop
-  curr_delay = DELAY
-  if(Data_1[event_count] < 0) then
-    curr_delay = (-1*Data_1[event_count])
+
+  
+
+  
+  if (((event_count>= Data_9[process_delay_count2]  )and (Data_9[process_delay_count2+1] >= event_count)) and (Data_1[event_count] > 0)) then
+    flag_process_delay = 1
+    Processdelay = Data_10[process_delay_count1]
+    
+  else
+    if (flag_process_delay = 1) then 
+      process_delay_count2=process_delay_count2+2
+      process_delay_count1=process_delay_count1+1
+      flag_process_delay = 0
+    endif 
+    
+    curr_delay = DELAY
+    if(Data_1[event_count] < 0) then
+      curr_delay = (-1*Data_1[event_count])
+    endif
+    Processdelay = curr_delay
+    
   endif
-  Processdelay = curr_delay
- 
+  
+
+  
+  
+  
   'only need to update if Data_1 value is positive
   if((Data_1[event_count] <= MAX_UPDATES) and (Data_1[event_count] > 0)) then
     for i = 1 to Data_1[event_count] 'loop over the number of updates at this time instance
@@ -166,7 +196,7 @@ FINISH:
   'analog_write(38, 0)   'analog card 1 ch 6
   'analog_write(47, 0)   'analog card 1 ch 7
   
-  P2_SYNC_ALL(0111b) 
+  'P2_SYNC_ALL(0111b) # this is wierd
   
   '***************************************************
   'should check if analog value is between -10 and 10 V in matlab code before writing to final list
