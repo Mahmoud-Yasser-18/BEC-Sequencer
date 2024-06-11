@@ -55,7 +55,7 @@ class Ramp(EventBehavior):
         elif self.ramp_type == RampType.EXPONENTIAL:
             self.func = lambda t: self.start_value * (self.end_value / self.start_value) ** (t / self.duration)
         elif self.ramp_type == RampType.LOGARITHMIC:
-            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (math.log10(t + 1) / math.log10(self.duration + 1))
+            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (np.log10(t + 1) / np.log10(self.duration + 1))
 
     
     def get_value_at_time(self, t: float) -> float:
