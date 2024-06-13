@@ -5,7 +5,7 @@ import csv
 import math
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Callable, List, Optional, Union,Tuple
+from typing import Callable, List, Optional, Union,Tuple, Dict, Any 
 import matplotlib.pyplot as plt
 import copy
 
@@ -601,16 +601,29 @@ class Sequence:
         
         self.all_events.sort(key=lambda event: event.start_time)
 
+    
 
-    def edit_event(self, start_time: float, channel_name: str,
-                   ramp_or_jump : Optional[str] = None,
+    def edit_event(self, start_time: Optional[float]=None, channel_name: Optional[str]=None,
+                   edited_event: Optional[Event]=None,
                     duration: Optional[float] = None, ramp_type: Optional[RampType] = None, start_value: Optional[float] = None, end_value: Optional[float] = None, func: Optional[Callable[[float], float]] = None, resolution: Optional[float] = None, 
                     jump_target_value: Optional[float] = None,
                       new_start_time: Optional[float] = None,
                         new_relative_time: Optional[float] = None,
                           new_reference_time: Optional[str] = None):
         temp_sequence = copy.deepcopy(self)
-        event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
+        
+        if (edited_event is not None) and (start_time is not  None) and (channel_name is not None):
+            raise ValueError("Provide either edited_event or start_time and channel_name, not both.")
+        
+        if edited_event is None and (start_time is None or channel_name is None):
+            raise ValueError("Provide either edited_event or start_time and channel_name.")
+        
+
+        if edited_event is None:
+            event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
+        else:
+            event = temp_sequence.find_event_by_time_and_channel(edited_event.start_time, edited_event.channel.name)    
+
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
 
@@ -639,7 +652,6 @@ class Sequence:
             event.behavior.edit_ramp(duration, ramp_type, start_value, end_value, func, resolution)
             delta_duration = event.behavior.duration-  event.end_time+  event.start_time 
             if delta_duration:
-                print("delta_duration",delta_duration)
                 event.update_times_end(delta_duration)
 
         elif isinstance(event.behavior, Jump):
@@ -652,7 +664,10 @@ class Sequence:
             channel.check_for_overlapping_events()
 
         # Apply the changes to the original sequence if no overlaps are found
-        event = self.find_event_by_time_and_channel(start_time, channel_name)
+        if edited_event is None:
+            event = self.find_event_by_time_and_channel(start_time, channel_name)
+        else:
+            event = edited_event    
 
 
         if new_start_time is not None:
@@ -691,103 +706,117 @@ class Sequence:
             channel.check_for_overlapping_events()
 
 
-    # edit the behavior of an event
-    def edit_behavior(self, start_time: float, channel_name: str, **kwargs):
-        temp_sequence = copy.deepcopy(self)
-        event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
-        if event is None:
-            raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
+    def sweep_event_parameters(self, parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, edited_event: Optional[Event] = None):
+        # Find the event to sweep
+        if edited_event is not None and start_time is not  None and channel_name is not None:
+            raise ValueError("Provide either edited_event or start_time and channel_name, not both.")
         
-        if isinstance(event.behavior, Jump):
-            if 'target_value' in kwargs:
-                event.behavior.target_value = kwargs['target_value']
-        elif isinstance(event.behavior, Ramp):
-            duration_change = 0
-            if 'duration' in kwargs:
-                new_duration = kwargs['duration']
-                duration_change = new_duration - event.behavior.duration
-                event.behavior.duration = new_duration
-            
-            if 'ramp_type' in kwargs:
-                event.behavior.ramp_type = kwargs['ramp_type']
-                if event.behavior.ramp_type == RampType.LINEAR:
-                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration)
-                elif event.behavior.ramp_type == RampType.QUADRATIC:
-                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration) ** 2
-                elif event.behavior.ramp_type == RampType.EXPONENTIAL:
-                    event.behavior.func = lambda t: event.behavior.start_value * (event.behavior.end_value / event.behavior.start_value) ** (t / event.behavior.duration)
-                elif event.behavior.ramp_type == RampType.LOGARITHMIC:
-                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (math.log10(t + 1) / math.log10(event.behavior.duration + 1))
-                elif event.behavior.ramp_type == RampType.GENERIC and 'func' in kwargs:
-                    event.behavior.func = kwargs['func']
-            
-            if 'start_value' in kwargs:
-                event.behavior.start_value = kwargs['start_value']
-            
-            if 'end_value' in kwargs:
-                event.behavior.end_value = kwargs['end_value']
+        if edited_event is None and (start_time is None or channel_name is None):
+            raise ValueError("Provide either edited_event or start_time and channel_name.")
+        
 
-            event.end_time = event.start_time + event.behavior.duration
 
-            for other_event in event.channel.events:
-                if other_event is not event and not (event.end_time < other_event.start_time or event.start_time > other_event.end_time):
-                    raise ValueError(f"Edited event conflicts with existing event {other_event.behavior} from {other_event.start_time} to {other_event.end_time} on channel {event.channel.name}")
+        
+        list_of_sequences=dict()
+        # know which parameter to sweep
+        if parameter == "duration":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, duration=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "ramp_type":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, ramp_type=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "start_value":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, start_value=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "end_value":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, end_value=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "func":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, func=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "resolution":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, resolution=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "jump_target_value":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, jump_target_value=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "start_time":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_start_time=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "relative_time":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_relative_time=value)
+                    list_of_sequences[(parameter,value)]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        elif parameter == "reference_time":
+            for value in values:
+                temp_sequence = copy.deepcopy(self)
+                try:
+                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_reference_time=value)
+                    list_of_sequences[((parameter,value))]=temp_sequence
+                except ValueError as e:
+                    print(e)
+                
+        else:
 
-            if duration_change != 0:
-                for child in event.children:
-                    if child.reference_time == 'start':
-                        child.update_times(duration_change)
-                    elif child.reference_time == 'end':
-                        child.update_times(duration_change)
+            raise ValueError(f"Invalid parameter: {parameter}")
 
-        for channel in temp_sequence.channels:
-            channel.check_for_overlapping_events()
+        return list_of_sequences
+        
 
-        # Apply the changes to the original sequence if no overlaps are found
-        event = self.find_event_by_time_and_channel(start_time, channel_name)
-        if isinstance(event.behavior, Jump):
-            if 'target_value' in kwargs:
-                event.behavior.target_value = kwargs['target_value']
-        elif isinstance(event.behavior, Ramp):
-            duration_change = 0
-            if 'duration' in kwargs:
-                new_duration = kwargs['duration']
-                duration_change = new_duration - event.behavior.duration
-                event.behavior.duration = new_duration
-            
-            if 'ramp_type' in kwargs:
-                event.behavior.ramp_type = kwargs['ramp_type']
-                if event.behavior.ramp_type == RampType.LINEAR:
-                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration)
-                elif event.behavior.ramp_type == RampType.QUADRATIC:
-                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (t / event.behavior.duration) ** 2
-                elif event.behavior.ramp_type == RampType.EXPONENTIAL:
-                    event.behavior.func = lambda t: event.behavior.start_value * (event.behavior.end_value / event.behavior.start_value) ** (t / event.behavior.duration)
-                elif event.behavior.ramp_type == RampType.LOGARITHMIC:
-                    event.behavior.func = lambda t: event.behavior.start_value + (event.behavior.end_value - event.behavior.start_value) * (math.log10(t + 1) / math.log10(event.behavior.duration + 1))
-                elif event.behavior.ramp_type == RampType.GENERIC and 'func' in kwargs:
-                    event.behavior.func = kwargs['func']
-            
-            if 'start_value' in kwargs:
-                event.behavior.start_value = kwargs['start_value']
-            
-            if 'end_value' in kwargs:
-                event.behavior.end_value = kwargs['end_value']
 
-            event.end_time = event.start_time + event.behavior.duration
-
-            for other_event in event.channel.events:
-                if other_event is not event and not (event.end_time < other_event.start_time or event.start_time > other_event.end_time):
-                    raise ValueError(f"Edited event conflicts with existing event {other_event.behavior} from {other_event.start_time} to {other_event.end_time} on channel {event.channel.name}")
-
-            if duration_change != 0:
-                for child in event.children:
-                    if child.reference_time == 'start':
-                        child.update_times(duration_change)
-                    elif child.reference_time == 'end':
-                        child.update_times(duration_change)
-
-        self.all_events.sort(key=lambda event: event.start_time)
 
 
     def print_event_tree(self, level: int = 0, indent: str = "    "):
@@ -959,6 +988,7 @@ class Sequence:
             return event_data
 
         data = {
+            "name": self.sequence_name,
             "channels": [],
             "events": []
         }
@@ -1018,7 +1048,7 @@ class Sequence:
             json_str = json_input
 
         data = json.loads(json_str)
-        sequence = Sequence()
+        sequence = Sequence(data["name"])
 
         channel_map = {}
         for channel_data in data["channels"]:
@@ -1287,26 +1317,89 @@ class Sequence:
             temp_original_sequence.find_channel_by_name(event.channel.name).events.append(event)
 
         return temp_original_sequence
-            
-        
+
 
 
 
 class SequenceManager:
     def __init__(self,) -> None:
+        self.main_sequences = dict()
 
+
+    def add_new_sequence(self,  sequence_name: str,index: Optional[int] = None):
         
-         
-        self.main_sequences =[]
-
-
-    def load_main_sequences(self):
-        pass
-
-    def creat_new_main_sequences(self):
-        pass 
-
+        if index is None:
+            index = len(self.main_sequences)
+        self.main_sequences[sequence_name] = {"index":index, "seq":Sequence('sequence_name'),"sweep_list":[]}
     
+    def change_sequence_name(self, old_name: str, new_name: str):
+        if old_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {old_name} not found.")
+        
+        if new_name in self.main_sequences:
+            raise ValueError(f"Sequence with name {new_name} already exists.")
+        
+        self.main_sequences[new_name] = self.main_sequences.pop(old_name)
+        self.main_sequences[new_name]["seq"].sequence_name = new_name
+        if self.main_sequences[new_name]["spweep_list"]:
+            for seq in self.main_sequences[new_name]["sweep_list"]:
+                seq.sequence_name = new_name
+
+    def change_sequence_index(self, sequence_name: str, new_index: int):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        
+        if new_index in (seq["index"] for seq in self.main_sequences.values()):
+            raise ValueError(f"Sequence with index {new_index} already exists.")
+        
+        self.main_sequences[sequence_name]["index"] = new_index
+
+    def delete_sequence(self, sequence_name: str):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        
+        self.main_sequences.pop(sequence_name)
+    
+    def sort_sequences(self):
+        self.main_sequences = dict(sorted(self.main_sequences.items(), key=lambda item: item[1]["index"]))
+
+
+    def load_sequence_json(self, json: str, index):
+        if index in self.main_sequences:
+            raise ValueError(f"Sequence with index {index} already exists.")
+        
+        sequence = Sequence.from_json(json)
+        if sequence.sequence_name in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence.sequence_name} already exists.")
+        
+        self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence}
+    
+    
+     
+     
+
+    def sweep_sequence(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, edited_event: Optional[Event] = None):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+
+        new_sweep_dict = dict()
+        if not self.main_sequences[sequence_name]["sweep_list"]:
+            for old_key, old_seq in self.main_sequences[sequence_name]["sweep_list"].items():
+                temp_sweep = old_seq.sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, edited_event=edited_event)
+                for new_key, new_seq in temp_sweep.items():
+                    new_sweep_dict[new_key+old_key] = new_seq
+            self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
+                
+        else:
+            new_sweep_dict = self.main_sequences[sequence_name]["seq"].sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, edited_event=edited_event)
+            self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
+
+
+
+        sequence = self.main_sequences[sequence_name]["seq"]
+        list_of_seqs = sequence.sweep_event_parameters(param, values)
+        self.main_sequences[sequence_name]["sweep_list"].append(list_of_seqs)
+
         
 
 def create_test_sequence():
@@ -1316,7 +1409,7 @@ def create_test_sequence():
 
     # Create events for testing
     event1 = sequence.add_event("Analog1", Jump(1.0), start_time=0)
-    event2 = sequence.add_event("Analog1", Ramp(5, RampType.LINEAR, 1.0, 5.0), start_time=10)
+    event2 = sequence.add_event("Analog1", Ramp(2, RampType.LINEAR, 1.0, 5.0), parent_event=event1, reference_time="end",relative_time=2)
     event3 = sequence.add_event("Analog1", Jump(0.0),  start_time=17)
     event4 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10), start_time=20)
     
@@ -1328,6 +1421,18 @@ def create_test_sequence():
 if __name__ == '__main__':
 
     sequence1 = create_test_sequence()
-    sequence1.edit_event(start_time=10,channel_name= "Analog1", duration=7)
-    sequence1.plot(channels_to_plot=["Analog1"])
+    
+    list_of_seqs = sequence1.sweep_event_parameters("duration", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
+
+    for key, seq in list_of_seqs.items():
+        seq.plot()
+    
+    seq_manager = SequenceManager()
+    seq_manager.add_new_sequence("test")
+    seq_manager.main_sequences["test"]["seq"] = sequence1
+
+    seq_manager.sweep_sequence("test", "start", [1,2,3,4,5,6,16])
+
+    
+
 
