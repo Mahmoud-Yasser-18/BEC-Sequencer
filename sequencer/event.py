@@ -107,6 +107,10 @@ class Channel:
             if current_event.end_time > next_event.start_time:
                 raise ValueError(f"Events {current_event} and {next_event} on channel {self.name} overlap.")
 
+
+    def __eq__(self, other: object) -> bool:
+        return self.name == other.name and self.card_number == other.card_number and self.channel_number == other.channel_number and self.reset == other.reset and self.reset_value == other.reset_value
+
 class Analog_Channel(Channel):
     def __init__(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10,LIMIT=65535, RANGE=20, OFFSET=10):
         super().__init__(name, card_number, channel_number, reset, reset_value)
@@ -134,12 +138,18 @@ class Analog_Channel(Channel):
             f"   events={self.events}\n"
             f")"
         )
+    
+    def __eq__(self, other: object) -> bool:
+        return super().__eq__(other) and self.default_voltage_func == other.default_voltage_func and self.max_voltage == other.max_voltage and self.min_voltage == other.min_voltage
 
 class Digital_Channel(Channel):
     def __init__(self, name: str, card_number: int, channel_number: int, card_id: str, bitpos: int, reset: bool = False, reset_value: float = 0):
         super().__init__(name, card_number, channel_number, reset, reset_value)
         self.card_id = card_id
         self.bitpos = bitpos
+
+    def __eq__(self, other: object) -> bool:
+        return super().__eq__(other) and self.card_id == other.card_id and self.bitpos == other.bitpos
 
     def __repr__(self) -> str:
         return (
@@ -270,12 +280,31 @@ class Sequence:
 
     # add a new analog channel to the sequence
     def add_analog_channel(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10) -> Analog_Channel:
+        for channel in self.channels:
+            if channel.name == name:
+                raise ValueError(f"Channel name '{name}' is already in use.")
+
+        # Ensure combination of card_number and channel_number is unique
+        for channel in self.channels:
+            if channel.card_number == card_number and channel.channel_number == channel_number:
+                raise ValueError(f"Card number {card_number} and channel number {channel_number} combination is already in use.")
+
         channel = Analog_Channel(name, card_number, channel_number, reset, reset_value, default_voltage_func, max_voltage, min_voltage)
+        
         self.channels.append(channel)
         return channel
 
     # add a new digital channel to the sequence
     def add_digital_channel(self, name: str, card_number: int, channel_number: int, card_id: str, bitpos: int, reset: bool = False, reset_value: float = 0) -> Digital_Channel:
+        for channel in self.channels:
+            if channel.name == name:
+                raise ValueError(f"Channel name '{name}' is already in use.")
+
+        # Ensure combination of card_number and channel_number is unique
+        for channel in self.channels:
+            if channel.card_number == card_number and channel.channel_number == channel_number:
+                raise ValueError(f"Card number {card_number} and channel number {channel_number} combination is already in use.")
+                    
         channel = Digital_Channel(name, card_number, channel_number, card_id, bitpos, reset, reset_value)
         self.channels.append(channel)
         return channel
@@ -1039,6 +1068,19 @@ class Sequence:
 
 
 
+    def add_sequence(self, new_sequence: 'Sequence', time_difference: float):
+        temp_original_sequence = copy.deepcopy(self)
+        temp_new_sequence = copy.deepcopy(new_sequence)
+
+        original_sequence_channels = [ch.name for ch in temp_original_sequence.channels]
+        new_sequence_channels = [ch.name for ch in temp_new_sequence.channels]
+
+
+        
+        # checking for channel conflicts
+        # make sure that the channels in the new sequence do not conflict with the channels in the original sequence
+        # add channels from the new sequence to the original sequence if they do not exist
+        
 
 
 
@@ -1102,11 +1144,10 @@ if __name__ == '__main__':
 
 
     sequence.plot()
-    update2_list, channel2_card, channel2_number, channel2_value = calculate_sequence_data_eff(sequence)
-
+    
     # plt.plot(update2_list)
     #plt.plot(channel2_card)
     #plt.plot(channel2_number)
-    plt.plot(channel2_value)
+
 
     plt.show()
