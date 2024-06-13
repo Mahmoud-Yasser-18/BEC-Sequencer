@@ -724,7 +724,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, duration=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -733,7 +733,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, ramp_type=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -742,7 +742,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, start_value=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -751,7 +751,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, end_value=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -760,7 +760,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, func=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -769,7 +769,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, resolution=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -778,7 +778,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, jump_target_value=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -787,7 +787,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_start_time=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -796,7 +796,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_relative_time=value)
-                    list_of_sequences[(parameter,value)]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -805,7 +805,7 @@ class Sequence:
                 temp_sequence = copy.deepcopy(self)
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_reference_time=value)
-                    list_of_sequences[((parameter,value))]=temp_sequence
+                    list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
                 
@@ -1330,7 +1330,7 @@ class SequenceManager:
         
         if index is None:
             index = len(self.main_sequences)
-        self.main_sequences[sequence_name] = {"index":index, "seq":Sequence('sequence_name'),"sweep_list":[]}
+        self.main_sequences[sequence_name] = {"index":index, "seq":Sequence('sequence_name'),"sweep_list":dict()}
     
     def change_sequence_name(self, old_name: str, new_name: str):
         if old_name not in self.main_sequences:
@@ -1342,7 +1342,7 @@ class SequenceManager:
         self.main_sequences[new_name] = self.main_sequences.pop(old_name)
         self.main_sequences[new_name]["seq"].sequence_name = new_name
         if self.main_sequences[new_name]["spweep_list"]:
-            for seq in self.main_sequences[new_name]["sweep_list"]:
+            for key, seq in self.main_sequences[new_name]["sweep_list"]:
                 seq.sequence_name = new_name
 
     def change_sequence_index(self, sequence_name: str, new_index: int):
@@ -1383,22 +1383,23 @@ class SequenceManager:
             raise ValueError(f"Sequence with name {sequence_name} not found.")
 
         new_sweep_dict = dict()
-        if not self.main_sequences[sequence_name]["sweep_list"]:
+        if  len(self.main_sequences[sequence_name]["sweep_list"])!=0:
+            # print("sweep_list is not empty")
+            # print(self.main_sequences[sequence_name])
             for old_key, old_seq in self.main_sequences[sequence_name]["sweep_list"].items():
+
                 temp_sweep = old_seq.sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, edited_event=edited_event)
                 for new_key, new_seq in temp_sweep.items():
-                    new_sweep_dict[new_key+old_key] = new_seq
+
+                    new_sweep_dict[(new_key,old_key)] = new_seq
             self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
                 
         else:
+            print("else")
             new_sweep_dict = self.main_sequences[sequence_name]["seq"].sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, edited_event=edited_event)
             self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
 
 
-
-        sequence = self.main_sequences[sequence_name]["seq"]
-        list_of_seqs = sequence.sweep_event_parameters(param, values)
-        self.main_sequences[sequence_name]["sweep_list"].append(list_of_seqs)
 
         
 
@@ -1422,17 +1423,23 @@ if __name__ == '__main__':
 
     sequence1 = create_test_sequence()
     
-    list_of_seqs = sequence1.sweep_event_parameters("duration", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
+    # list_of_seqs = sequence1.sweep_event_parameters("duration", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
 
-    for key, seq in list_of_seqs.items():
-        seq.plot()
+    # for key, seq in list_of_seqs.items():
+    #     seq.plot()
     
     seq_manager = SequenceManager()
     seq_manager.add_new_sequence("test")
     seq_manager.main_sequences["test"]["seq"] = sequence1
 
-    seq_manager.sweep_sequence("test", "start", [1,2,3,4,5,6,16])
+
+    seq_manager.sweep_sequence("test","end_value", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
+    print(seq_manager.main_sequences)
+    seq_manager.sweep_sequence("test","duration", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
+    print(seq_manager.main_sequences)
+
+    for key, seq in seq_manager.main_sequences["test"]["sweep_list"].items():
+        print(key)
+        seq.plot()
 
     
-
-
