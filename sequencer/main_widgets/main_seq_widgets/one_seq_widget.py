@@ -203,7 +203,7 @@ class EventsViewerWidget(QWidget):
             if behavior['behavior_type'] == 'Jump':
                 child_event = self.sequence.add_event(
                     channel_name=data['channel'],
-                    behavior=Jump(data['jump_target_value']),
+                    behavior=Jump(behavior['jump_target_value']),
                     relative_time=float(data["relative_time"]),
                     reference_time=data["reference_time"],
                     parent_event=parent_event
