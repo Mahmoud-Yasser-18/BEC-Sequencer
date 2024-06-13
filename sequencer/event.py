@@ -1399,12 +1399,62 @@ class SequenceManager:
             new_sweep_dict = self.main_sequences[sequence_name]["seq"].sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, edited_event=edited_event)
             self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
 
+    def run_main_sequence(self ):
 
+        
+        # put all sequences in a list and sort them by the index
+        seq_list = list(self.main_sequences.values())
+        seq_list.sort(key=lambda seq: seq["index"])
+
+        # Run the sequences in order
+        main_sequence = seq_list[0]["seq"]
+        for seq in seq_list[1:]:
+            main_sequence = main_sequence.add_sequence(seq["seq"])
+
+        return main_sequence
+    
+    def run_sweep_sequences(self):
+        # put all sequences in a list and sort them by the index
+        seq_list = list(self.main_sequences.values())
+        seq_list.sort(key=lambda seq: seq["index"])
+
+        # make a list of all the sweep sequences and compine them according to the index
+        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [seq_list[0]["seq"]]
+        # print("""list (seq_list[0]["sweep_list"].values()) """)
+        # print(len(sweep_sequences))
+        # print(sweep_sequences)
+        for seq in seq_list[1:]:
+            if len(seq["sweep_list"].items())!=0:
+                new_sweep_sequences = []
+                
+                
+                for sweep_seq in seq["sweep_list"].values():
+                    for sweep in sweep_sequences:
+                        temp = copy.copy(sweep)
+                        temp.append(sweep_seq)
+                        new_sweep_sequences.append(temp)
+                
+                sweep_sequences = new_sweep_sequences
+            else:
+                for sweep in sweep_sequences:
+                    sweep.append(seq["seq"])
+        
+        # print("sweep_sequences",sweep_sequences)
+        # print("len(sweep_sequences)",len(sweep_sequences))
+        final_sweep_sequences = []
+        for sweep in sweep_sequences:
+            main_sweep = sweep[0]
+            for seq in sweep[1:]:
+                main_sweep = main_sweep.add_sequence(seq)
+            final_sweep_sequences.append(main_sweep)
+
+        return final_sweep_sequences
+            
 
         
 
-def create_test_sequence():
-    sequence = Sequence("test")
+def create_test_sequence(name: str = "test"):
+    sequence = Sequence(name)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
     
 
@@ -1421,8 +1471,7 @@ def create_test_sequence():
 
 if __name__ == '__main__':
 
-    sequence1 = create_test_sequence()
-    
+
     # list_of_seqs = sequence1.sweep_event_parameters("duration", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
 
     # for key, seq in list_of_seqs.items():
@@ -1430,16 +1479,22 @@ if __name__ == '__main__':
     
     seq_manager = SequenceManager()
     seq_manager.add_new_sequence("test")
-    seq_manager.main_sequences["test"]["seq"] = sequence1
+    seq_manager.main_sequences["test"]["seq"] = create_test_sequence()
+
+    seq_manager.add_new_sequence("test2")
+    seq_manager.main_sequences["test2"]["seq"] = create_test_sequence("test2")
 
 
-    seq_manager.sweep_sequence("test","end_value", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
-    print(seq_manager.main_sequences)
-    seq_manager.sweep_sequence("test","duration", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
-    print(seq_manager.main_sequences)
-
-    for key, seq in seq_manager.main_sequences["test"]["sweep_list"].items():
-        print(key)
-        seq.plot()
+    # seq_manager.sweep_sequence("test","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
+    # # print(seq_manager.main_sequences)
+    seq_manager.sweep_sequence("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
+    # print(seq_manager.main_sequences)
+    seq_manager.sweep_sequence("test2","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
+    # print(seq_manager.main_sequences)
+    # seq_manager.sweep_sequence("test2","duration", [1,2,3],start_time=2,channel_name= "Analog1")
+    # print(seq_manager.main_sequences)
 
     
+    main_seq = seq_manager.run_sweep_sequences()
+    for seq in main_seq:
+        seq.plot()
