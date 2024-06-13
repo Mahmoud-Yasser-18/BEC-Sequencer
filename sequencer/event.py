@@ -267,11 +267,10 @@ class Event:
             child.print_event_hierarchy(level + 1, indent)
 
 class Sequence:
-    def __init__(self,time_resolution: float = 0.001):
+    def __init__(self,name:str):
         
-        # the duration of the smallest time step that can be represented in the sequence
-        self.time_resolution = time_resolution # in seconds 
-
+        self.sequence_name=name
+        
         # list of all channels in the sequence 
         self.channels: List[Channel] = []
         # list of all events in the sequence 
@@ -340,6 +339,13 @@ class Sequence:
             if channel.name == name:
                 return channel
         return None
+    
+    def find_channel_by_channel_and_card_number(self, card_number: int, channel_number: int) -> Optional[Channel]:
+        for channel in self.channels:
+            if channel.card_number == card_number and channel.channel_number == channel_number:
+                return channel
+        return None
+
     # find an event by its start time and channel name
     def find_event_by_time_and_channel(self, start_time: float, channel_name: str) -> Optional[Event]:
         channel = self.find_channel_by_name(channel_name)
@@ -621,7 +627,7 @@ class Sequence:
         root_events = [event for event in self.all_events if event.parent is None]
         for root_event in root_events:
             root_event.print_event_hierarchy(level, indent)
-    def plot_all(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None):
+    def plot_all(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None,plot_now: bool =False):
         if channels_to_plot is None:
             channels_to_plot = [channel.name for channel in self.channels]
         else:
@@ -685,10 +691,12 @@ class Sequence:
         ax.set_ylabel("Value")
         ax.legend()
         ax.grid(True)
+        
         plt.tight_layout()
-        plt.show()
+        if plot_now:
+            plt.show()
 
-    def plot(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None):
+    def plot(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None, plot_now: bool =False):
         if channels_to_plot is None:
             channels_to_plot = [channel.name for channel in self.channels]
         else:
@@ -754,7 +762,8 @@ class Sequence:
         
         axes[-1].set_xlabel("Time")
         plt.tight_layout()
-        plt.show()
+        if plot_now:
+            plt.show()  
 
     def to_json(self, filename: str) -> str:
         def serialize_event(event: Event) -> dict:
@@ -900,7 +909,7 @@ class Sequence:
         return sequence
 
 
-    def plot_event_tree(self):
+    def plot_event_tree(self,plot_now: bool =False):
         fig, ax = plt.subplots(figsize=(15, 8))
         
         # Create a dictionary to map channels to their vertical positions
@@ -950,9 +959,10 @@ class Sequence:
         # Add grid
         ax.grid(True)
         plt.tight_layout()
-        plt.show()
+        if plot_now:
+            plt.show()
 
-    def plot_with_event_tree(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None):
+    def plot_with_event_tree(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None,plot_now: bool =False):
         if channels_to_plot is None:
             channels_to_plot = [channel.name for channel in self.channels]
         else:
@@ -1058,34 +1068,68 @@ class Sequence:
         # Add grid
         ax.grid(True)
         plt.tight_layout()
-        plt.show()
+        if plot_now:
+            plt.show()
     
-    def sequence_dauation(self):
+    def find_sequence_dauation(self):
         return max(
             (event.start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 0))
             for event in self.all_events
         )
 
 
-
-    def add_sequence(self, new_sequence: 'Sequence', time_difference: float):
+    # returns a new sequence with the events of the new sequence added to the original sequence with a time difference if specified
+    def add_sequence(self, new_sequence: 'Sequence', time_difference: float = 0.0):
         temp_original_sequence = copy.deepcopy(self)
         temp_new_sequence = copy.deepcopy(new_sequence)
 
-        original_sequence_channels = [ch.name for ch in temp_original_sequence.channels]
-        new_sequence_channels = [ch.name for ch in temp_new_sequence.channels]
 
-
+        # Check for channel conflicts in names and properties
+        original_sequence_channels_names = [ch.name for ch in temp_original_sequence.channels]
+        new_sequence_channels_names = [ch.name for ch in temp_new_sequence.channels]
+        intersection_channels_name = list(set(original_sequence_channels_names) & set(new_sequence_channels_names))
         
-        # checking for channel conflicts
-        # make sure that the channels in the new sequence do not conflict with the channels in the original sequence
-        # add channels from the new sequence to the original sequence if they do not exist
+        
+        for channel_name in intersection_channels_name:
+            if  temp_original_sequence.find_channel_by_name(channel_name)== temp_new_sequence.find_channel_by_name(channel_name):
+                pass
+            else:
+                raise ValueError(f"Channel {channel_name} already exists in the original sequence but with different properties")
+
+        # Check for channel conflicts in channel_number and card number 
+        original_sequence_channels = [(ch.card_number, ch.channel_number) for ch in temp_original_sequence.channels]
+        new_sequence_channels = [(ch.card_number, ch.channel_number) for ch in temp_new_sequence.channels]
+        intersection_channels = list(set(original_sequence_channels) & set(new_sequence_channels))
+        for channel in intersection_channels:
+            if  temp_original_sequence.find_channel_by_channel_and_card_number(channel[0], channel[1])== temp_new_sequence.find_channel_by_channel_and_card_number(channel[0], channel[1]):
+                pass
+            else:
+                raise ValueError(f"Channel {channel} already exists in the original sequence but with different properties")
+        # all channels are unique and do not conflict with the original sequence 
+        
+        
+        original_sequence_channels_duration = temp_original_sequence.find_sequence_dauation()
+        # adding the events from the new sequence to the original sequence
+        for event in temp_new_sequence.all_events:
+            # add each event to the list of events in the original sequence and channels with only changing the start time 
+            event.start_time += (original_sequence_channels_duration+time_difference)
+            event.end_time += (original_sequence_channels_duration+time_difference)
+            temp_original_sequence.all_events.append(event)
+
+            # add the event to the channel events list in the original sequence            
+            temp_original_sequence.find_channel_by_name(event.channel.name).events.append(event)
+
+        return temp_original_sequence
+            
         
 
 
 
 class SequenceManager:
     def __init__(self,) -> None:
+
+        
+         
         self.main_sequences =[]
 
 
@@ -1098,13 +1142,10 @@ class SequenceManager:
     
         
 
-
-
-
-if __name__ == '__main__':
-    sequence = Sequence(time_resolution=0.000001)
-    analog_channel = sequence.add_analog_channel("Analog1", 2, 2)
-    digital_channel = sequence.add_digital_channel("Digital1", 2, 2, "card1", 0)
+def create_test_sequence():
+    sequence = Sequence()
+    analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
+    digital_channel = sequence.add_digital_channel("Digital1", 1, 2, "card1", 0)
 
     # Create events for testing
     event1 = sequence.add_event("Analog1", Jump(1.0), start_time=0)
@@ -1114,40 +1155,27 @@ if __name__ == '__main__':
     event5 = sequence.add_event("Digital1", Jump(0), relative_time=2, reference_time="start", parent_event=event4)
     event5 = sequence.add_event("Digital1", Jump(5), start_time=12)
     event6 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10), relative_time=11, reference_time="end", parent_event=event4)
+
+    return sequence
+
+
+
+
+if __name__ == '__main__':
+
+    sequence1 = create_test_sequence()
+    sequence2 = create_test_sequence()
+    # testing adding two sequences together 
     
-    # sequence.print_event_tree()
-    # sequence.plot_with_event_tree()
-    # print (sequence.all_events)
+    sequence3 = sequence1.add_sequence(sequence2, 10)
 
 
-
-    # # Edit behavior
-    # sequence.edit_behavior(start_time=10, channel_name="Analog1", duration=3, ramp_type=RampType.QUADRATIC, start_value=2.0, end_value=6.0)
-    # sequence.to_csv("mohid.csv")
-    # sequence.print_event_tree()
-    # sequence.plot_with_event_tree()
-    # sequence.plot(["Analog1"])
-    # print("Efficient way: ")
-    # for item in calculate_time_ranges(sequence.all_events):
-    #     print(item)
-    
-
-    # sequence.plot()
-
-
-
-    #update_list, channel_card, channel_number, channel_value= calculate_sequence_data(sequence)
-    #plt.plot(update_list)
-    #plt.plot(channel_card) 
-    #plt.plot(channel_number)
-    #plt.plot(channel_value)
-
-
-    sequence.plot()
-    
-    # plt.plot(update2_list)
-    #plt.plot(channel2_card)
-    #plt.plot(channel2_number)
-
-
+    sequence1.plot_with_event_tree(plot_now=False)
+    sequence2.plot_with_event_tree(plot_now=False)  
+    sequence3.plot_with_event_tree(plot_now=False)  
     plt.show()
+    
+    
+    
+
+
