@@ -18,6 +18,8 @@ class RampType(Enum):
     EXPONENTIAL = 'exponential'
     LOGARITHMIC = 'logarithmic'
     GENERIC = 'generic'
+    MINIMUM_JERK = 5
+
 
 class EventBehavior(ABC):
     @abstractmethod
@@ -27,6 +29,10 @@ class EventBehavior(ABC):
 class Jump(EventBehavior):
     def __init__(self, target_value: float):
         self.target_value = target_value
+
+    def edit_jump(self, target_value: float):
+        self.target_value = target_value
+
 
     def get_value_at_time(self, t: float) -> float:
         return self.target_value
@@ -93,7 +99,9 @@ class Ramp(EventBehavior):
             self.func = lambda t: self.start_value * (self.end_value / self.start_value) ** (t / self.duration)
         elif self.ramp_type == RampType.LOGARITHMIC:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (np.log10(t + 1) / np.log10(self.duration + 1))
-    
+        elif self.ramp_type == RampType.MINIMUM_JERK:
+            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (10 * (t/self.duration)**3 - 15 * (t/self.duration)**4 + 6 * (t/self.duration)**5)
+
     def edit_ramp(self, duration: Optional[float] = None, ramp_type: Optional[RampType] = None, start_value: Optional[float] = None, end_value: Optional[float] = None, func: Optional[Callable[[float], float]] = None, resolution: Optional[float] = None):
         new_duration = duration if duration is not None else self.duration
         new_ramp_type = ramp_type if ramp_type is not None else self.ramp_type
@@ -124,6 +132,8 @@ class Ramp(EventBehavior):
             self.func = func
         else:
             self._set_func()
+
+
     def get_value_at_time(self, t: float) -> float:
         if 0 <= t <= self.duration:
             return self.func(t)
@@ -158,6 +168,7 @@ class Channel:
             f")"
         )
     def check_for_overlapping_events(self):
+        self.events.sort(key=lambda event: event.start_time)
         for i in range(len(self.events) - 1):
             current_event = self.events[i]
             next_event = self.events[i + 1]
@@ -263,6 +274,12 @@ class Event:
         self.end_time += delta
         for child in self.children:
             child.update_times(delta)
+    
+    def update_times_end(self, delta: float):
+        self.end_time += delta
+        for child in self.children:
+            if child.reference_time == 'end':
+                child.update_times(delta)
 
     def update_relative_time(self, new_relative_time: float, new_reference_time: Optional[str] = None):
         if new_reference_time:
@@ -332,6 +349,10 @@ class Sequence:
         self.channels: List[Channel] = []
         # list of all events in the sequence 
         self.all_events: List[Event] = []
+
+    def check_for_overlapping_events(self):
+        for channel in self.channels:
+            channel.check_for_overlapping_events()
 
 
     # add a new analog channel to the sequence
@@ -581,6 +602,95 @@ class Sequence:
         self.all_events.sort(key=lambda event: event.start_time)
 
 
+    def edit_event(self, start_time: float, channel_name: str,
+                   ramp_or_jump : Optional[str] = None,
+                    duration: Optional[float] = None, ramp_type: Optional[RampType] = None, start_value: Optional[float] = None, end_value: Optional[float] = None, func: Optional[Callable[[float], float]] = None, resolution: Optional[float] = None, 
+                    jump_target_value: Optional[float] = None,
+                      new_start_time: Optional[float] = None,
+                        new_relative_time: Optional[float] = None,
+                          new_reference_time: Optional[str] = None):
+        temp_sequence = copy.deepcopy(self)
+        event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
+        if event is None:
+            raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
+
+        if new_start_time is not None and new_relative_time is not None:
+            raise ValueError("Provide either new_start_time or new_relative_time, not both.")
+
+        if new_start_time is not None:
+            delta = new_start_time - event.start_time
+            event.update_times(delta)
+        elif new_relative_time is not None:
+            if new_reference_time is None:
+                new_reference_time = event.reference_time
+
+            if new_reference_time == "start":
+                new_start_time = event.parent.start_time + new_relative_time
+            elif new_reference_time == "end":
+                new_start_time = event.parent.end_time + new_relative_time
+            else:
+                raise ValueError("Invalid reference_time. Use 'start' or 'end'.")
+
+            delta = new_start_time - event.start_time
+            event.reference_time = new_reference_time
+            event.update_times(delta)
+
+        if isinstance(event.behavior, Ramp): 
+            event.behavior.edit_ramp(duration, ramp_type, start_value, end_value, func, resolution)
+            delta_duration = event.behavior.duration-  event.end_time+  event.start_time 
+            if delta_duration:
+                print("delta_duration",delta_duration)
+                event.update_times_end(delta_duration)
+
+        elif isinstance(event.behavior, Jump):
+            event.behavior.edit_jump(jump_target_value)
+        
+        temp_sequence.all_events.sort(key=lambda event: event.start_time)
+
+        for channel in temp_sequence.channels:
+            channel.events.sort(key=lambda event: event.start_time)
+            channel.check_for_overlapping_events()
+
+        # Apply the changes to the original sequence if no overlaps are found
+        event = self.find_event_by_time_and_channel(start_time, channel_name)
+
+
+        if new_start_time is not None:
+            delta = new_start_time - event.start_time
+            event.update_times(delta)
+        elif new_relative_time is not None:
+            if new_reference_time is None:
+                new_reference_time = event.reference_time
+
+            if new_reference_time == "start":
+                new_start_time = event.parent.start_time + new_relative_time
+            elif new_reference_time == "end":
+                new_start_time = event.parent.end_time + new_relative_time
+            else:
+                raise ValueError("Invalid reference_time. Use 'start' or 'end'.")
+
+            delta = new_start_time - event.start_time
+            event.reference_time = new_reference_time
+            event.update_times(delta)
+
+        if isinstance(event.behavior, Ramp): 
+            event.behavior.edit_ramp(duration, ramp_type, start_value, end_value, func, resolution)
+            delta_duration = event.behavior.duration-  event.end_time+  event.start_time 
+            if delta_duration:
+                print("delta_duration",delta_duration)
+                event.update_times_end(delta_duration)
+
+        elif isinstance(event.behavior, Jump):
+            event.behavior.edit_jump(jump_target_value)
+
+        
+        temp_sequence.all_events.sort(key=lambda event: event.start_time)
+
+        for channel in temp_sequence.channels:
+            channel.events.sort(key=lambda event: event.start_time)
+            channel.check_for_overlapping_events()
+
+
     # edit the behavior of an event
     def edit_behavior(self, start_time: float, channel_name: str, **kwargs):
         temp_sequence = copy.deepcopy(self)
@@ -684,7 +794,7 @@ class Sequence:
         root_events = [event for event in self.all_events if event.parent is None]
         for root_event in root_events:
             root_event.print_event_hierarchy(level, indent)
-    def plot_all(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None,plot_now: bool =False):
+    def plot_all(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None,plot_now: bool =True):
         if channels_to_plot is None:
             channels_to_plot = [channel.name for channel in self.channels]
         else:
@@ -753,7 +863,7 @@ class Sequence:
         if plot_now:
             plt.show()
 
-    def plot(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None, plot_now: bool =False):
+    def plot(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None, plot_now: bool =True):
         if channels_to_plot is None:
             channels_to_plot = [channel.name for channel in self.channels]
         else:
@@ -966,7 +1076,7 @@ class Sequence:
         return sequence
 
 
-    def plot_event_tree(self,plot_now: bool =False):
+    def plot_event_tree(self,plot_now: bool =True):
         fig, ax = plt.subplots(figsize=(15, 8))
         
         # Create a dictionary to map channels to their vertical positions
@@ -1019,7 +1129,7 @@ class Sequence:
         if plot_now:
             plt.show()
 
-    def plot_with_event_tree(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None,plot_now: bool =False):
+    def plot_with_event_tree(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None,plot_now: bool =True):
         if channels_to_plot is None:
             channels_to_plot = [channel.name for channel in self.channels]
         else:
@@ -1200,19 +1310,16 @@ class SequenceManager:
         
 
 def create_test_sequence():
-    sequence = Sequence()
+    sequence = Sequence("test")
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
-    digital_channel = sequence.add_digital_channel("Digital1", 1, 2, "card1", 0)
+    
 
     # Create events for testing
     event1 = sequence.add_event("Analog1", Jump(1.0), start_time=0)
     event2 = sequence.add_event("Analog1", Ramp(5, RampType.LINEAR, 1.0, 5.0), start_time=10)
-    event3 = sequence.add_event("Analog1", Jump(0.0), relative_time=5, reference_time="end", parent_event=event2)
-    event4 = sequence.add_event("Digital1", Jump(1), relative_time=-10, reference_time="end", parent_event=event2)
-    event5 = sequence.add_event("Digital1", Jump(0), relative_time=2, reference_time="start", parent_event=event4)
-    event5 = sequence.add_event("Digital1", Jump(5), start_time=12)
-    event6 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10), relative_time=11, reference_time="end", parent_event=event4)
-
+    event3 = sequence.add_event("Analog1", Jump(0.0),  start_time=17)
+    event4 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10), start_time=20)
+    
     return sequence
 
 
@@ -1221,18 +1328,6 @@ def create_test_sequence():
 if __name__ == '__main__':
 
     sequence1 = create_test_sequence()
-    sequence2 = create_test_sequence()
-    # testing adding two sequences together 
-    
-    sequence3 = sequence1.add_sequence(sequence2, 10)
-
-
-    sequence1.plot_with_event_tree(plot_now=False)
-    sequence2.plot_with_event_tree(plot_now=False)  
-    sequence3.plot_with_event_tree(plot_now=False)  
-    plt.show()
-    
-    
-    
-
+    sequence1.edit_event(start_time=10,channel_name= "Analog1", duration=7)
+    sequence1.plot(channels_to_plot=["Analog1"])
 
