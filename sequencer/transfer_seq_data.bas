@@ -1,6 +1,6 @@
 '<ADbasic Header, Headerversion 001.001>
 ' Process_Number                 = 1
-' Initial_Processdelay           = 3000
+' Initial_Processdelay           = 1000
 ' Eventsource                    = Timer
 ' Control_long_Delays_for_Stop   = No
 ' Priority                       = High
@@ -98,6 +98,8 @@ INIT:
   'Bit = 0 --> input
   'Bit = 1 --> output
   P2_DigProg(d_io, 1111b)
+  
+  
     
   'configure the channels of each modules for sycnhronous output: this helps to make sure that all updates that are meant to be
   'simultaneous occur at the same time in the EVENT loop, not one after the other
@@ -192,27 +194,25 @@ FINISH:
   '***************************************************
  
   
-sub generic_write(type_card_channel, avalue) 
-  ' if statement for each module i.e. analog card
-
-  ' Extract x by dividing the encoded number by 10^4
-  type = type_card_channel / 10000
-
-  ' Extract y by dividing by 100, then taking modulo 100
-  
-  ' Extract z by taking modulo 100
-  card  = Mod (type_card_channel ,100)
-  
-  if (type=0) then 
-    channel= Mod ((type_card_channel / 100) , 100)
-    P2_Write_DAC(card,channel,avalue)
+sub generic_write(type_card_channel , avalue)
+  ' Extract x by shifting right by 12 bits
+  type =Shift_Right (type_card_channel,12)And  1Fh
+  card =Shift_Right(type_card_channel, 7) And  1Fh
+  channel = type_card_channel And  7Fh
+    
+  ' Extract y by masking the relevant bits and shifting right by 7 bits
+  if (type = 0) then 
+    P2_Write_DAC(channel,card,avalue)
+     
   else 
-    P2_Dig_Write_Latch(card, avalue)
+    P2_Dig_Write_Latch(card,avalue)
   endif 
-
-      
- 
+    
+  ' Extract z by masking the last 7 bits
+    
 endsub
+
+
 
 
 

@@ -71,10 +71,24 @@ def calculate_sequence_data(sequence: Sequence) -> None:
     print(f"Total time taken: {total_time}")        
     return update_list, channel_number, channel_value
 
+def encode_channel(type: int, channel: int, card: int) -> int:
+    """
+    Encodes three integers into a single integer using bitwise operations.
+    
+    Args:
+        type (int): The first integer (1 to 32).
+        y (int): The second integer (1 to 20).
+        z (int): The third integer (1 to 99).
+    
+    Returns:
+        int: The encoded integer.
+    """
+    return (type << 12) | (channel << 7) | card
 
 
-def encode_channel(type, channel,card ):
-    return type * 10000 +   channel* 100 +card
+
+# def encode_channel(type, channel,card ):
+#     return type * 10000 +   channel* 100 +card
 
 
 def calculate_time_ranges(all_events):
@@ -331,8 +345,12 @@ class ADwin_Driver:
 
     def initiate_experiment(self, process_number=1, index=0,repeat=1):
         self.load_ADwin_Data(index,repeat=repeat)
-        self.start_process(process_number)
     
+    def repeat_process(self, process_number=1, repeat=1,poll_interval=1):
+        for i in range(repeat):
+            self.start_process(process_number)
+            self.wait_for_process_to_complete(poll_interval)
+
     def is_process_running(self) -> bool:
         status = self.adw.Process_Status(1)
         # 1: Process is running.
@@ -359,7 +377,7 @@ if __name__ == "__main__":
     sequence = Sequence(time_resolution=0.01)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
     analog_channel = sequence.add_analog_channel("Analog2", 3, 5)
-    time_unit = 1
+    time_unit = 0.0000001
     # event1 = sequence.add_event("Analog1", Jump(0), start_time=0)
     # event2 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*1)
     # event3 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*2)
@@ -371,21 +389,24 @@ if __name__ == "__main__":
     # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*2,ramp_type=RampType.LINEAR,start_value=3,end_value=0,resolution=0.1), start_time=time_unit*4)
     # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.01), start_time=time_unit*11)
     # event6 = sequence.add_event("Analog1", Jump(0), start_time=time_unit*13)
+    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*2,ramp_type=RampType.LINEAR,start_value=3,end_value=1,resolution=time_unit*1), start_time=time_unit*0)
+    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*2,ramp_type=RampType.LINEAR,start_value=1,end_value=3,resolution=time_unit*1), start_time=time_unit*4)
+    # event5 = sequence.add_event("Analog1", Jump(0), start_time=time_unit*5)
 
-    event1 = sequence.add_event("Analog1", Jump(3), start_time=0)
-    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.01), start_time=time_unit*1)
-    event1 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
-    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=0,resolution=0.1), start_time=time_unit*4)
-    event1 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*6)
-    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=2,end_value=3,resolution=0.1), start_time=time_unit*7)
+    # event1 = sequence.add_event("Analog1", Jump(3), start_time=0)
+    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=time_unit*0.1), start_time=time_unit*1)
+    # event1 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
+    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=0,resolution=time_unit*0.1), start_time=time_unit*4)
+    # event1 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*6)
+    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=2,end_value=3,resolution=time_unit*0.1), start_time=time_unit*7)
 
 
-    event1 = sequence.add_event("Analog2", Jump(3), start_time=0)
-    event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=1,resolution=0.01), start_time=time_unit*1)
-    event1 = sequence.add_event("Analog2", Jump(3), start_time=time_unit*3)
-    event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.1), start_time=time_unit*4)
-    event1 = sequence.add_event("Analog2", Jump(2), start_time=time_unit*6)
-    event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=2,end_value=5,resolution=0.1), start_time=time_unit*7)
+    # event1 = sequence.add_event("Analog2", Jump(3), start_time=0)
+    # event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=1,resolution=time_unit*0.1), start_time=time_unit*1)
+    # event1 = sequence.add_event("Analog2", Jump(3), start_time=time_unit*3)
+    # event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=time_unit*0.1), start_time=time_unit*4)
+    # event1 = sequence.add_event("Analog2", Jump(2), start_time=time_unit*6)
+    # event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=2,end_value=1,resolution=time_unit*0.1), start_time=time_unit*7)
 
 
     adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
@@ -396,7 +417,9 @@ if __name__ == "__main__":
     print(len(update_list))
     # print(channel_value)
     print("channel value: ", channel_value)
+    
     adwin_driver.initiate_all_experiments(repeat=1)
+    adwin_driver.repeat_process(repeat=300000,poll_interval=0.000000000001)
 
 
 
