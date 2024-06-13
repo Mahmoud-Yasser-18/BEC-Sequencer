@@ -39,12 +39,21 @@ class Jump(EventBehavior):
 
 
 class Ramp(EventBehavior):
-    def __init__(self, duration: float, ramp_type: RampType = RampType.LINEAR, start_value: float = 0, end_value: float = 1, func: Optional[Callable[[float], float]] = None,resolution=0.001):
+    def __init__(self, duration: float, ramp_type: RampType = RampType.LINEAR, start_value: float = 0, end_value: float = 1, func: Optional[Callable[[float], float]] = None, resolution=0.001):
+        if start_value == end_value:
+            raise ValueError("start_value and end_value must be different")
+        
+        if duration == 0:
+            raise ValueError("duration must be non-zero")
+        
+        if ramp_type == RampType.EXPONENTIAL and (start_value == 0 or end_value == 0):
+            raise ValueError("For exponential ramp, start_value and end_value must be non-zero")
+        
         self.duration = duration
         self.ramp_type = ramp_type
         self.start_value = start_value
         self.end_value = end_value
-        self.resolution=resolution
+        self.resolution = resolution
         
         if func:
             self.func = func
@@ -57,7 +66,7 @@ class Ramp(EventBehavior):
         elif self.ramp_type == RampType.LOGARITHMIC:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (np.log10(t + 1) / np.log10(self.duration + 1))
 
-    
+
     def get_value_at_time(self, t: float) -> float:
         if 0 <= t <= self.duration:
             return self.func(t)
