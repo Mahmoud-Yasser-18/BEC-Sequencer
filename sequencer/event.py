@@ -35,7 +35,28 @@ class Jump(EventBehavior):
         return f"Jump({self.target_value})"
 
 
+class sine(EventBehavior):
+    def __init__(self, amplitude: float, frequency: float, phase: float, offset: float,resolution: float=0.001):
+        if amplitude < 0:
+            raise ValueError("amplitude must be non-negative")
+        if frequency <= 0:
+            raise ValueError("frequency must be positive")
+        if offset < 0:
+            raise ValueError("offset must be non-negative")
+        
 
+        self.amplitude = amplitude
+        self.frequency = frequency
+        self.phase = phase
+        self.offset = offset
+        self.resolution=resolution
+
+    def get_value_at_time(self, t: float) -> float:
+        return self.amplitude * np.sin(2 * np.pi * self.frequency * t + self.phase) + self.offset
+    
+    def __repr__(self) -> str:
+        return f"sine({self.amplitude}, {self.frequency}, {self.phase}, {self.offset})"
+    
 
 
 class Ramp(EventBehavior):
@@ -48,6 +69,9 @@ class Ramp(EventBehavior):
         
         if ramp_type == RampType.EXPONENTIAL and (start_value == 0 or end_value == 0):
             raise ValueError("For exponential ramp, start_value and end_value must be non-zero")
+
+        if resolution < 0.000001:
+            raise ValueError("resolution must be at least 0.000001")
         
         self.duration = duration
         self.ramp_type = ramp_type
@@ -57,7 +81,11 @@ class Ramp(EventBehavior):
         
         if func:
             self.func = func
-        elif self.ramp_type == RampType.LINEAR:
+        else:
+            self._set_func()
+
+    def _set_func(self):
+        if self.ramp_type == RampType.LINEAR:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (t / self.duration)
         elif self.ramp_type == RampType.QUADRATIC:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (t / self.duration)**2
@@ -65,8 +93,37 @@ class Ramp(EventBehavior):
             self.func = lambda t: self.start_value * (self.end_value / self.start_value) ** (t / self.duration)
         elif self.ramp_type == RampType.LOGARITHMIC:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (np.log10(t + 1) / np.log10(self.duration + 1))
+    
+    def edit_ramp(self, duration: Optional[float] = None, ramp_type: Optional[RampType] = None, start_value: Optional[float] = None, end_value: Optional[float] = None, func: Optional[Callable[[float], float]] = None, resolution: Optional[float] = None):
+        new_duration = duration if duration is not None else self.duration
+        new_ramp_type = ramp_type if ramp_type is not None else self.ramp_type
+        new_start_value = start_value if start_value is not None else self.start_value
+        new_end_value = end_value if end_value is not None else self.end_value
+        new_resolution = resolution if resolution is not None else self.resolution
+        
+        if new_start_value == new_end_value:
+            raise ValueError("start_value and end_value must be different")
+        
+        if new_duration == 0:
+            raise ValueError("duration must be non-zero")
+        
+        if new_ramp_type == RampType.EXPONENTIAL and (new_start_value == 0 or new_end_value == 0):
+            raise ValueError("For exponential ramp, start_value and end_value must be non-zero")
+        
+        if new_resolution < 0.000001:
+            raise ValueError("resolution must be at least 0.000001")
+        
+        # Apply changes only after validation
+        self.duration = new_duration
+        self.ramp_type = new_ramp_type
+        self.start_value = new_start_value
+        self.end_value = new_end_value
+        self.resolution = new_resolution
 
-
+        if func:
+            self.func = func
+        else:
+            self._set_func()
     def get_value_at_time(self, t: float) -> float:
         if 0 <= t <= self.duration:
             return self.func(t)
