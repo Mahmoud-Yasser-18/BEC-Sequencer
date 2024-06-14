@@ -18,7 +18,11 @@ class RampType(Enum):
     EXPONENTIAL = 'exponential'
     LOGARITHMIC = 'logarithmic'
     GENERIC = 'generic'
-    MINIMUM_JERK = 5
+    MINIMUM_JERK = 'minimum jerk'
+
+    def __str__(self):
+        return self.value
+
 
 
 class EventBehavior(ABC):
@@ -243,6 +247,9 @@ class Event:
         self.parent = parent
         self.reference_time = reference_time if parent else None
 
+        self.is_sweept = False
+        self.reference_original_event = self
+
         if start_time is not None:
             self.start_time = start_time
             self.relative_time = None
@@ -438,6 +445,7 @@ class Sequence:
     # add a new event in the middle of the sequence
     def add_event_in_middle(self, parent_start_time: float, parent_channel_name: str, child_events: List[tuple], relative_time: float, reference_time: str, behavior: EventBehavior, channel_name: str) -> Event:
         temp_sequence = copy.deepcopy(self)
+        self.copy_original_events_to_new_sequence(self, temp_sequence)
         parent_event = temp_sequence.find_event_by_time_and_channel(parent_start_time, parent_channel_name)
         if parent_event is None:
             raise ValueError(f"Parent event not found for start_time {parent_start_time} and channel {parent_channel_name}")
@@ -494,6 +502,7 @@ class Sequence:
     # update the absolute time of an event
     def update_event_absolute_time(self, start_time: float, channel_name: str, new_start_time: float):
         temp_sequence = copy.deepcopy(self)
+        self.copy_original_events_to_new_sequence(self, temp_sequence)
         event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
@@ -515,6 +524,7 @@ class Sequence:
     # update the relative time of an event 
     def update_event_relative_time(self, start_time: float, channel_name: str, new_relative_time: float, new_reference_time: Optional[str] = None):
         temp_sequence = copy.deepcopy(self)
+        self.copy_original_events_to_new_sequence(self, temp_sequence)
         event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
@@ -546,6 +556,7 @@ class Sequence:
     # delete an event from the sequence
     def delete_event(self, start_time: float, channel_name: str):
         temp_sequence = copy.deepcopy(self)
+        self.copy_original_events_to_new_sequence(self, temp_sequence)
         event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
@@ -611,6 +622,8 @@ class Sequence:
                         new_relative_time: Optional[float] = None,
                           new_reference_time: Optional[str] = None):
         temp_sequence = copy.deepcopy(self)
+        self.copy_original_events_to_new_sequence(self, temp_sequence)
+
         
         if (edited_event is not None) and (start_time is not  None) and (channel_name is not None):
             raise ValueError("Provide either edited_event or start_time and channel_name, not both.")
@@ -622,7 +635,7 @@ class Sequence:
         if edited_event is None:
             event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         else:
-            event = temp_sequence.find_event_by_time_and_channel(edited_event.start_time, edited_event.channel.name)    
+            event = temp_sequence.find_event_by_original_reference(edited_event)
 
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
@@ -705,6 +718,19 @@ class Sequence:
             channel.events.sort(key=lambda event: event.start_time)
             channel.check_for_overlapping_events()
 
+    def find_event_by_original_reference(self, reference_original_event: Event) -> Optional[Event]:
+        for event in self.all_events:
+            if event.reference_original_event == reference_original_event:
+                return event
+        return None
+
+    @staticmethod
+    def copy_original_events_to_new_sequence(original_sequence: 'Sequence', new_sequence: 'Sequence'):
+        for event in original_sequence.all_events:
+            new_event = new_sequence.find_event_by_time_and_channel(event.start_time, event.channel.name)
+            new_event.reference_original_event = event.reference_original_event
+            new_event.is_sweept = True
+    
 
     def sweep_event_parameters(self, parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, edited_event: Optional[Event] = None):
         # Find the event to sweep
@@ -715,13 +741,16 @@ class Sequence:
             raise ValueError("Provide either edited_event or start_time and channel_name.")
         
 
+        temp_sequence = copy.deepcopy(self)
+        
+        self.copy_original_events_to_new_sequence(self, temp_sequence)
 
         
         list_of_sequences=dict()
         # know which parameter to sweep
         if parameter == "duration":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, duration=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -730,7 +759,7 @@ class Sequence:
                 
         elif parameter == "ramp_type":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, ramp_type=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -739,7 +768,7 @@ class Sequence:
                 
         elif parameter == "start_value":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, start_value=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -748,7 +777,7 @@ class Sequence:
                 
         elif parameter == "end_value":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, end_value=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -757,7 +786,7 @@ class Sequence:
                 
         elif parameter == "func":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, func=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -766,7 +795,7 @@ class Sequence:
                 
         elif parameter == "resolution":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, resolution=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -775,7 +804,7 @@ class Sequence:
                 
         elif parameter == "jump_target_value":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, jump_target_value=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -784,7 +813,7 @@ class Sequence:
                 
         elif parameter == "start_time":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_start_time=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -793,7 +822,7 @@ class Sequence:
                 
         elif parameter == "relative_time":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_relative_time=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -802,7 +831,7 @@ class Sequence:
                 
         elif parameter == "reference_time":
             for value in values:
-                temp_sequence = copy.deepcopy(self)
+                
                 try:
                     temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_reference_time=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
@@ -1279,6 +1308,9 @@ class Sequence:
     def add_sequence(self, new_sequence: 'Sequence', time_difference: float = 0.0):
         temp_original_sequence = copy.deepcopy(self)
         temp_new_sequence = copy.deepcopy(new_sequence)
+        self.copy_original_events_to_new_sequence(self, temp_original_sequence)
+        self.copy_original_events_to_new_sequence(self, temp_new_sequence)
+
 
 
         # Check for channel conflicts in names and properties
@@ -1456,14 +1488,23 @@ class SequenceManager:
 def create_test_sequence(name: str = "test"):
     sequence = Sequence(name)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
+    analog_channel = sequence.add_analog_channel("Analog2", 2, 2)
     
 
     # Create events for testing
     event1 = sequence.add_event("Analog1", Jump(1.0), start_time=0)
     event2 = sequence.add_event("Analog1", Ramp(2, RampType.LINEAR, 1.0, 5.0), parent_event=event1, reference_time="end",relative_time=2)
-    event3 = sequence.add_event("Analog1", Jump(0.0),  start_time=17)
+    event3 = sequence.add_event("Analog1", Jump(0.0),  parent_event=event2, reference_time="end",relative_time=2)
     event4 = sequence.add_event("Analog1", Ramp(2, RampType.EXPONENTIAL, 5, 10), start_time=20)
     
+# Create events for testing
+    event1 = sequence.add_event("Analog2", Jump(1.0), start_time=1)
+    event2 = sequence.add_event("Analog2", Ramp(2, RampType.LINEAR, 1.0, 5.0), parent_event=event1, reference_time="end",relative_time=2)
+    event3 = sequence.add_event("Analog2", Jump(0.0),  start_time=8)
+    event4 = sequence.add_event("Analog2", Ramp(2, RampType.EXPONENTIAL, 5, 10), start_time=15)
+    
+
+
     return sequence
 
 
@@ -1476,25 +1517,55 @@ if __name__ == '__main__':
 
     # for key, seq in list_of_seqs.items():
     #     seq.plot()
+
+
+    main_seq = Sequence("MOT_loading")
+
+    main_seq.add_analog_channel("MOT Coils", 2, 1)
+    main_seq.add_analog_channel("Camera Trigger", 2, 2)
+    main_seq.add_analog_channel("Trap TTL", 2, 3)
+    main_seq.add_analog_channel("Trap FM", 2, 4)
+    main_seq.add_analog_channel("Trap AM", 2, 5)
+    main_seq.add_analog_channel("Repump TTL", 2, 6)
+    main_seq.add_analog_channel("Repump FM", 2, 7)
+    main_seq.add_analog_channel("Repump AM", 2, 8)
+
+
+
+    # Defualt values
+    time = 0    
+    main_seq.add_event("MOT Coils", Jump(0), start_time=time)
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=time)
+    main_seq.add_event("Trap TTL", Jump(3.3), start_time=time)
+    main_seq.add_event("Trap FM", Jump(2.5), start_time=time)
+    main_seq.add_event("Trap AM", Jump(1.25), start_time=time)
+    main_seq.add_event("Repump TTL", Jump(3.3), start_time=time)
+    main_seq.add_event("Repump FM", Jump(2.5), start_time=time)
+    main_seq.add_event("Repump AM", Jump(0.5), start_time=time)
+
     
-    seq_manager = SequenceManager()
-    seq_manager.add_new_sequence("test")
-    seq_manager.main_sequences["test"]["seq"] = create_test_sequence()
-
-    seq_manager.add_new_sequence("test2")
-    seq_manager.main_sequences["test2"]["seq"] = create_test_sequence("test2")
 
 
-    # seq_manager.sweep_sequence("test","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
+
+    
+    # seq_manager = SequenceManager()
+    # seq_manager.add_new_sequence("test")
+    # seq_manager.main_sequences["test"]["seq"] = create_test_sequence()
+
+    # seq_manager.add_new_sequence("test2")
+    # seq_manager.main_sequences["test2"]["seq"] = create_test_sequence("test2")
+
+
+    # # seq_manager.sweep_sequence("test","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
+    # # # print(seq_manager.main_sequences)
+    # seq_manager.sweep_sequence("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
     # # print(seq_manager.main_sequences)
-    seq_manager.sweep_sequence("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
-    # print(seq_manager.main_sequences)
-    seq_manager.sweep_sequence("test2","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
-    # print(seq_manager.main_sequences)
-    # seq_manager.sweep_sequence("test2","duration", [1,2,3],start_time=2,channel_name= "Analog1")
-    # print(seq_manager.main_sequences)
+    # seq_manager.sweep_sequence("test2","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
+    # # print(seq_manager.main_sequences)
+    # # seq_manager.sweep_sequence("test2","duration", [1,2,3],start_time=2,channel_name= "Analog1")
+    # # print(seq_manager.main_sequences)
 
     
-    main_seq = seq_manager.run_sweep_sequences()
-    for seq in main_seq:
-        seq.plot()
+    # main_seq = seq_manager.run_sweep_sequences()
+    # for seq in main_seq:
+    #     seq.plot()
