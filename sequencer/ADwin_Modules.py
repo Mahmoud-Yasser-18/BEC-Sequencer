@@ -8,7 +8,7 @@ import os
 
 from copy import deepcopy 
 import numpy as np
-from sequencer.event import Sequence,Digital_Channel, Analog_Channel, Jump, Ramp, Event, RampType
+from sequencer.event import Sequence,Digital_Channel, Analog_Channel, Jump, Ramp, Event, RampType, SequenceManager
 import time
 
 
@@ -392,19 +392,33 @@ if __name__ == "__main__":
 
 
     # Defualt values
-    t = 0    
+    t = 1   
     main_seq.add_event("MOT Coils", Jump(0), start_time=t)
     main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
     main_seq.add_event("Trap TTL", Jump(3.3), start_time=t)
-    main_seq.add_event("Trap FM", Jump(2.5), start_time=t)
+    Trap_FM_event= main_seq.add_event("Trap FM", Jump(2.5), start_time=t)
     main_seq.add_event("Trap AM", Jump(1.25), start_time=t)
     main_seq.add_event("Repump TTL", Jump(3.3), start_time=t)
     main_seq.add_event("Repump FM", Jump(2.5), start_time=t)
     main_seq.add_event("Repump AM", Jump(0.5), start_time=t)
-
-
+  
+    target = list(np.arange(2, 3, 0.1))+[2.5]
+    list_of_seq = main_seq.sweep_event_parameters("jump_target_value", target, edited_event=Trap_FM_event)
+    
+    
     adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
     adwin_driver.add_to_queue(main_seq)
-    
+
+
+    for seq in list_of_seq.values():
+        print("=====================================")
+        seq.print_sequence("Trap FM")
+        adwin_driver.add_to_queue(seq)
+
     adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
-    # main_seq.plot()
+
+
+    
+
+
+
