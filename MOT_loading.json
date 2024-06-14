@@ -1,0 +1,215 @@
+{
+    "name": "MOT_loading",
+    "channels": [
+        {
+            "name": "MOT Coils",
+            "card_number": 2,
+            "channel_number": 1,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        },
+        {
+            "name": "Camera Trigger",
+            "card_number": 2,
+            "channel_number": 2,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        },
+        {
+            "name": "Trap TTL",
+            "card_number": 2,
+            "channel_number": 3,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        },
+        {
+            "name": "Trap FM",
+            "card_number": 2,
+            "channel_number": 4,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        },
+        {
+            "name": "Trap AM",
+            "card_number": 2,
+            "channel_number": 5,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        },
+        {
+            "name": "Repump TTL",
+            "card_number": 2,
+            "channel_number": 6,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        },
+        {
+            "name": "Repump FM",
+            "card_number": 2,
+            "channel_number": 7,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        },
+        {
+            "name": "Repump AM",
+            "card_number": 2,
+            "channel_number": 8,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        }
+    ],
+    "events": [
+        {
+            "channel_name": "MOT Coils",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 0
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Camera Trigger",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 0
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Trap TTL",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 3.3
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Trap FM",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 2.5
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Trap AM",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 1.25
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Repump TTL",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 3.3
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Repump FM",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 2.5
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Repump AM",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 0.5
+                }
+            },
+            "reference_time": null,
+            "children": []
+        }
+    ]
+}
