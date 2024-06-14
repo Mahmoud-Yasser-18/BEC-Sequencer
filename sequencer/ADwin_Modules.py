@@ -345,6 +345,7 @@ class ADwin_Driver:
 
     def initiate_experiment(self, process_number=1, index=0,repeat=1):
         self.load_ADwin_Data(index,repeat=repeat)
+        self.start_process(process_number)
     
     def repeat_process(self, process_number=1, repeat=1,poll_interval=1):
         for i in range(repeat):
@@ -374,72 +375,36 @@ import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
-    sequence = Sequence(time_resolution=0.01)
-    analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
-    analog_channel = sequence.add_analog_channel("Analog2", 3, 5)
-    time_unit = 0.0000001
-    # event1 = sequence.add_event("Analog1", Jump(0), start_time=0)
-    # event2 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*1)
-    # event3 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*2)
-    # event4 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
-    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*3,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.1), start_time=time_unit*4)
-    # event6 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*8)
-    # event6 = sequence.add_event("Analog1", Jump(1), start_time=time_unit*9)
-    # event6 = sequence.add_event("Analog1", Jump(2.5), start_time=time_unit*10)
-    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*2,ramp_type=RampType.LINEAR,start_value=3,end_value=0,resolution=0.1), start_time=time_unit*4)
-    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=0.01), start_time=time_unit*11)
-    # event6 = sequence.add_event("Analog1", Jump(0), start_time=time_unit*13)
-    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*2,ramp_type=RampType.LINEAR,start_value=3,end_value=1,resolution=time_unit*1), start_time=time_unit*0)
-    event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*2,ramp_type=RampType.LINEAR,start_value=1,end_value=3,resolution=time_unit*1), start_time=time_unit*4)
-    # event5 = sequence.add_event("Analog1", Jump(0), start_time=time_unit*5)
 
-    # event1 = sequence.add_event("Analog1", Jump(3), start_time=0)
-    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=time_unit*0.1), start_time=time_unit*1)
-    # event1 = sequence.add_event("Analog1", Jump(3), start_time=time_unit*3)
-    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=0,resolution=time_unit*0.1), start_time=time_unit*4)
-    # event1 = sequence.add_event("Analog1", Jump(2), start_time=time_unit*6)
-    # event5 = sequence.add_event("Analog1", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=2,end_value=3,resolution=time_unit*0.1), start_time=time_unit*7)
+    
+
+    main_seq = Sequence("MOT_loading")
+
+    main_seq.add_analog_channel("MOT Coils", 2,1)
+    main_seq.add_analog_channel("Camera Trigger", 2, 2)
+    main_seq.add_analog_channel("Trap TTL", 2, 3)
+    main_seq.add_analog_channel("Trap FM", 2, 4)
+    main_seq.add_analog_channel("Trap AM", 2, 5)
+    main_seq.add_analog_channel("Repump TTL", 2, 6)
+    main_seq.add_analog_channel("Repump FM", 2, 7)
+    main_seq.add_analog_channel("Repump AM", 2, 8)
 
 
-    # event1 = sequence.add_event("Analog2", Jump(3), start_time=0)
-    # event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.LINEAR,start_value=3,end_value=1,resolution=time_unit*0.1), start_time=time_unit*1)
-    # event1 = sequence.add_event("Analog2", Jump(3), start_time=time_unit*3)
-    # event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=3,end_value=1,resolution=time_unit*0.1), start_time=time_unit*4)
-    # event1 = sequence.add_event("Analog2", Jump(2), start_time=time_unit*6)
-    # event5 = sequence.add_event("Analog2", Ramp(duration=time_unit*1,ramp_type=RampType.EXPONENTIAL,start_value=2,end_value=1,resolution=time_unit*0.1), start_time=time_unit*7)
+
+    # Defualt values
+    t = 0    
+    main_seq.add_event("MOT Coils", Jump(0), start_time=t)
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    main_seq.add_event("Trap TTL", Jump(3.3), start_time=t)
+    main_seq.add_event("Trap FM", Jump(2.5), start_time=t)
+    main_seq.add_event("Trap AM", Jump(1.25), start_time=t)
+    main_seq.add_event("Repump TTL", Jump(3.3), start_time=t)
+    main_seq.add_event("Repump FM", Jump(2.5), start_time=t)
+    main_seq.add_event("Repump AM", Jump(0.5), start_time=t)
 
 
     adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
-    adwin_driver.add_to_queue(sequence)
-    update_list, channel_number, channel_value,processdelay_times,processdelay_value_list=calculate_sequence_data_eff(sequence,adwin_driver)
-    print(processdelay_times)
-    print(processdelay_value_list)
-    print(len(update_list))
-    # print(channel_value)
-    print("channel value: ", channel_value)
+    adwin_driver.add_to_queue(main_seq)
     
-    adwin_driver.initiate_all_experiments(repeat=1)
-    adwin_driver.repeat_process(repeat=300000,poll_interval=0.000000000001)
-
-
-
-    LIMIT=65535
-    RANGE=20
-    OFFSET=10
-
-    # plt.scatter(np.arange(len(channel_value)),(channel_value-LIMIT/2)/LIMIT*RANGE)
-    # plt.show()
-
-    # plt.scatter(np.arange(len(update_list)),update_list)
-    # plt.show()
-
-    # print(np.sum(update_list[update_list > 0]))
-    # print(np.sum(channel_number))
-
-    # print(update_list)
-    print(len(channel_value))
-    print(update_list)
-
-    # plt.plot(channel_number)
-    # plt.scatter(np.arange(10),channel_value[:10])
-
+    adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
+    # main_seq.plot()
