@@ -739,13 +739,13 @@ class Sequence:
             new_event.is_sweept = True
     
 
-    def sweep_event_parameters(self, parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, edited_event: Optional[Event] = None):
+    def sweep_event_parameters(self, parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None):
         # Find the event to sweep
-        if edited_event is not None and start_time is not  None and channel_name is not None:
-            raise ValueError("Provide either edited_event or start_time and channel_name, not both.")
+        if event_to_sweep is not None and start_time is not  None and channel_name is not None:
+            raise ValueError("Provide either event_to_sweep or start_time and channel_name, not both.")
         
-        if edited_event is None and (start_time is None or channel_name is None):
-            raise ValueError("Provide either edited_event or start_time and channel_name.")
+        if event_to_sweep is None and (start_time is None or channel_name is None):
+            raise ValueError("Provide either event_to_sweep or start_time and channel_name.")
         
 
 
@@ -758,7 +758,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, duration=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, duration=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -769,7 +769,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, ramp_type=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, ramp_type=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -780,7 +780,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, start_value=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, start_value=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -791,7 +791,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, end_value=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, end_value=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -802,7 +802,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, func=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, func=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -813,7 +813,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, resolution=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, resolution=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -824,7 +824,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, jump_target_value=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, jump_target_value=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -835,7 +835,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_start_time=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, new_start_time=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -846,7 +846,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_relative_time=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, new_relative_time=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -857,7 +857,7 @@ class Sequence:
                 self.copy_original_events_to_new_sequence(self, temp_sequence)
 
                 try:
-                    temp_sequence.edit_event( edited_event=edited_event, start_time=start_time, channel_name=channel_name, new_reference_time=value)
+                    temp_sequence.edit_event( edited_event=event_to_sweep, start_time=start_time, channel_name=channel_name, new_reference_time=value)
                     list_of_sequences[tuple((parameter,value))]=temp_sequence
                 except ValueError as e:
                     print(e)
@@ -1529,6 +1529,7 @@ def create_test_sequence(name: str = "test"):
     sequence = Sequence(name)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
     analog_channel = sequence.add_analog_channel("Analog2", 2, 2)
+    digital_channel = sequence.add_digital_channel("Digital1", 2, 1, 1, 1)
     
 
     # Create events for testing
