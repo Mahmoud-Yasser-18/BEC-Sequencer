@@ -108,7 +108,15 @@ class Ramp(EventBehavior):
 
     def edit_ramp(self, duration: Optional[float] = None, ramp_type: Optional[RampType] = None, start_value: Optional[float] = None, end_value: Optional[float] = None, func: Optional[Callable[[float], float]] = None, resolution: Optional[float] = None):
         new_duration = duration if duration is not None else self.duration
-        new_ramp_type = ramp_type if ramp_type is not None else self.ramp_type
+        if ramp_type is not None:
+            try:
+                new_ramp_type = RampType[ramp_type.upper().replace(' ', '_')]
+            except KeyError:
+                # Handle the case where the ramp_type string is not valid
+                raise ValueError(f"Invalid ramp type: {ramp_type}")
+        else:
+            new_ramp_type = self.ramp_type
+
         new_start_value = start_value if start_value is not None else self.start_value
         new_end_value = end_value if end_value is not None else self.end_value
         new_resolution = resolution if resolution is not None else self.resolution
