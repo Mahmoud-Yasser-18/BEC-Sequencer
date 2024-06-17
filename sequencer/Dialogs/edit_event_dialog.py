@@ -109,7 +109,7 @@ class EditEventDialog(QDialog):
             self.ramp_duration_input.setText(str(event.behavior.duration))
             self.start_value_input.setText(str(event.behavior.start_value))
             self.end_value_input.setText(str(event.behavior.end_value))
-            self.ramp_type_combo.setCurrentText(event.behavior.ramp_type.name)
+            self.ramp_type_combo.setCurrentText(str(event.behavior.ramp_type.value))
 
         if event.parent is not None:
             self.relative_time_input.setText(str(event.relative_time))

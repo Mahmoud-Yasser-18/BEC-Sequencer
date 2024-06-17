@@ -131,7 +131,7 @@ class RootEventDialog(BaseEventDialog):
 
     def get_data(self):
         data = {
-            'channel': self.channel_combo.currentText(),
+
             'behavior': self.get_behavior(),
             'start_time': float(self.start_time_input.text()),
             'relative_time': None,
