@@ -13,6 +13,7 @@ from PyQt5.QtCore import Qt, QRect, pyqtSignal, QPoint
 
 from sequencer.Dialogs.channel_dialog import ChannelDialog
 from sequencer.Dialogs.event_dialog import ChildEventDialog
+from sequencer.Dialogs.edit_event_dialog import EditEventDialog
 from sequencer.event import Ramp, Jump, Sequence
 
 
@@ -67,6 +68,7 @@ class ChannelLabelWidget(QWidget):
 class EventButton(QPushButton):
     addChildEventSignal = pyqtSignal(object)
     deleteEventSignal = pyqtSignal(object)
+    editEventSignal = pyqtSignal(object)
 
     def __init__(self, event, scale_factor, sequence, parent=None):
         super().__init__(parent)
@@ -79,7 +81,7 @@ class EventButton(QPushButton):
         if isinstance(self.event.behavior, Ramp):
             duration = self.event.behavior.duration
             self.setGeometry(int(self.event.start_time * self.scale_factor), 0, int(duration * self.scale_factor), 50)
-            self.setText(str(self.event.start_time))
+            self.setText(str(self.event.behavior.ramp_type)+' '+str(self.event.behavior.start_value)+'->'+str(self.event.behavior.end_value))
         elif isinstance(self.event.behavior, Jump):
             self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
             self.setText('J')
@@ -93,12 +95,16 @@ class EventButton(QPushButton):
         context_menu = QMenu(self)
         add_child_action = context_menu.addAction("Add Child Event")
         delete_action = context_menu.addAction("Delete Event")
+        edit_action = context_menu.addAction("Edit Event")
+
 
         action = context_menu.exec_(self.mapToGlobal(pos))
         if action == add_child_action:
             self.addChildEventSignal.emit(self.event)
         elif action == delete_action:
             self.deleteEventSignal.emit(self.event)
+        elif action == edit_action:
+            self.editEventSignal.emit(self.event)
 
 
 class TimeAxisWidget(QWidget):
@@ -190,6 +196,7 @@ class EventsViewerWidget(QWidget):
             button = EventButton(event, self.scale_factor, self.sequence, buttons_container)
             button.addChildEventSignal.connect(self.add_child_event)
             button.deleteEventSignal.connect(self.delete_event)
+            button.editEventSignal.connect(self.edit_event)
 
             previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10/self.scale_factor)
         
@@ -217,6 +224,10 @@ class EventsViewerWidget(QWidget):
                     parent_event=parent_event
                 )
             self.refreshUI(self.container_layout)
+
+    def edit_event(self, event):
+        self
+        
 
     def delete_event(self, event):
         self.sequence.delete_event(event.start_time, event.channel.name)
