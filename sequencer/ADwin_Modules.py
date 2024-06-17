@@ -396,14 +396,14 @@ if __name__ == "__main__":
 
     # Defualt values
     t = 0
-    # main_seq.add_event("MOT Coils", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
-    # main_seq.add_event("Camera Trigger", Jump(0), start_time=t) # 
-    # main_seq.add_event("Trap TTL", Jump(3.3), start_time=t)
-    # Trap_FM_event = main_seq.add_event("Trap FM", Jump(2.5), start_time=t)
-    # main_seq.add_event("Trap AM", Jump(1.25), start_time=t)
-    # main_seq.add_event("Repump TTL", Jump(3.3), start_time=t)
-    # main_seq.add_event("Repump FM", Jump(2.5), start_time=t)
-    # main_seq.add_event("Repump AM", Jump(0.5), start_time=t)
+    main_seq.add_event("MOT Coils", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t) # 
+    main_seq.add_event("Trap TTL", Jump(3.3), start_time=t)
+    Trap_FM_event = main_seq.add_event("Trap FM", Jump(2.5), start_time=t)
+    main_seq.add_event("Trap AM", Jump(1.25), start_time=t)
+    main_seq.add_event("Repump TTL", Jump(3.3), start_time=t)
+    main_seq.add_event("Repump FM", Jump(2.5), start_time=t)
+    main_seq.add_event("Repump AM", Jump(0.5), start_time=t)
     main_seq.add_event("Absorption FM", Jump(10), start_time=t)
     main_seq.add_event("Absorption AM", Jump(3.3), start_time=t) # 3.3 is the ON value for the AM and 0 is the OFF value
   
