@@ -28,6 +28,7 @@ class ChannelLabelWidget(QWidget):
         self.initUI()
 
     def initUI(self):
+        
         main_layout = QVBoxLayout(self)
         self.scroll_area = self.create_scroll_area()
         main_layout.addWidget(self.scroll_area)
@@ -244,8 +245,8 @@ class EventButton(QPushButton):
             self.editEventSignal.emit(self.event)
 
 
-class TimeAxisWidget(QWidget):
-    def __init__(self, max_time: float, scale_factor: float, parent: Optional[QWidget] = None):
+class TimeAxisContent(QWidget):
+    def __init__(self, max_time, scale_factor, parent=None):
         super().__init__(parent)
         self.max_time = max_time
         self.scale_factor = scale_factor
@@ -267,37 +268,75 @@ class TimeAxisWidget(QWidget):
             painter.drawLine(x, 20, x, 30)
             painter.drawText(QRect(x - 10, 30, 20, 20), Qt.AlignCenter, str(time))
 
+class TimeAxisWidget(QWidget):
+    def __init__(self,  parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.max_time = parent.max_time  # Example max time
+        self.scale_factor = parent.scale_factor  # Example scale factor
+        self.initUI()
+        self.setFixedHeight(105)
+        
+
+
+    def initUI(self) -> None:
+        # Create the scroll area
+        self.scroll_area = QScrollArea(self)
+        #self.scroll_area.setWidgetResizable(True)
+
+        # Create the content widget for the scroll area
+        content_widget = TimeAxisContent(self.max_time, self.scale_factor, self)
+        self.scroll_area.setWidget(content_widget)
+
+        # Create a layout and add the scroll area to it
+        layout = QVBoxLayout()
+        layout.addWidget(self.scroll_area)
+
+        # Set the layout for this widget
+        self.setLayout(layout)
 
 class EventsViewerWidget(QWidget):
-    def __init__(self, sequence: Sequence, scale_factor: float, parent: Optional[QWidget] = None):
-        super().__init__(parent)
+    changes_in_event = pyqtSignal()
+
+    def __init__(self, sequence: Sequence, scale_factor: float, parent: QWidget):
+        super().__init__()
         self.sequence = sequence
         self.scale_factor = scale_factor
+        self.parent = parent
+        self.main_layout = QVBoxLayout(self)
+        self.setLayout(self.main_layout)
         self.initUI()
 
     def initUI(self) -> None:
-        main_layout = QVBoxLayout(self)
         self.scroll_area = self.create_scroll_area()
-        main_layout.addWidget(self.scroll_area)
-        self.setLayout(main_layout)
-        # self.scroll_area.setFixedWidth(800)
+        self.main_layout.addWidget(self.scroll_area)
 
     def create_scroll_area(self) -> QScrollArea:
         scroll_area = QScrollArea(self)
-        # scroll_area.setWidgetResizable(True)
 
-        container_widget = QWidget()
-        self.container_layout = QVBoxLayout(container_widget)
+        self.container_widget = QWidget()
+        self.container_layout = QVBoxLayout(self.container_widget)
 
-        self.refreshUI(self.container_layout)
+        self.populate_events()
 
-        container_widget.setLayout(self.container_layout)
-        container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels *100)
-        scroll_area.setWidget(container_widget)
+        self.container_widget.setLayout(self.container_layout)
+        self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
+        scroll_area.setWidget(self.container_widget)
         return scroll_area
 
-    def refreshUI(self, layout: QVBoxLayout) -> None:
-        self.clear_layout(layout)
+    def refreshUI(self) -> None:
+        self.clear_layout(self.container_layout)
+        self.populate_events()
+        self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
+        self.changes_in_event.emit()
+
+    def clear_layout(self, layout: QVBoxLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def populate_events(self) -> None:
         all_events = self.sequence.all_events
         self.max_time = max(
             (event.start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 0))
@@ -305,38 +344,28 @@ class EventsViewerWidget(QWidget):
         )
 
         self.num_channels = len(self.sequence.channels)
-        self.time_axis = TimeAxisWidget(self.max_time, self.scale_factor, self)
-        layout.addWidget(self.time_axis)
 
         for channel in self.sequence.channels:
             buttons_container = self.create_buttons_container(channel)
-            
-            layout.addWidget(buttons_container)
-
-    def clear_layout(self, layout: QVBoxLayout) -> None:
-        for i in reversed(range(layout.count())):
-            widget_to_remove = layout.itemAt(i).widget()
-            layout.removeWidget(widget_to_remove)
-            widget_to_remove.setParent(None)
+            self.container_layout.addWidget(buttons_container)
 
     def create_buttons_container(self, channel: any) -> QWidget:
         buttons_container = QWidget(self)
         buttons_container.setFixedHeight(50)
         previous_end_time = 0.0
-        button = None
         previous_event = None
+
         if len(channel.events) == 0:
-            gap_button = GapButton(channel, buttons_container,previous_event)
+            gap_button = GapButton(channel, buttons_container, previous_event)
             gap_button.setGeometry(0, 0, int(self.max_time * self.scale_factor) + 50, 50)
             gap_button.addEventSignal.connect(self.add_event)
             return buttons_container
-        
 
         for event in channel.events:
             start_time = event.start_time
             if start_time > previous_end_time:
                 gap_duration = start_time - previous_end_time
-                gap_button = GapButton(channel, buttons_container,previous_event)
+                gap_button = GapButton(channel, buttons_container, previous_event)
                 gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
                 gap_button.addEventSignal.connect(self.add_event)
 
@@ -346,16 +375,17 @@ class EventsViewerWidget(QWidget):
             button.deleteEventSignal.connect(self.delete_event)
             button.editEventSignal.connect(self.edit_event)
 
-            previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10/self.scale_factor)
-        # add gap after last event
-        if button is not None:
+            previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10 / self.scale_factor)
+
+        if previous_event:
             gap_duration = self.max_time - previous_end_time
-            gap_button = GapButton(channel, buttons_container,previous_event)
+            gap_button = GapButton(channel, buttons_container, previous_event)
             gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
             gap_button.addEventSignal.connect(self.add_event)
-        
+
         return buttons_container
-    def add_event(self,channel):
+
+    def add_event(self, channel):
         try:
             dialog = RootEventDialog([channel.name])
             if dialog.exec_() == QDialog.Accepted:
@@ -373,22 +403,19 @@ class EventsViewerWidget(QWidget):
                         behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
                         start_time=float(data["start_time"])
                     )
-                self.refreshUI(self.container_layout)
-
+                self.refreshUI()
         except Exception as e:
-            pass
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
-            
+
     def add_child_event(self, parent_event):
-        try :
+        try:
             dialog = ChildEventDialog([ch.name for ch in self.sequence.channels])
             if dialog.exec_() == QDialog.Accepted:
                 data = dialog.get_data()
-                behavior = data['behavior']  # Replace this with actual logic to determine the behavior
-                print( behavior['behavior_type'])
+                behavior = data['behavior']
                 if behavior['behavior_type'] == 'Jump':
-                    child_event = self.sequence.add_event(
+                    self.sequence.add_event(
                         channel_name=data['channel'],
                         behavior=Jump(behavior['jump_target_value']),
                         relative_time=float(data["relative_time"]),
@@ -396,53 +423,45 @@ class EventsViewerWidget(QWidget):
                         parent_event=parent_event
                     )
                 else:
-                    child_event = self.sequence.add_event(
+                    self.sequence.add_event(
                         channel_name=data['channel'],
                         behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
                         relative_time=float(data["relative_time"]),
                         reference_time=data["reference_time"],
                         parent_event=parent_event
                     )
-                self.refreshUI(self.container_layout)
+                self.refreshUI()
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
-
 
     def edit_event(self, event):
-        try:
-
-            dialog = EditEventDialog(event)
-            if dialog.exec_() == QDialog.Accepted:
-                data = dialog.get_data()
-                self.sequence.edit_event(edited_event=event,
-                                        
-                                        
-                                        new_start_time=data.get('start_time', None),
-                                        new_relative_time=data.get('relative_time', None),
-                                        new_reference_time=data.get('reference_time', None),
-                                            duration=data.get('behavior_data', None).get('duration', None),
-                                            start_value=data.get('behavior_data', None).get('start_value', None),
-                                            end_value=data.get('behavior_data', None).get('end_value', None),
-                                            ramp_type=data.get('behavior_data', None).get('ramp_type', None),
-                                            jump_target_value=data.get('behavior_data', None).get('target_value', None)
-                                            )
-                self.refreshUI(self.container_layout)
-        except Exception as e:
-            error_message = f"An error occurred: {str(e)}"
-            QMessageBox.critical(self, "Error", error_message)
-
-        
+        dialog = EditEventDialog(event)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            self.sequence.edit_event(
+                edited_event=event,
+                new_start_time=data.get('start_time', None),
+                new_relative_time=data.get('relative_time', None),
+                new_reference_time=data.get('reference_time', None),
+                duration=data.get('behavior_data', None).get('duration', None),
+                start_value=data.get('behavior_data', None).get('start_value', None),
+                end_value=data.get('behavior_data', None).get('end_value', None),
+                ramp_type=data.get('behavior_data', None).get('ramp_type', None),
+                jump_target_value=data.get('behavior_data', None).get('target_value', None)
+            )
+            self.refreshUI()
 
     def delete_event(self, event):
         try:
             self.sequence.delete_event(event.start_time, event.channel.name)
-            self.refreshUI(self.container_layout)
+            self.refreshUI()
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
-            
 
+    def emmit_change_in_event(self):
+        self.change_in_event.emit()
 
 class SyncedTableWidget(QWidget):
     def __init__(self,sequence, scale_factor: float = 100.0):
@@ -450,37 +469,70 @@ class SyncedTableWidget(QWidget):
         self.scale_factor=scale_factor
         self.sequence = sequence
         self.layout_main = QHBoxLayout()
-        
-        self.setup_ui()
+        self.syncing = False  # Flag to prevent multiple updates
         self.setLayout(self.layout_main) 
-
-    def setup_ui(self) -> None:
-        self.channel_list = ChannelLabelWidget(self.sequence)
-        self.data_table = EventsViewerWidget(self.sequence, self.scale_factor)
-
-        self.channel_list.channel_right_clicked.connect(self.show_context_menu)
+        self.setup_ui()
         
-        # # self.data_table.time_axis.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        # self.channel_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        # self.data_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        # self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+    def setup_ui(self) -> None:
+        
+        
+        self.sub_layout_main = QVBoxLayout()
+        self.channel_list = ChannelLabelWidget(self.sequence)
+        self.data_table = EventsViewerWidget(self.sequence, self.scale_factor, parent=self)
+        self.data_table.changes_in_event.connect(self.refresh_UI)
+        self.time_axis = TimeAxisWidget(self.data_table)
+        
+        self.channel_list.channel_right_clicked.connect(self.show_context_menu)        
+
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
         self.scroll_bar2 = self.data_table.scroll_area.verticalScrollBar()
+        
         self.scroll_bar1.valueChanged.connect(self.sync_scroll)
         self.scroll_bar2.valueChanged.connect(self.sync_scroll)
 
+
+
+        self.scroll_bar3 = self.data_table.scroll_area.horizontalScrollBar()
+        self.scroll_bar4 =  self.time_axis.scroll_area.horizontalScrollBar()
+
+        self.scroll_bar3.valueChanged.connect(self.sync_scroll_vertical)
+        self.scroll_bar4.valueChanged.connect(self.sync_scroll_vertical)
+
+
+        self.sub_layout_main.addWidget(self.time_axis)
+        self.sub_layout_main.addWidget(self.data_table)
+
+        dummy_widget = QWidget()
+        dummy_widget.setLayout(self.sub_layout_main)
+
+
         
         self.layout_main.addWidget(self.channel_list)
-        self.layout_main.addWidget(self.data_table)
+        self.layout_main.addWidget(dummy_widget,2)
         
+    def sync_scroll_vertical(self, value: int) -> None:
+        if self.syncing:
+            return
+        self.syncing = True
+        sender = self.sender()
+        if sender == self.scroll_bar3:
+            self.scroll_bar4.setValue(self.calculate_proportion(value, self.scroll_bar3, self.scroll_bar4))
+        else:
+            self.scroll_bar3.setValue(self.calculate_proportion(value, self.scroll_bar4, self.scroll_bar3))
+        self.syncing = False
 
     def sync_scroll(self, value: int) -> None:
+        if self.syncing:
+            return
+        self.syncing = True
         sender = self.sender()
         if sender == self.scroll_bar1:
             self.scroll_bar2.setValue(self.calculate_proportion(value, self.scroll_bar1, self.scroll_bar2))
         else:
             self.scroll_bar1.setValue(self.calculate_proportion(value, self.scroll_bar2, self.scroll_bar1))
+        self.syncing = False
 
     def calculate_proportion(self, value: int, scroll_bar_from: QScrollBar, scroll_bar_to: QScrollBar) -> int:
         proportion = value / scroll_bar_from.maximum() if scroll_bar_from.maximum() != 0 else 0
@@ -531,7 +583,7 @@ class SyncedTableWidget(QWidget):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    seq= Sequence.from_json("sequencer/seq_data.json")
+    seq= Sequence.from_json("MOT_loading.json")
 
     window = SyncedTableWidget(seq)
     window.show()
