@@ -4,6 +4,9 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 import sys 
 
+from sequencer.event import Event, Channel,Digital_Channel  ,Analog_Channel
+
+
 # Add this class to the Dialogs/channel_dialog.py file
 class ChannelDialog(QDialog):
     def __init__(self, parent=None):
@@ -80,15 +83,133 @@ class ChannelDialog(QDialog):
         return data
 
 
+#edit Channel dialog 
+class Edit_Analog_Channel(QDialog):
+    def __init__(self,channel, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Edit Analog Channel')
+        self.layout = QFormLayout(self)
+
+
+
+# Edit Analog Channel dialog
+class Edit_Analog_Channel(QDialog):
+    def __init__(self, channel: Analog_Channel, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Edit Analog Channel')
+        self.layout = QFormLayout(self)
+
+        self.name_edit = QLineEdit(self)
+        self.name_edit.setText(channel.name)
+        self.card_number_edit = QLineEdit(self)
+        self.card_number_edit.setValidator(QIntValidator())
+        self.card_number_edit.setText(str(channel.card_number))
+        self.channel_number_edit = QLineEdit(self)
+        self.channel_number_edit.setValidator(QIntValidator())
+        self.channel_number_edit.setText(str(channel.channel_number))
+        self.reset_value_edit = QLineEdit(self)
+        self.reset_value_edit.setValidator(QDoubleValidator())
+        self.reset_value_edit.setText(str(channel.reset_value))
+        self.max_voltage_edit = QLineEdit(self)
+        self.max_voltage_edit.setValidator(QDoubleValidator())
+        self.max_voltage_edit.setText(str(channel.max_voltage))
+        self.min_voltage_edit = QLineEdit(self)
+        self.min_voltage_edit.setValidator(QDoubleValidator())
+        self.min_voltage_edit.setText(str(channel.min_voltage))
+
+        self.layout.addRow('Name:', self.name_edit)
+        self.layout.addRow('Card Number:', self.card_number_edit)
+        self.layout.addRow('Channel Number:', self.channel_number_edit)
+        self.layout.addRow('Reset Value:', self.reset_value_edit)
+        self.layout.addRow('Max Voltage:', self.max_voltage_edit)
+        self.layout.addRow('Min Voltage:', self.min_voltage_edit)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttons)
+
+    def get_data(self):
+        return {
+            'name': self.name_edit.text(),
+            'card_number': int(self.card_number_edit.text()),
+            'channel_number': int(self.channel_number_edit.text()),
+            'reset_value': float(self.reset_value_edit.text()),
+            'max_voltage': float(self.max_voltage_edit.text()),
+            'min_voltage': float(self.min_voltage_edit.text())
+        }
+
+
+# Edit Digital Channel dialog
+class Edit_Digital_Channel(QDialog):
+    def __init__(self, channel: Digital_Channel, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Edit Digital Channel')
+        self.layout = QFormLayout(self)
+
+        self.name_edit = QLineEdit(self)
+        self.name_edit.setText(channel.name)
+        self.card_number_edit = QLineEdit(self)
+        self.card_number_edit.setValidator(QIntValidator())
+        self.card_number_edit.setText(str(channel.card_number))
+        self.channel_number_edit = QLineEdit(self)
+        self.channel_number_edit.setValidator(QIntValidator())
+        self.channel_number_edit.setText(str(channel.channel_number))
+        self.reset_value_edit = QLineEdit(self)
+        self.reset_value_edit.setValidator(QDoubleValidator())
+        self.reset_value_edit.setText(str(channel.reset_value))
+        self.bitpos_edit = QLineEdit(self)
+        self.bitpos_edit.setValidator(QIntValidator())
+        self.bitpos_edit.setText(str(channel.bitpos))
+
+        self.layout.addRow('Name:', self.name_edit)
+        self.layout.addRow('Card Number:', self.card_number_edit)
+        self.layout.addRow('Channel Number:', self.channel_number_edit)
+        self.layout.addRow('Reset Value:', self.reset_value_edit)
+
+        self.layout.addRow('Bit Position:', self.bitpos_edit)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttons)
+
+    def get_data(self):
+        return {
+            'name': self.name_edit.text(),
+            'card_number': int(self.card_number_edit.text()),
+            'channel_number': int(self.channel_number_edit.text()),
+            'reset_value': float(self.reset_value_edit.text()),
+            'bitpos': int(self.bitpos_edit.text())
+        }
+
+        
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-
+    # Test ChannelDialog for adding a new channel
+    print("Testing ChannelDialog for adding a new channel")
+    add_channel_dialog = ChannelDialog()
+    if add_channel_dialog.exec_() == QDialog.Accepted:
+        add_channel_data = add_channel_dialog.get_data()
+        print(add_channel_data)
     
-    # For testing the RootEventDialog
-    root_dialog = ChannelDialog()
-    if root_dialog.exec_() == QDialog.Accepted:
-        root_data = root_dialog.get_data()
-        print(root_data)
+    # Test Edit_Analog_Channel for editing an existing analog channel
+    analog_channel = Analog_Channel('AnalogChannel1', 2, 3, False, 1.0, max_voltage=5.0, min_voltage=-5.0)
+    print("Testing Edit_Analog_Channel for editing an existing analog channel")
+    edit_analog_dialog = Edit_Analog_Channel(analog_channel)
+    if edit_analog_dialog.exec_() == QDialog.Accepted:
+        edit_analog_data = edit_analog_dialog.get_data()
+        print(edit_analog_data)
 
+    # Test Edit_Digital_Channel for editing an existing digital channel
+    digital_channel = Digital_Channel('DigitalChannel1', 4, 5, 'Card1', 8, False, 0.0)
+    print("Testing Edit_Digital_Channel for editing an existing digital channel")
+    edit_digital_dialog = Edit_Digital_Channel(digital_channel)
+    if edit_digital_dialog.exec_() == QDialog.Accepted:
+        edit_digital_data = edit_digital_dialog.get_data()
+        print(edit_digital_data)
+
+    sys.exit(app.exec_())
