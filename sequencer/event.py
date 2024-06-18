@@ -401,6 +401,99 @@ class Sequence:
         self.channels.append(channel)
         return channel
 
+    def edit_digital_channel(self, name: str,new_name: Optional[str]=None, card_number: Optional[int]=None, channel_number: Optional[int]=None, card_id: Optional[str]=None, bitpos: Optional[int]=None, reset: Optional[bool]=None, reset_value: Optional[float]=None):
+        channel = self.find_channel_by_name(name)
+        # check if the new name is already taken by another channel
+        if new_name is not None:
+            for c in self.channels:
+                if c.name == new_name:
+                    raise ValueError(f"Channel name {new_name} is already taken by another channel")
+        # check if the new card_number and channel_number is already taken by another channel
+        if card_number is not None or channel_number is not None:
+            new_card_number = card_number if card_number is not None else channel.card_number
+            new_channel_number = channel_number if channel_number is not None else channel.channel_number
+            for c in self.channels:
+                if c.card_number == new_card_number and c.channel_number == new_channel_number:
+                    raise ValueError(f"Card number {new_card_number} and channel number {new_channel_number} is already taken by another channel")
+                
+        
+        if channel is None:
+            raise ValueError(f"Channel {name} not found")
+        if new_name is not None:
+            channel.name = new_name
+        if card_number is not None:
+            channel.card_number = card_number
+        if channel_number is not None:
+            channel.channel_number = channel_number
+        if card_id is not None:
+            channel.card_id = card_id
+        if bitpos is not None:
+            channel.bitpos = bitpos
+        if reset is not None:
+            channel.reset = reset
+        if reset_value is not None:
+            channel.reset_value = reset_value
+    
+
+    def edit_analog_channel(self, name: str,new_name: Optional[str]=None, card_number: Optional[int]=None, channel_number: Optional[int]=None, reset: Optional[bool]=None, reset_value: Optional[float]=None, default_voltage_func: Optional[Callable[[float], float]]=None, max_voltage: Optional[float]=None, min_voltage: Optional[float]=None):
+        channel = self.find_channel_by_name(name)
+        
+        if channel is None:
+            raise ValueError(f"Channel {name} not found")
+        # check if the new name is already taken by another channel
+        if new_name is not None:
+            for c in self.channels:
+                if c.name == new_name:
+                    raise ValueError(f"Channel name {new_name} is already taken by another channel")
+        # check if the new card_number and channel_number is already taken by another channel
+        if card_number is not None or channel_number is not None:
+            new_card_number = card_number if card_number is not None else channel.card_number
+            new_channel_number = channel_number if channel_number is not None else channel.channel_number
+            
+            for c in self.channels:
+                if c.card_number == new_card_number and c.channel_number == new_channel_number:
+                    raise ValueError(f"Card number {new_card_number} and channel number {new_channel_number} is already taken by another channel")
+                
+        
+        if new_name is not None:
+            channel.name = new_name
+        if card_number is not None:
+            channel.card_number = card_number
+        if channel_number is not None:
+            channel.channel_number = channel_number
+        if reset is not None:
+            channel.reset = reset
+        if reset_value is not None:
+            channel.reset_value = reset_value
+        if default_voltage_func is not None:
+            channel.default_voltage_func = default_voltage_func
+        if max_voltage is not None:
+            channel.max_voltage = max_voltage
+        if min_voltage is not None:
+            channel.min_voltage = min_voltage
+        
+    def delete_channel(self, name: str):
+        #check first for a temp sequence
+        temp_sequence = copy.deepcopy(self)
+        self.copy_original_events_to_new_sequence(self, temp_sequence)
+        
+        channel = temp_sequence.find_channel_by_name(name)
+        
+        channel = self.find_channel_by_name(name)
+        if channel is None:
+            raise ValueError(f"Channel {name} not found")
+        for event in channel.events:
+            self.delete_event(start_time=event.start_time,channel_name=name)
+        
+        temp_sequence.channels.remove(channel)
+
+        # Apply the changes to the original sequence if no overlaps are found
+        channel = self.find_channel_by_name(name)
+        for event in channel.events:
+            self.delete_event(start_time=event.start_time,channel_name=name)
+        self.channels.remove(channel)
+
+
     # add a new event to the sequence
     def add_event(self, channel_name: str, behavior: EventBehavior, start_time: Optional[float] = None, relative_time: Optional[float] = None, reference_time: str = "start", parent_event: Optional[Event] = None) -> Event:
         if start_time is not None and relative_time is not None:
@@ -1620,8 +1713,6 @@ def create_test_sequence(name: str = "test"):
     event3 = sequence.add_event("Analog2", Jump(0.0),  start_time=8)
     event4 = sequence.add_event("Analog2", Ramp(2, RampType.EXPONENTIAL, 5, 10), start_time=15)
     
-
-
     return sequence
 
 
