@@ -416,10 +416,15 @@ class Sequence:
         if parent_event is None:
             if start_time is None:
                 raise ValueError("Root event must have start_time specified.")
+            if start_time < 0:
+                raise ValueError("start_time must be non-negative.")
             event = Event(channel, behavior, start_time=start_time)
         else:
             if relative_time is None:
                 raise ValueError("Child event must have relative_time specified.")
+            if relative_time+parent_event.start_time < 0:
+                raise ValueError("Negative time is not allowed.")
+            
             event = Event(channel, behavior, relative_time=relative_time, reference_time=reference_time, parent=parent_event)
             parent_event.children.append(event)
 
@@ -671,6 +676,8 @@ class Sequence:
                 new_start_time = event.parent.end_time + new_relative_time
             else:
                 raise ValueError("Invalid reference_time. Use 'start' or 'end'.")
+            if new_start_time < 0:
+                raise ValueError("Negative time is not allowed.")
 
             delta = new_start_time - event.start_time
             event.reference_time = new_reference_time
@@ -734,15 +741,19 @@ class Sequence:
             channel.check_for_overlapping_events()
 
     def find_event_by_original_reference(self, reference_original_event: Event) -> Optional[Event]:
+        if reference_original_event is None:
+            raise ValueError("Provide a valid reference_original_event.")
         for event in self.all_events:
             if event.reference_original_event == reference_original_event:
                 return event
-        return None
+        raise ValueError("Event not found.")
 
     @staticmethod
     def copy_original_events_to_new_sequence(original_sequence: 'Sequence', new_sequence: 'Sequence'):
         for event in original_sequence.all_events:
+            print("event",event)
             new_event = new_sequence.find_event_by_time_and_channel(event.start_time, event.channel.name)
+            print("new_event",new_event)
             new_event.reference_original_event = event.reference_original_event
             new_event.is_sweept = True
     
