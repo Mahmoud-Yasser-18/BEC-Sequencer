@@ -628,11 +628,28 @@ class SequenceManagerWidget(QWidget):
     def create_menu_bar(self):
         menu_bar = QMenuBar(self)
         file_menu = QMenu("File", self)
+
         load_action = QAction("Load Sequence Manager", self)
         load_action.triggered.connect(self.load_sequence_manager)
         file_menu.addAction(load_action)
+
+        save_action = QAction("Save Sequence Manager", self)
+        save_action.triggered.connect(self.save_sequence_manager)
+        file_menu.addAction(save_action)
+
         menu_bar.addMenu(file_menu)
         return menu_bar
+
+    def save_sequence_manager(self):
+        file_dialog = QFileDialog(self)
+        file_name, _ = file_dialog.getSaveFileName(self, "Save Sequence Manager", "", "JSON Files (*.json)")
+        if file_name:
+            self.sequence_manager.to_json(file_name=file_name)
+
+
+
+
+
 
     def load_sequence_manager(self):
         file_dialog = QFileDialog(self)
