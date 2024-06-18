@@ -751,9 +751,9 @@ class Sequence:
     @staticmethod
     def copy_original_events_to_new_sequence(original_sequence: 'Sequence', new_sequence: 'Sequence'):
         for event in original_sequence.all_events:
-            print("event",event)
+            # print("event",event)
             new_event = new_sequence.find_event_by_time_and_channel(event.start_time, event.channel.name)
-            print("new_event",new_event)
+            # print("new_event",new_event)
             new_event.reference_original_event = event.reference_original_event
             new_event.is_sweept = True
     
@@ -895,6 +895,18 @@ class Sequence:
         root_events = [event for event in self.all_events if event.parent is None]
         for root_event in root_events:
             root_event.print_event_hierarchy(level, indent)
+        
+    
+    #string of the class 
+    def __repr__(self) -> str:
+        return (
+            f"Sequence(\n"
+            f"   channels={self.channels},\n"
+            f"   all_events={self.all_events}\n"
+            f")"
+        )
+
+
     def plot_all(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None,plot_now: bool =True):
         if channels_to_plot is None:
             channels_to_plot = [channel.name for channel in self.channels]
@@ -1033,7 +1045,7 @@ class Sequence:
         if plot_now:
             plt.show()  
 
-    def to_json(self, filename: str) -> str:
+    def to_json(self, filename: Optional[str] = None) -> str:
         def serialize_event(event: Event) -> dict:
             event_data = {
                 "channel_name": event.channel.name,
@@ -1090,8 +1102,9 @@ class Sequence:
 
         root_events = [event for event in self.all_events if event.parent is None]
         data["events"] = [serialize_event(event) for event in root_events]
-        with open(filename, 'w') as file:
-            json.dump(data, file, indent=4)
+        if filename:
+            with open(filename, 'w') as file:
+                json.dump(data, file, indent=4)
 
         return json.dumps(data, indent=4)
 
@@ -1397,7 +1410,7 @@ class Sequence:
 
 
 class SequenceManager:
-    def __init__(self,) -> None:
+    def __init__(self) -> None:
         self.main_sequences = dict()
 
 
@@ -1540,6 +1553,50 @@ class SequenceManager:
             final_sweep_sequences.append(main_sweep)
 
         return final_sweep_sequences
+    
+    def to_json(self,file_name: Optional[str] = None) -> str:
+        data = {
+            "sequences": []
+        }
+        for seq_name, seq_data in self.main_sequences.items():
+            data["sequences"].append({
+                "name": seq_name,
+                "index": seq_data["index"],
+                "sequence": seq_data["seq"].to_json()
+            })
+
+        if file_name:
+            with open(file_name, 'w') as file:
+                json.dump(data, file, indent=4)
+            
+        return json.dumps(data, indent=4)
+    
+    @staticmethod
+    def from_json( file_name: Optional[str] = None,json_input: Optional[str] = None) -> 'SequenceManager':
+        
+        if json_input is not None and file_name is not None:
+            raise ValueError("Provide either a JSON string or a file name, not both.")
+
+        if json_input is None and file_name is None:
+            raise ValueError("Provide either a JSON string or a file name.")
+
+        if file_name:
+            with open(file_name, 'r') as file:
+                json_str = file.read()
+        else:
+            json_str = json_input
+
+        seq_manager = SequenceManager()
+
+        data = json.loads(json_str)
+        for seq_data in data["sequences"]:
+            sequence = Sequence.from_json(json_input=seq_data["sequence"])
+            seq_manager.main_sequences[seq_data["name"]] = {"index":seq_data["index"], "seq":sequence}
+
+        return seq_manager 
+            
+
+
             
 
         
@@ -1548,7 +1605,7 @@ def create_test_sequence(name: str = "test"):
     sequence = Sequence(name)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
     analog_channel = sequence.add_analog_channel("Analog2", 2, 2)
-    digital_channel = sequence.add_digital_channel("Digital1", 2, 1, 1, 1)
+    digital_channel = sequence.add_digital_channel("Digital1", 5, 1, 1, 1)
     
 
     # Create events for testing
@@ -1566,6 +1623,24 @@ def create_test_sequence(name: str = "test"):
 
 
     return sequence
+
+
+def create_test_sequence2(name: str = "test"):
+    #test saving and loading from json sequence manager
+    seq_manager = SequenceManager()
+    seq = create_test_sequence(name+"1")
+    seq_manager.load_sequence(seq)
+    seq2 = create_test_sequence(name+"2")
+    seq2.add_sequence(seq)
+    seq_manager.load_sequence(seq2)
+    seq3 = create_test_sequence(name+"3")
+    seq_manager.load_sequence(seq3)
+    
+    seq_manager.to_json("manager_test.json")
+    seq_manager2 = SequenceManager.from_json("manager_test.json")
+    return seq_manager,seq_manager2
+
+
 
 
 
