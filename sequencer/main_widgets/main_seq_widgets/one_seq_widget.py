@@ -3,7 +3,7 @@
 import sys
 from typing import List, Optional
 from PyQt5.QtWidgets import (
-    QApplication, QHBoxLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar
+    QApplication, QHBoxLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
 )
 from PyQt5.QtCore import Qt, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen
@@ -16,6 +16,18 @@ from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog
 from sequencer.event import Ramp, Jump, Sequence
 
+import sys
+from typing import List, Optional
+from PyQt5.QtWidgets import (
+    QApplication, QHBoxLayout, QVBoxLayout, QScrollArea, QScrollBar, QMenuBar,
+    QMenu, QAction, QPushButton, QWidget, QLabel, QDialog, QMessageBox, QFileDialog
+)
+from PyQt5.QtCore import Qt, pyqtSignal, QPoint
+
+from sequencer.Dialogs.channel_dialog import ChannelDialog
+from sequencer.Dialogs.event_dialog import ChildEventDialog, RootEventDialog
+from sequencer.Dialogs.edit_event_dialog import EditEventDialog
+from sequencer.event import Ramp, Jump, Sequence, SequenceManager
 
 
 class ChannelLabelWidget(QWidget):
@@ -337,6 +349,16 @@ class EventsViewerWidget(QWidget):
                 widget.deleteLater()
 
     def populate_events(self) -> None:
+        # check if a sequence has no events or channels 
+        if len(self.sequence.channels) == 0:
+            self.max_time = 1
+            self.num_channels = 1
+            return
+        if len(self.sequence.all_events) == 0:
+            self.max_time = 1
+            self.num_channels = 1
+            return  
+        
         all_events = self.sequence.all_events
         self.max_time = max(
             (event.start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 0))
@@ -576,15 +598,84 @@ class SyncedTableWidget(QWidget):
 
         self.setup_ui()
 
+from sequencer.event import SequenceManager
 
 
+# self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence}
+# class to handle sequence manager
+class SequenceManagerWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.sequence_manager = SequenceManager()
+        self.initUI()
+
+    def initUI(self):
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+
+        self.menu_bar = self.create_menu_bar()
+        self.layout.addWidget(self.menu_bar)
+
+        self.button_layout = QHBoxLayout()
+        self.layout.addLayout(self.button_layout)
+
+        self.sequence_view_area = QWidget()
+        self.sequence_view_layout = QVBoxLayout(self.sequence_view_area)
+        self.layout.addWidget(self.sequence_view_area)
+
+        self.update_buttons()
+
+    def create_menu_bar(self):
+        menu_bar = QMenuBar(self)
+        file_menu = QMenu("File", self)
+        load_action = QAction("Load Sequence Manager", self)
+        load_action.triggered.connect(self.load_sequence_manager)
+        file_menu.addAction(load_action)
+        menu_bar.addMenu(file_menu)
+        return menu_bar
+
+    def load_sequence_manager(self):
+        file_dialog = QFileDialog(self)
+        file_name, _ = file_dialog.getOpenFileName(self, "Open Sequence Manager", "", "JSON Files (*.json)")
+        if file_name:
+            self.sequence_manager = SequenceManager.from_json(file_name=file_name)
+            self.update_buttons()
+
+    def update_buttons(self):
+        for i in reversed(range(self.button_layout.count())):
+            self.button_layout.itemAt(i).widget().setParent(None)
+
+        for sequence_name in self.sequence_manager.main_sequences:
+            button = QPushButton(sequence_name, self)
+            button.clicked.connect(self.display_sequence)
+            self.button_layout.addWidget(button)
+
+        add_button = QPushButton("+", self)
+        add_button.clicked.connect(self.add_new_sequence)
+        self.button_layout.addWidget(add_button)
+
+    def add_new_sequence(self):
+        sequence_name, ok = QInputDialog.getText(self, "Add New Sequence", "Enter sequence name:")
+        if ok and sequence_name:
+            self.sequence_manager.add_new_sequence(sequence_name)
+            self.update_buttons()
+
+    def display_sequence(self):
+        button = self.sender()
+        sequence_name = button.text()
+        sequence = self.sequence_manager.main_sequences[sequence_name]["seq"]
+
+        for i in reversed(range(self.sequence_view_layout.count())):
+            widget_to_remove = self.sequence_view_layout.itemAt(i).widget()
+            self.sequence_view_layout.removeWidget(widget_to_remove)
+            widget_to_remove.setParent(None)
+
+        synced_table_widget = SyncedTableWidget(sequence)
+        self.sequence_view_layout.addWidget(synced_table_widget)
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-
-    seq= Sequence.from_json("MOT_loading.json")
-
-    window = SyncedTableWidget(seq)
+    window = SequenceManagerWidget()
     window.show()
     sys.exit(app.exec_())
