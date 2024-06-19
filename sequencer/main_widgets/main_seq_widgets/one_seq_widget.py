@@ -772,9 +772,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt,QMimeData
 from PyQt5.QtGui import QColor, QPalette,QDrag
 
+
 class DraggableButton(QPushButton):
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
+        self.parent = parent
         self.setAcceptDrops(True)
 
     def mouseMoveEvent(self, event):
@@ -791,8 +793,7 @@ class DraggableButton(QPushButton):
 
     def dropEvent(self, event):
         if event.source() != self:
-            self.parent().move_button(self, event.source())
-
+            self.parent.move_button(self, event.source())
 
 class SequenceManagerWidget(QWidget):
     def __init__(self):
@@ -818,10 +819,9 @@ class SequenceManagerWidget(QWidget):
 
         self.sequence_view_area = QWidget()
         self.sequence_view_layout = QVBoxLayout(self.sequence_view_area)
-        self.layout.addWidget(self.sequence_view_area,2)
+        self.layout.addWidget(self.sequence_view_area, 2)
 
         self.update_buttons()
-
 
     def create_menu_bar(self):
         menu_bar = QMenuBar(self)
@@ -857,12 +857,12 @@ class SequenceManagerWidget(QWidget):
             self.button_layout.itemAt(i).widget().setParent(None)
 
         for sequence_name in self.sequence_manager.main_sequences:
-            button = QPushButton(sequence_name, self)
+            button = DraggableButton(sequence_name, self)
             button.clicked.connect(self.display_sequence)
             button.setStyleSheet(self.get_button_style(False))
             self.button_layout.addWidget(button)
 
-        add_button = QPushButton("+", self)
+        add_button = DraggableButton("+", self)
         add_button.clicked.connect(self.add_new_sequence)
         add_button.setStyleSheet("""
             QPushButton {
@@ -881,6 +881,20 @@ class SequenceManagerWidget(QWidget):
         """)
         self.button_layout.addWidget(add_button, alignment=Qt.AlignLeft)
 
+    def move_button(self, target, source):
+        source_index = self.button_layout.indexOf(source)
+        target_index = self.button_layout.indexOf(target)
+        # print(f"Moving {source.text()} from index {source_index} to index {target_index}")
+        #rearrange the sequences in the sequence manager
+        # target_index_manager = self.sequence_manager.main_sequences[target.text()]["index"]
+
+        self.sequence_manager.move_sequence_to_index(source.text(),source_index )
+        # print(self.sequence_manager.main_sequences)
+
+        self.button_layout.insertWidget(target_index, source)
+
+        print(f"Moved {source.text()} from index {source_index} to index {target_index}")
+        print([(key,value["index"]) for key, value in self.sequence_manager.main_sequences.items()])
     def get_button_style(self, selected):
         if selected:
             return """
@@ -957,12 +971,12 @@ class SequenceManagerWidget(QWidget):
                 QMessageBox.critical(dialog, "Error, File is corrupt due to ", str(e))
         dialog.accept()
 
-    def display_sequence(self,flag=False):
+    def display_sequence(self, flag=False):
         button = self.sender()
         if not flag:
             sequence_name = button.text()
             sequence = self.sequence_manager.main_sequences[sequence_name]["seq"]
-        else :
+        else:
             sequence = list(self.sequence_manager.main_sequences.values())[-1]["seq"]
             sequence_name = sequence.sequence_name
         
@@ -974,7 +988,7 @@ class SequenceManagerWidget(QWidget):
             self.sequence_view_layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
 
-        synced_table_widget = SyncedTableWidget(self.sequence_manager,sequence)
+        synced_table_widget = SyncedTableWidget(self.sequence_manager, sequence)
         self.sequence_view_layout.addWidget(synced_table_widget)
 
         if self.selected_sequence_button:
@@ -986,7 +1000,6 @@ class SequenceManagerWidget(QWidget):
             button = self.button_layout.itemAt(self.button_layout.count()-2).widget()
             self.selected_sequence_button = button
             self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
-
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

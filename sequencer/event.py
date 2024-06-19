@@ -1512,10 +1512,11 @@ class Sequence:
 
 
 
+from collections import OrderedDict
 
 class SequenceManager:
     def __init__(self) -> None:
-        self.main_sequences = dict()
+        self.main_sequences = OrderedDict()
 
 
     def add_new_sequence(self,  sequence_name: str,index: Optional[int] = None):
@@ -1527,7 +1528,7 @@ class SequenceManager:
         
         if index is None:
             index = len(self.main_sequences)
-        self.main_sequences[sequence_name] = {"index":index, "seq":Sequence('sequence_name'),"sweep_list":dict()}
+        self.main_sequences[sequence_name] = {"index":index, "seq":Sequence('sequence_name'),"sweep_list":OrderedDict()}
     
     def load_sequence(self,  sequence: Sequence,index: Optional[int] = None):
         if sequence.sequence_name in self.main_sequences:
@@ -1538,7 +1539,7 @@ class SequenceManager:
         if index is None:
             index = len(self.main_sequences)
 
-        self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence,"sweep_list":dict()}
+        self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence,"sweep_list":OrderedDict()}
 
     def change_sequence_name(self, old_name: str, new_name: str):
         if old_name not in self.main_sequences:
@@ -1561,6 +1562,36 @@ class SequenceManager:
             raise ValueError(f"Sequence with index {new_index} already exists.")
         
         self.main_sequences[sequence_name]["index"] = new_index
+    
+    def swap_sequence_index(self, sequence_name1: str, sequence_name2: str):
+        if sequence_name1 not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name1} not found.")
+        
+        if sequence_name2 not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name2} not found.")
+        
+        index1 = self.main_sequences[sequence_name1]["index"]
+        index2 = self.main_sequences[sequence_name2]["index"]
+        self.main_sequences[sequence_name1]["index"] = index2
+        self.main_sequences[sequence_name2]["index"] = index1
+    
+    def move_sequence_to_index(self, sequence_name: str, new_index: int):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        # check that the new index is not bigger than the number of sequences 
+        # check that the new index is not smaller than 0
+        # check that the new index is not the same as the current index
+        # check that the new index is not the same as the index of another sequence
+        # get the current index of the sequence to be moved
+        # get the index of the sequence at the new index 
+        current_index = self.main_sequences[sequence_name]["index"]
+        
+        #swap the indexes index of the sequence to be moved with the index of the sequence at the new index
+        
+
+            
+        self.sort_sequences()
+        
 
     def delete_sequence(self, sequence_name: str):
         if sequence_name not in self.main_sequences:
@@ -1569,7 +1600,7 @@ class SequenceManager:
         self.main_sequences.pop(sequence_name)
     
     def sort_sequences(self):
-        self.main_sequences = dict(sorted(self.main_sequences.items(), key=lambda item: item[1]["index"]))
+        self.main_sequences = OrderedDict(sorted(self.main_sequences.items(), key=lambda item: item[1]["index"]))
 
 
     def load_sequence_json(self, json: str, index):
@@ -1590,7 +1621,7 @@ class SequenceManager:
         if sequence_name not in self.main_sequences:
             raise ValueError(f"Sequence with name {sequence_name} not found.")
 
-        new_sweep_dict = dict()
+        new_sweep_dict = OrderedDict()
         if  len(self.main_sequences[sequence_name]["sweep_list"])!=0:
             for old_key, old_seq in self.main_sequences[sequence_name]["sweep_list"].items():
 
@@ -1659,6 +1690,9 @@ class SequenceManager:
         data = {
             "sequences": []
         }
+        #sort sequences by index before saving 
+        self.sort_sequences()
+        
         for seq_name, seq_data in self.main_sequences.items():
             data["sequences"].append({
                 "name": seq_name,
