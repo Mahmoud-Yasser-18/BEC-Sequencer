@@ -3,7 +3,7 @@
 import sys
 from typing import List, Optional
 from PyQt5.QtWidgets import (
-    QApplication, QHBoxLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
+    QApplication, QHBoxLayout,QToolTip, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
 )
 from PyQt5.QtCore import Qt, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen
@@ -88,26 +88,23 @@ class ChannelLabelWidget(QWidget):
         self.buttonclicked.emit()
 
 class GapButton(QPushButton):
-    addEventSignal = pyqtSignal(object) 
+    addEventSignal = pyqtSignal(object)
 
-    def __init__(self, channel,parent,previous_event):
+    def __init__(self, channel, parent, previous_event):
         super().__init__(parent)
-        self.channel =channel
+        self.channel = channel
         self.previous_event = previous_event
         self.initUI()
 
     def initUI(self):
         if self.previous_event is None:
             self.setText("Add Event")
-            #link push button to emit signal
-            # self.clicked.connect(self.addEventSignal.emit(self.channel))
-
         else:
             if isinstance(self.previous_event.behavior, Ramp):
                 self.setText(str(self.previous_event.behavior.end_value))
             elif isinstance(self.previous_event.behavior, Jump):
                 self.setText(str(self.previous_event.behavior.target_value))
-        
+
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         no_event_stylesheet = """
@@ -137,17 +134,26 @@ class GapButton(QPushButton):
             background-color: #9E9E9E; /* Grayed-out color */
             border: 2px solid #616161; /* Darker gray border */
             color: #333333; /* Dark text for contrast */
-
         }
 
         QPushButton:focus {
             outline: 2px solid #007BFF; /* Blue outline */
         }
         """
+        self.setStyleSheet(no_event_stylesheet)
 
-        self.setStyleSheet(no_event_stylesheet) 
-
-
+    def enterEvent(self, event):
+        if self.previous_event:
+            if isinstance(self.previous_event.behavior, Ramp):
+                behavior = f"Holding on {self.previous_event.behavior.end_value} after ramp"
+            elif isinstance(self.previous_event.behavior, Jump):
+                behavior = f"Holding on {self.previous_event.behavior.target_value} after jump"
+            else:
+                behavior = "Unknown behavior"
+            QToolTip.showText(event.globalPos(), behavior, self)
+        else:
+            QToolTip.showText(event.globalPos(), "No previous event", self)
+        super().enterEvent(event)
 
     def show_context_menu(self, pos):
         context_menu = QMenu(self)
@@ -156,13 +162,10 @@ class GapButton(QPushButton):
         if action == add_event_action:
             self.addEventSignal.emit(self.channel)
 
-
-
 class EventButton(QPushButton):
     addChildEventSignal = pyqtSignal(object)
     deleteEventSignal = pyqtSignal(object)
     editEventSignal = pyqtSignal(object)
-    
 
     def __init__(self, event, scale_factor, sequence, parent=None):
         super().__init__(parent)
@@ -175,7 +178,7 @@ class EventButton(QPushButton):
         if isinstance(self.event.behavior, Ramp):
             duration = self.event.behavior.duration
             self.setGeometry(int(self.event.start_time * self.scale_factor), 0, int(duration * self.scale_factor), 50)
-            self.setText(str(self.event.behavior.ramp_type)+' '+str(self.event.behavior.start_value)+'->'+str(self.event.behavior.end_value))
+            self.setText(str(self.event.behavior.ramp_type) + ' ' + str(self.event.behavior.start_value) + '->' + str(self.event.behavior.end_value))
         elif isinstance(self.event.behavior, Jump):
             self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
             self.setText('J')
@@ -211,24 +214,29 @@ class EventButton(QPushButton):
             background-color: #9E9E9E; /* Grayed-out color */
             border: 2px solid #616161; /* Darker gray border */
             color: #333333; /* Dark text for contrast */
-
         }
 
         QPushButton:focus {
             outline: 2px solid #007BFF; /* Blue outline */
         }
         """
-
         self.setStyleSheet(event_stylesheet)
 
-
+    def enterEvent(self, event):
+        if isinstance(self.event.behavior, Ramp):
+            behavior = f"Ramp: {self.event.behavior.start_value} -> {self.event.behavior.end_value}"
+        elif isinstance(self.event.behavior, Jump):
+            behavior = f"Jump to {self.event.behavior.target_value}"
+        else:
+            behavior = "Unknown behavior"
+        QToolTip.showText(event.globalPos(), behavior, self)
+        super().enterEvent(event)
 
     def show_context_menu(self, pos):
         context_menu = QMenu(self)
         add_child_action = context_menu.addAction("Add Child Event")
         delete_action = context_menu.addAction("Delete Event")
         edit_action = context_menu.addAction("Edit Event")
-
 
         action = context_menu.exec_(self.mapToGlobal(pos))
         if action == add_child_action:
@@ -667,10 +675,44 @@ class SequenceManagerWidget(QWidget):
         self.button_layout.addWidget(add_button)
 
     def add_new_sequence(self):
-        sequence_name, ok = QInputDialog.getText(self, "Add New Sequence", "Enter sequence name:")
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add New Sequence")
+
+        layout = QVBoxLayout(dialog)
+
+        new_sequence_button = QPushButton("Create New Sequence", dialog)
+        load_sequence_button = QPushButton("Load Sequence from File", dialog)
+
+        layout.addWidget(new_sequence_button)
+        layout.addWidget(load_sequence_button)
+
+        new_sequence_button.clicked.connect(lambda: self.create_new_sequence(dialog))
+        load_sequence_button.clicked.connect(lambda: self.load_sequence_from_file(dialog))
+
+        dialog.setLayout(layout)
+        dialog.exec_()
+
+    def create_new_sequence(self, dialog):
+        sequence_name, ok = QInputDialog.getText(dialog, "Add New Sequence", "Enter sequence name:")
         if ok and sequence_name:
-            self.sequence_manager.add_new_sequence(sequence_name)
-            self.update_buttons()
+            try:
+                self.sequence_manager.add_new_sequence(sequence_name)
+                self.update_buttons()
+            except Exception as e:
+                QMessageBox.critical(dialog, "Error", str(e))
+        dialog.accept()
+
+    def load_sequence_from_file(self, dialog):
+        file_dialog = QFileDialog(self)
+        file_name, _ = file_dialog.getOpenFileName(self, "Load Sequence from JSON", "", "JSON Files (*.json)")
+        if file_name:
+            try:
+                sequence = Sequence.from_json(file_name)
+                self.sequence_manager.load_sequence(sequence)
+                self.update_buttons()
+            except Exception as e:
+                QMessageBox.critical(dialog, "Error, File is corrupt due to ", str(e))
+        dialog.accept()
 
     def display_sequence(self):
         button = self.sender()
