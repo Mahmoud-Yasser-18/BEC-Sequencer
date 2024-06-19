@@ -30,8 +30,10 @@ from sequencer.Dialogs.edit_event_dialog import EditEventDialog
 from sequencer.event import Ramp, Jump, Sequence, SequenceManager
 
 
+
 class ChannelLabelWidget(QWidget):
     channel_right_clicked = pyqtSignal(QPoint)
+    buttonclicked = pyqtSignal()
 
     def __init__(self, sequence, parent=None):
         super().__init__(parent)
@@ -40,7 +42,6 @@ class ChannelLabelWidget(QWidget):
         self.initUI()
 
     def initUI(self):
-        
         main_layout = QVBoxLayout(self)
         self.scroll_area = self.create_scroll_area()
         main_layout.addWidget(self.scroll_area)
@@ -58,24 +59,33 @@ class ChannelLabelWidget(QWidget):
         spacer_label.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(spacer_label)
 
-        for channel in self.channels:
-            label = QLabel(channel, self)
-            label.setFixedHeight(50)
-            label.setAlignment(Qt.AlignCenter)
-            label.setContextMenuPolicy(Qt.CustomContextMenu)
-            label.customContextMenuRequested.connect(self.show_context_menu)
-            self.layout.addWidget(label)
+        if not self.channels:
+            add_channel_button = QPushButton("Add Channel", self)
+            add_channel_button.setFixedHeight(20)
+            add_channel_button.clicked.connect(self.add_channel)
+            self.layout.addWidget(add_channel_button, alignment=Qt.AlignCenter)
+        else:
+            for channel in self.channels:
+                label = QLabel(channel, self)
+                label.setFixedHeight(50)
+                label.setAlignment(Qt.AlignCenter)
+                label.setContextMenuPolicy(Qt.CustomContextMenu)
+                label.customContextMenuRequested.connect(self.show_context_menu)
+                self.layout.addWidget(label)
 
         self.container_widget.setLayout(self.layout)
-        self.container_widget.setFixedSize(100, len(self.channels) * 100)
+        self.container_widget.setFixedSize(100, len(self.channels) * 100 if self.channels else 100)
 
         scroll_area.setWidget(self.container_widget)
         scroll_area.setFixedWidth(150)
-        # scroll_area.setFixedSize(150, len(self.channels) * 100)
         return scroll_area
 
     def show_context_menu(self, position):
         self.channel_right_clicked.emit(self.mapToGlobal(position))
+
+    #Example slot for adding a channel
+    def add_channel(self):
+        self.buttonclicked.emit()
 
 class GapButton(QPushButton):
     addEventSignal = pyqtSignal(object) 
@@ -100,20 +110,6 @@ class GapButton(QPushButton):
         
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
-        # self.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: #4CAF50;  /* Green background */
-        #         color: white;               /* White text */
-        #         border: 2px solid #4CAF50;  /* Green border */
-        #         border-radius: 10px;        /* Rounded corners */
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #45a049;  /* Darker green on hover */
-        #     }
-        #     QPushButton:pressed {
-        #         background-color: #3e8e41;  /* Even darker green when pressed */
-        #     }
-        # """)
         no_event_stylesheet = """
         QPushButton {
             background-color: #4CAF50; /* Green */
@@ -225,20 +221,6 @@ class EventButton(QPushButton):
 
         self.setStyleSheet(event_stylesheet)
 
-        # self.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: #4CAF50;  /* Green background */
-        #         color: white;               /* White text */
-        #         border: 2px solid #4CAF50;  /* Green border */
-        #         border-radius: 10px;        /* Rounded corners */
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #45a049;  /* Darker green on hover */
-        #     }
-        #     QPushButton:pressed {
-        #         background-color: #3e8e41;  /* Even darker green when pressed */
-        #     }
-        # """)
 
 
     def show_context_menu(self, pos):
@@ -355,9 +337,12 @@ class EventsViewerWidget(QWidget):
             self.num_channels = 1
             return
         if len(self.sequence.all_events) == 0:
-            self.max_time = 1
-            self.num_channels = 1
-            return  
+            self.max_time = 0
+            self.num_channels = len(self.sequence.channels)
+            for channel in self.sequence.channels:
+                buttons_container = self.create_buttons_container(channel)
+                self.container_layout.addWidget(buttons_container)
+            return
         
         all_events = self.sequence.all_events
         self.max_time = max(
@@ -371,17 +356,19 @@ class EventsViewerWidget(QWidget):
             buttons_container = self.create_buttons_container(channel)
             self.container_layout.addWidget(buttons_container)
 
+#          if len(channel.events) == 0:
+#             gap_button = GapButton(channel, buttons_container, previous_event)
+#             gap_button.setGeometry(0, 0, int(self.max_time * self.scale_factor) + 50, 50)
+#             gap_button.addEventSignal.connect(self.add_event)
+#             return buttons_container
+
     def create_buttons_container(self, channel: any) -> QWidget:
         buttons_container = QWidget(self)
         buttons_container.setFixedHeight(50)
         previous_end_time = 0.0
         previous_event = None
 
-        if len(channel.events) == 0:
-            gap_button = GapButton(channel, buttons_container, previous_event)
-            gap_button.setGeometry(0, 0, int(self.max_time * self.scale_factor) + 50, 50)
-            gap_button.addEventSignal.connect(self.add_event)
-            return buttons_container
+       
 
         for event in channel.events:
             start_time = event.start_time
@@ -401,9 +388,17 @@ class EventsViewerWidget(QWidget):
 
         if previous_event:
             gap_duration = self.max_time - previous_end_time
-            gap_button = GapButton(channel, buttons_container, previous_event)
-            gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
-            gap_button.addEventSignal.connect(self.add_event)
+            if gap_duration > 0:
+                gap_button = GapButton(channel, buttons_container, previous_event)
+                gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
+                gap_button.addEventSignal.connect(self.add_event)
+        
+        #add a button to the container at the end of the channel
+        gap_button = GapButton(channel, buttons_container, previous_event)
+        gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int((self.max_time - previous_end_time+1) * self.scale_factor), 50)
+        gap_button.addEventSignal.connect(self.add_event)
+        
+
 
         return buttons_container
 
@@ -506,7 +501,7 @@ class SyncedTableWidget(QWidget):
         self.time_axis = TimeAxisWidget(self.data_table)
         
         self.channel_list.channel_right_clicked.connect(self.show_context_menu)        
-
+        self.channel_list.buttonclicked.connect(self.show_channel_dialog)
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
         self.scroll_bar2 = self.data_table.scroll_area.verticalScrollBar()

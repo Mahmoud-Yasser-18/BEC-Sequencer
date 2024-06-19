@@ -1,6 +1,4 @@
 {
-    "name": "Test Protocol",
-
     "channels": [
         {
             "name": "Analog1",
@@ -50,7 +48,7 @@
                 "type": "Ramp",
                 "details": {
                     "duration": 3,
-                    "ramp_type": "quadratic",
+                    "ramp_type": "RampType.QUADRATIC",
                     "start_value": 2.0,
                     "end_value": 6.0
                 }
@@ -103,7 +101,7 @@
                                 "type": "Ramp",
                                 "details": {
                                     "duration": 2,
-                                    "ramp_type": "exponential",
+                                    "ramp_type": "RampType.EXPONENTIAL",
                                     "start_value": 5,
                                     "end_value": 10
                                 }

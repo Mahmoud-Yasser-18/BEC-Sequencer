@@ -104,6 +104,32 @@
                 "max_voltage": 10,
                 "min_voltage": -10
             }
+        },
+        {
+            "name": "Absorption FM",
+            "card_number": 3,
+            "channel_number": 1,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
+        },
+        {
+            "name": "Absorption AM",
+            "card_number": 3,
+            "channel_number": 4,
+            "reset": false,
+            "reset_value": 0,
+            "type": "Analog",
+            "extra": {
+                "default_voltage_func": null,
+                "max_voltage": 10,
+                "min_voltage": -10
+            }
         }
     ],
     "events": [
@@ -206,6 +232,32 @@
                 "type": "Jump",
                 "details": {
                     "target_value": 0.5
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Absorption FM",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 10
+                }
+            },
+            "reference_time": null,
+            "children": []
+        },
+        {
+            "channel_name": "Absorption AM",
+            "start_time": 0,
+            "end_time": 0,
+            "behavior": {
+                "type": "Jump",
+                "details": {
+                    "target_value": 3.3
                 }
             },
             "reference_time": null,

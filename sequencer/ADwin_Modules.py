@@ -407,9 +407,9 @@ if __name__ == "__main__":
     main_seq.add_event("Absorption FM", Jump(10), start_time=t)
     main_seq.add_event("Absorption AM", Jump(3.3), start_time=t) # 3.3 is the ON value for the AM and 0 is the OFF value
   
-
-    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
-    adwin_driver.add_to_queue(main_seq)
+    main_seq.to_json("MOT_loading.json")
+    # adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
+    # adwin_driver.add_to_queue(main_seq)
 
     
     
@@ -423,7 +423,7 @@ if __name__ == "__main__":
     #     seq.print_sequence("Trap FM")
     #     adwin_driver.add_to_queue(seq)
 
-    adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
+    # adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
 
 
     
