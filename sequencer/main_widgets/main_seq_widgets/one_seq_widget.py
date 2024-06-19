@@ -145,7 +145,7 @@ class GapButton(QPushButton):
     def enterEvent(self, event):
         if self.previous_event:
             if isinstance(self.previous_event.behavior, Ramp):
-                behavior = f"Holding on {self.previous_event.behavior.end_value} after ramp"
+                behavior = f"Holding on {self.previous_event.behavior.end_value} after {self.previous_event.behavior.ramp_type} ramp"
             elif isinstance(self.previous_event.behavior, Jump):
                 behavior = f"Holding on {self.previous_event.behavior.target_value} after jump"
             else:
@@ -224,7 +224,7 @@ class EventButton(QPushButton):
 
     def enterEvent(self, event):
         if isinstance(self.event.behavior, Ramp):
-            behavior = f"Ramp: {self.event.behavior.start_value} -> {self.event.behavior.end_value}"
+            behavior = f"{self.event.behavior.ramp_type} Ramp of {self.event.behavior.duration} from {self.event.behavior.start_value} to {self.event.behavior.end_value}"
         elif isinstance(self.event.behavior, Jump):
             behavior = f"Jump to {self.event.behavior.target_value}"
         else:
@@ -606,10 +606,17 @@ from sequencer.event import SequenceManager
 
 # self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence}
 # class to handle sequence manager
+from PyQt5.QtWidgets import (
+    QScrollArea, QHBoxLayout, QVBoxLayout, QInputDialog, QDialog, QMessageBox, QPushButton, QMenuBar, QAction, QFileDialog, QWidget, QApplication
+)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor, QPalette
+
 class SequenceManagerWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.sequence_manager = SequenceManager()
+        self.selected_sequence_button = None
         self.initUI()
 
     def initUI(self):
@@ -619,14 +626,20 @@ class SequenceManagerWidget(QWidget):
         self.menu_bar = self.create_menu_bar()
         self.layout.addWidget(self.menu_bar)
 
-        self.button_layout = QHBoxLayout()
-        self.layout.addLayout(self.button_layout)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.button_container = QWidget()
+        self.button_layout = QHBoxLayout(self.button_container)
+        self.scroll_area.setWidget(self.button_container)
+
+        self.layout.addWidget(self.scroll_area)
 
         self.sequence_view_area = QWidget()
         self.sequence_view_layout = QVBoxLayout(self.sequence_view_area)
-        self.layout.addWidget(self.sequence_view_area)
+        self.layout.addWidget(self.sequence_view_area,2)
 
         self.update_buttons()
+
 
     def create_menu_bar(self):
         menu_bar = QMenuBar(self)
@@ -649,17 +662,13 @@ class SequenceManagerWidget(QWidget):
         if file_name:
             self.sequence_manager.to_json(file_name=file_name)
 
-
-
-
-
-
     def load_sequence_manager(self):
         file_dialog = QFileDialog(self)
         file_name, _ = file_dialog.getOpenFileName(self, "Open Sequence Manager", "", "JSON Files (*.json)")
         if file_name:
             self.sequence_manager = SequenceManager.from_json(file_name=file_name)
             self.update_buttons()
+            self.display_sequence(flag=True)
 
     def update_buttons(self):
         for i in reversed(range(self.button_layout.count())):
@@ -668,11 +677,61 @@ class SequenceManagerWidget(QWidget):
         for sequence_name in self.sequence_manager.main_sequences:
             button = QPushButton(sequence_name, self)
             button.clicked.connect(self.display_sequence)
+            button.setStyleSheet(self.get_button_style(False))
             self.button_layout.addWidget(button)
 
         add_button = QPushButton("+", self)
         add_button.clicked.connect(self.add_new_sequence)
-        self.button_layout.addWidget(add_button)
+        add_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: 2px solid #4CAF50;
+                border-radius: 10px;
+                padding: 10px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3e8e41;
+            }
+        """)
+        self.button_layout.addWidget(add_button, alignment=Qt.AlignLeft)
+
+    def get_button_style(self, selected):
+        if selected:
+            return """
+                QPushButton {
+                    background-color: #FFC300; /* Bright Yellow */
+                    color: white;
+                    border: 2px solid #C70039;
+                    border-radius: 10px;
+                    padding: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #FFB200; /* Slightly Darker Yellow */
+                }
+                QPushButton:pressed {
+                    background-color: #FFA200; /* Even Darker Yellow */
+                }
+            """
+        else:
+            return """
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    border: 2px solid #1976D2;
+                    border-radius: 10px;
+                    padding: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #1E88E5;
+                }
+                QPushButton:pressed {
+                    background-color: #1565C0;
+                }
+            """
 
     def add_new_sequence(self):
         dialog = QDialog(self)
@@ -698,6 +757,7 @@ class SequenceManagerWidget(QWidget):
             try:
                 self.sequence_manager.add_new_sequence(sequence_name)
                 self.update_buttons()
+                self.display_sequence(flag=True)
             except Exception as e:
                 QMessageBox.critical(dialog, "Error", str(e))
         dialog.accept()
@@ -710,15 +770,19 @@ class SequenceManagerWidget(QWidget):
                 sequence = Sequence.from_json(file_name)
                 self.sequence_manager.load_sequence(sequence)
                 self.update_buttons()
+                self.display_sequence(flag=True)
             except Exception as e:
                 QMessageBox.critical(dialog, "Error, File is corrupt due to ", str(e))
         dialog.accept()
 
-    def display_sequence(self):
+    def display_sequence(self,flag=False):
         button = self.sender()
-        sequence_name = button.text()
-        sequence = self.sequence_manager.main_sequences[sequence_name]["seq"]
-
+        if not flag:
+            sequence_name = button.text()
+            sequence = self.sequence_manager.main_sequences[sequence_name]["seq"]
+        else :
+            sequence = list(self.sequence_manager.main_sequences.values())[-1]["seq"]
+            sequence_name = sequence.sequence_name
         for i in reversed(range(self.sequence_view_layout.count())):
             widget_to_remove = self.sequence_view_layout.itemAt(i).widget()
             self.sequence_view_layout.removeWidget(widget_to_remove)
@@ -726,6 +790,16 @@ class SequenceManagerWidget(QWidget):
 
         synced_table_widget = SyncedTableWidget(sequence)
         self.sequence_view_layout.addWidget(synced_table_widget)
+
+        if self.selected_sequence_button:
+            self.selected_sequence_button.setStyleSheet(self.get_button_style(False))
+        if not flag:
+            self.selected_sequence_button = button
+            self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
+        else:
+            button = self.button_layout.itemAt(self.button_layout.count()-2).widget()
+            self.selected_sequence_button = button
+            self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
 
 
 if __name__ == '__main__':
