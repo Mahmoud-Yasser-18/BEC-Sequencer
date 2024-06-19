@@ -3,7 +3,7 @@
 import sys
 from typing import List, Optional
 from PyQt5.QtWidgets import (
-    QApplication, QHBoxLayout,QToolTip, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
+    QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
 )
 from PyQt5.QtCore import Qt, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen
@@ -46,6 +46,37 @@ class ChannelLabelWidget(QWidget):
         self.scroll_area = self.create_scroll_area()
         main_layout.addWidget(self.scroll_area)
         self.setLayout(main_layout)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #2C3E50;
+                color: #ECF0F1;
+                font-size: 16px;
+                font-family: Arial, sans-serif;
+            }
+            QLabel {
+                background-color: #34495E;
+                border: 1px solid #1ABC9C;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QLabel:hover {
+                background-color: #1ABC9C;
+                color: #2C3E50;
+            }
+            QPushButton {
+                background-color: #1ABC9C;
+                border: none;
+                color: #2C3E50;
+                padding: 10px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #16A085;
+            }
+            QPushButton:pressed {
+                background-color: #148F77;
+            }
+        """)
 
     def create_scroll_area(self) -> QScrollArea:
         scroll_area = QScrollArea(self)
@@ -53,11 +84,6 @@ class ChannelLabelWidget(QWidget):
 
         self.container_widget = QWidget()
         self.layout = QVBoxLayout(self.container_widget)
-
-        spacer_label = QLabel(" ", self)
-        spacer_label.setFixedHeight(50)
-        spacer_label.setAlignment(Qt.AlignCenter)
-        self.layout.addWidget(spacer_label)
 
         if not self.channels:
             add_channel_button = QPushButton("Add Channel", self)
@@ -83,7 +109,6 @@ class ChannelLabelWidget(QWidget):
     def show_context_menu(self, position):
         self.channel_right_clicked.emit(self.mapToGlobal(position))
 
-    #Example slot for adding a channel
     def add_channel(self):
         self.buttonclicked.emit()
 
@@ -246,7 +271,6 @@ class EventButton(QPushButton):
         elif action == edit_action:
             self.editEventSignal.emit(self.event)
 
-
 class TimeAxisContent(QWidget):
     def __init__(self, max_time, scale_factor, parent=None):
         super().__init__(parent)
@@ -256,10 +280,16 @@ class TimeAxisContent(QWidget):
 
     def initUI(self) -> None:
         self.setFixedSize(int(self.max_time * self.scale_factor) + 50, 50)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #2C3E50;
+                color: #ECF0F1;
+            }
+        """)
 
     def paintEvent(self, event: any) -> None:
         painter = QPainter(self)
-        pen = QPen(Qt.black, 2)
+        pen = QPen(Qt.white, 2)
         painter.setPen(pen)
         self.draw_time_axis(painter)
 
@@ -269,21 +299,25 @@ class TimeAxisContent(QWidget):
             x = int(time * self.scale_factor)
             painter.drawLine(x, 20, x, 30)
             painter.drawText(QRect(x - 10, 30, 20, 20), Qt.AlignCenter, str(time))
-
 class TimeAxisWidget(QWidget):
-    def __init__(self,  parent: Optional[QWidget] = None):
+    def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.max_time = parent.max_time  # Example max time
         self.scale_factor = parent.scale_factor  # Example scale factor
         self.initUI()
         self.setFixedHeight(105)
-        
-
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #2C3E50;
+                color: #ECF0F1;
+                font-size: 16px;
+                font-family: Arial, sans-serif;
+            }
+        """)
 
     def initUI(self) -> None:
         # Create the scroll area
         self.scroll_area = QScrollArea(self)
-        #self.scroll_area.setWidgetResizable(True)
 
         # Create the content widget for the scroll area
         content_widget = TimeAxisContent(self.max_time, self.scale_factor, self)
@@ -311,6 +345,32 @@ class EventsViewerWidget(QWidget):
     def initUI(self) -> None:
         self.scroll_area = self.create_scroll_area()
         self.main_layout.addWidget(self.scroll_area)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #2C3E50;
+                color: #ECF0F1;
+                font-size: 16px;
+                font-family: Arial, sans-serif;
+            }
+            QPushButton {
+                background-color: #FF5733;
+                border: none;
+                color: #ECF0F1;
+                padding: 10px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #D14928;
+            }
+            QPushButton:pressed {
+                background-color: #C04022;
+            }
+            QPushButton:checked {
+                background-color: #FFC300;
+                border: 2px solid #FFA500;
+            }
+        """)
 
     def create_scroll_area(self) -> QScrollArea:
         scroll_area = QScrollArea(self)
@@ -339,7 +399,6 @@ class EventsViewerWidget(QWidget):
                 widget.deleteLater()
 
     def populate_events(self) -> None:
-        # check if a sequence has no events or channels 
         if len(self.sequence.channels) == 0:
             self.max_time = 1
             self.num_channels = 1
@@ -364,19 +423,11 @@ class EventsViewerWidget(QWidget):
             buttons_container = self.create_buttons_container(channel)
             self.container_layout.addWidget(buttons_container)
 
-#          if len(channel.events) == 0:
-#             gap_button = GapButton(channel, buttons_container, previous_event)
-#             gap_button.setGeometry(0, 0, int(self.max_time * self.scale_factor) + 50, 50)
-#             gap_button.addEventSignal.connect(self.add_event)
-#             return buttons_container
-
     def create_buttons_container(self, channel: any) -> QWidget:
         buttons_container = QWidget(self)
         buttons_container.setFixedHeight(50)
         previous_end_time = 0.0
         previous_event = None
-
-       
 
         for event in channel.events:
             start_time = event.start_time
@@ -401,13 +452,10 @@ class EventsViewerWidget(QWidget):
                 gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
                 gap_button.addEventSignal.connect(self.add_event)
         
-        #add a button to the container at the end of the channel
         gap_button = GapButton(channel, buttons_container, previous_event)
         gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int((self.max_time - previous_end_time+1) * self.scale_factor), 50)
         gap_button.addEventSignal.connect(self.add_event)
         
-
-
         return buttons_container
 
     def add_event(self, channel):
@@ -460,49 +508,51 @@ class EventsViewerWidget(QWidget):
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
 
-    def edit_event(self, event):
-        dialog = EditEventDialog(event)
-        if dialog.exec_() == QDialog.Accepted:
-            data = dialog.get_data()
-            self.sequence.edit_event(
-                edited_event=event,
-                new_start_time=data.get('start_time', None),
-                new_relative_time=data.get('relative_time', None),
-                new_reference_time=data.get('reference_time', None),
-                duration=data.get('behavior_data', None).get('duration', None),
-                start_value=data.get('behavior_data', None).get('start_value', None),
-                end_value=data.get('behavior_data', None).get('end_value', None),
-                ramp_type=data.get('behavior_data', None).get('ramp_type', None),
-                jump_target_value=data.get('behavior_data', None).get('target_value', None)
-            )
-            self.refreshUI()
-
-    def delete_event(self, event):
+    def delete_event(self, event_to_delete):
         try:
-            self.sequence.delete_event(event.start_time, event.channel.name)
+            self.sequence.delete_event(event_to_delete)
             self.refreshUI()
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
 
-    def emmit_change_in_event(self):
-        self.change_in_event.emit()
+    def edit_event(self, event_to_edit):
+        try:
+            dialog = RootEventDialog([ch.name for ch in self.sequence.channels], event_to_edit)
+            if dialog.exec_() == QDialog.Accepted:
+                data = dialog.get_data()
+                behavior = data['behavior']
+                if behavior['behavior_type'] == 'Jump':
+                    self.sequence.update_event(
+                        event_to_edit,
+                        channel_name=data['channel'],
+                        behavior=Jump(behavior['jump_target_value']),
+                        start_time=float(data["start_time"])
+                    )
+                else:
+                    self.sequence.update_event(
+                        event_to_edit,
+                        channel_name=data['channel'],
+                        behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
+                        start_time=float(data["start_time"])
+                    )
+                self.refreshUI()
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
 
 class SyncedTableWidget(QWidget):
-    def __init__(self,sequence, scale_factor: float = 100.0):
+    def __init__(self, sequence, scale_factor: float = 100.0):
         super().__init__()
-        self.scale_factor=scale_factor
+        self.scale_factor = scale_factor
         self.sequence = sequence
-        self.layout_main = QHBoxLayout()
         self.syncing = False  # Flag to prevent multiple updates
-        self.setLayout(self.layout_main) 
         self.setup_ui()
         
-        
     def setup_ui(self) -> None:
+        self.layout_main = QGridLayout()
+        self.setLayout(self.layout_main)
         
-        
-        self.sub_layout_main = QVBoxLayout()
         self.channel_list = ChannelLabelWidget(self.sequence)
         self.data_table = EventsViewerWidget(self.sequence, self.scale_factor, parent=self)
         self.data_table.changes_in_event.connect(self.refresh_UI)
@@ -513,30 +563,23 @@ class SyncedTableWidget(QWidget):
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
         self.scroll_bar2 = self.data_table.scroll_area.verticalScrollBar()
-        
         self.scroll_bar1.valueChanged.connect(self.sync_scroll)
         self.scroll_bar2.valueChanged.connect(self.sync_scroll)
 
-
-
         self.scroll_bar3 = self.data_table.scroll_area.horizontalScrollBar()
-        self.scroll_bar4 =  self.time_axis.scroll_area.horizontalScrollBar()
-
+        self.scroll_bar4 = self.time_axis.scroll_area.horizontalScrollBar()
         self.scroll_bar3.valueChanged.connect(self.sync_scroll_vertical)
         self.scroll_bar4.valueChanged.connect(self.sync_scroll_vertical)
 
+        # Adding widgets to the grid layout
+        self.layout_main.addWidget(QWidget(), 0, 0)  # Empty top-left slot
+        self.layout_main.addWidget(self.time_axis, 0, 1)  # Top-right slot
+        self.layout_main.addWidget(self.channel_list, 1, 0)  # Bottom-left slot
+        self.layout_main.addWidget(self.data_table, 1, 1)  # Bottom-right slot
+        self.layout_main.setColumnStretch(0, 0)  # Column 0 (channel_list) - does not expand
+        self.layout_main.setColumnStretch(1, 1)  # Column 1 (time_axis and data_table) - expands to fill space
 
-        self.sub_layout_main.addWidget(self.time_axis)
-        self.sub_layout_main.addWidget(self.data_table)
 
-        dummy_widget = QWidget()
-        dummy_widget.setLayout(self.sub_layout_main)
-
-
-        
-        self.layout_main.addWidget(self.channel_list)
-        self.layout_main.addWidget(dummy_widget,2)
-        
     def sync_scroll_vertical(self, value: int) -> None:
         if self.syncing:
             return
@@ -570,7 +613,6 @@ class SyncedTableWidget(QWidget):
         if action == add_channel_action:
             self.show_channel_dialog()
 
-
     def show_channel_dialog(self):
         dialog = ChannelDialog(self)
         if dialog.exec_() == QDialog.Accepted:
@@ -588,18 +630,15 @@ class SyncedTableWidget(QWidget):
                 # Add digital channel logic here, similar to analog channel
                 pass
             self.refresh_UI()
-    
-    
-    
+
     def refresh_UI(self):
         layout = self.layout()
-
         for i in reversed(range(layout.count())):
             widget_to_remove = layout.itemAt(i).widget()
             layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
-
         self.setup_ui()
+
 
 from sequencer.event import SequenceManager
 
