@@ -773,11 +773,19 @@ from PyQt5.QtCore import Qt,QMimeData
 from PyQt5.QtGui import QColor, QPalette,QDrag
 
 
+
 class DraggableButton(QPushButton):
+    save_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+    delete_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+    edit_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
+        self.text_to_emit = text 
         self.parent = parent
         self.setAcceptDrops(True)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
 
     def mouseMoveEvent(self, event):
         if event.buttons() != Qt.LeftButton:
@@ -794,6 +802,34 @@ class DraggableButton(QPushButton):
     def dropEvent(self, event):
         if event.source() != self:
             self.parent.move_button(self, event.source())
+
+    def show_context_menu(self, position):
+        context_menu = QMenu(self)
+        save_sequence_action = QAction('Save Sequence', self)
+        save_sequence_action.triggered.connect(self.save_sequence)
+        context_menu.addAction(save_sequence_action)
+        delete_sequence_action = QAction('delete Sequence', self)
+        delete_sequence_action.triggered.connect(self.delete_sequence)
+        context_menu.addAction(delete_sequence_action)
+        
+        edit_sequence_action = QAction('edit Sequence', self)
+        edit_sequence_action.triggered.connect(self.edit_sequence)
+        context_menu.addAction(edit_sequence_action)
+        
+        
+        context_menu.exec_(self.mapToGlobal(position))
+        
+
+    def save_sequence(self):
+        print("text to emit",self.text_to_emit)
+        self.save_sequence_signal.emit(self.text_to_emit)
+    def edit_sequence(self):
+        print("text to emit",self.text_to_emit)
+        self.edit_sequence_signal.emit(self.text_to_emit)
+    def delete_sequence(self):
+        print("text to emit",self.text_to_emit)
+        self.delete_sequence_signal.emit(self.text_to_emit)
+
 
 class SequenceManagerWidget(QWidget):
     def __init__(self):
@@ -851,6 +887,27 @@ class SequenceManagerWidget(QWidget):
             self.sequence_manager = SequenceManager.from_json(file_name=file_name)
             self.update_buttons()
             self.display_sequence(flag=True)
+    
+    def save_sequence(self, sequence_name):
+        file_dialog = QFileDialog(self)
+        file_name, _ = file_dialog.getSaveFileName(self, "Save Singel Sequence", "", "JSON Files (*.json)")
+        if file_name:
+            self.sequence_manager.to_json(file_name=file_name)
+        self.sequence_manager.main_sequences[sequence_name]["seq"].to_json(file_name+".json")
+
+    def delete_sequence(self, sequence_name):
+        self.sequence_manager.delete_sequence(sequence_name)
+        self.update_buttons()
+        self.display_sequence(flag=True)
+
+    def edit_sequence(self, sequence_name):
+        # ask user for new name
+        new_sequence_name, ok = QInputDialog.getText(self, "Edit Sequence Name", "Enter new sequence name:")
+        if ok and new_sequence_name:
+                
+            self.sequence_manager.change_sequence_name(old_name=sequence_name, new_name=new_sequence_name)
+            self.update_buttons()
+            self.display_sequence(flag=True)
 
     def update_buttons(self):
         for i in reversed(range(self.button_layout.count())):
@@ -859,6 +916,11 @@ class SequenceManagerWidget(QWidget):
         for sequence_name in self.sequence_manager.main_sequences:
             button = DraggableButton(sequence_name, self)
             button.clicked.connect(self.display_sequence)
+            button.save_sequence_signal.connect(self.save_sequence)
+            button.delete_sequence_signal.connect(self.delete_sequence)
+            button.edit_sequence_signal.connect(self.edit_sequence)
+
+
             button.setStyleSheet(self.get_button_style(False))
             self.button_layout.addWidget(button)
 
@@ -887,14 +949,17 @@ class SequenceManagerWidget(QWidget):
         # print(f"Moving {source.text()} from index {source_index} to index {target_index}")
         #rearrange the sequences in the sequence manager
         # target_index_manager = self.sequence_manager.main_sequences[target.text()]["index"]
+        print("="*10)
+        print([(key,value["index"]) for key, value in self.sequence_manager.main_sequences.items()])
 
-        self.sequence_manager.move_sequence_to_index(source.text(),source_index )
+        self.sequence_manager.move_sequence_to_index(source.text(),target_index )
         # print(self.sequence_manager.main_sequences)
 
         self.button_layout.insertWidget(target_index, source)
 
         print(f"Moved {source.text()} from index {source_index} to index {target_index}")
         print([(key,value["index"]) for key, value in self.sequence_manager.main_sequences.items()])
+
     def get_button_style(self, selected):
         if selected:
             return """

@@ -1550,7 +1550,7 @@ class SequenceManager:
         
         self.main_sequences[new_name] = self.main_sequences.pop(old_name)
         self.main_sequences[new_name]["seq"].sequence_name = new_name
-        if self.main_sequences[new_name]["spweep_list"]:
+        if self.main_sequences[new_name]["sweep_list"]:
             for key, seq in self.main_sequences[new_name]["sweep_list"]:
                 seq.sequence_name = new_name
 
@@ -1578,14 +1578,22 @@ class SequenceManager:
     def move_sequence_to_index(self, sequence_name: str, new_index: int):
         if sequence_name not in self.main_sequences:
             raise ValueError(f"Sequence with name {sequence_name} not found.")
-        # check that the new index is not bigger than the number of sequences 
-        # check that the new index is not smaller than 0
-        # check that the new index is not the same as the current index
-        # check that the new index is not the same as the index of another sequence
-        # get the current index of the sequence to be moved
-        # get the index of the sequence at the new index 
+
         current_index = self.main_sequences[sequence_name]["index"]
+
+        if new_index not in (seq["index"] for seq in self.main_sequences.values()):
+            raise ValueError(f" can not exchange index with {new_index} as it does not exist.")
+
+        if current_index == new_index:
+            return
         
+        for seq_name, seq_data in self.main_sequences.items():
+            if  current_index> seq_data["index"] and seq_data["index"]>=new_index:
+                self.main_sequences[seq_name]["index"] += 1
+            elif current_index< seq_data["index"] and seq_data["index"]<=new_index:
+                self.main_sequences[seq_name]["index"] -= 1
+        
+        self.main_sequences[sequence_name]["index"] = new_index
         #swap the indexes index of the sequence to be moved with the index of the sequence at the new index
         
 
@@ -1598,9 +1606,15 @@ class SequenceManager:
             raise ValueError(f"Sequence with name {sequence_name} not found.")
         
         self.main_sequences.pop(sequence_name)
+        self.sort_sequences()
+
     
     def sort_sequences(self):
         self.main_sequences = OrderedDict(sorted(self.main_sequences.items(), key=lambda item: item[1]["index"]))
+        # reindex the sequences
+        for i, (seq_name, seq_data) in enumerate(self.main_sequences.items()):
+            self.main_sequences[seq_name]["index"] = i
+        
 
 
     def load_sequence_json(self, json: str, index):
