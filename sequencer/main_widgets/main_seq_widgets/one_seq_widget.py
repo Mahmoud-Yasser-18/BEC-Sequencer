@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt, QRect, pyqtSignal, QPoint
 
 from sequencer.Dialogs.channel_dialog import ChannelDialog
 from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog
-from sequencer.Dialogs.edit_event_dialog import EditEventDialog
+from sequencer.Dialogs.edit_event_dialog import EditEventDialog,SweepEventDialog
 from sequencer.event import Ramp, Jump, Sequence
 
 import sys
@@ -402,8 +402,9 @@ class TimeAxisWidget(QWidget):
 class EventsViewerWidget(QWidget):
     changes_in_event = pyqtSignal()
 
-    def __init__(self, sequence: Sequence, scale_factor: float, parent: QWidget):
+    def __init__(self,sequence_manager:SequenceManager , sequence: Sequence, scale_factor: float, parent: QWidget):
         super().__init__()
+        self.sequence_manager = sequence_manager
         self.sequence = sequence
         self.scale_factor = scale_factor
         self.parent = parent
@@ -518,6 +519,7 @@ class EventsViewerWidget(QWidget):
             button.addChildEventSignal.connect(self.add_child_event)
             button.deleteEventSignal.connect(self.delete_event)
             button.editEventSignal.connect(self.edit_event)
+            button.sweepEventSignal.connect(self.sweep_event)
 
             previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10 / self.scale_factor)
 
@@ -586,81 +588,90 @@ class EventsViewerWidget(QWidget):
 
     def delete_event(self, event_to_delete):
         try:
-            self.sequence.delete_event(event_to_delete)
+            self.sequence.delete_event(event_to_delete=event_to_delete)
             self.refreshUI()
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
 
     def edit_event(self, event_to_edit):
-        try:
-            dialog = RootEventDialog([ch.name for ch in self.sequence.channels], event_to_edit)
+        # try:
+            dialog = EditEventDialog( event_to_edit)
             if dialog.exec_() == QDialog.Accepted:
                 data = dialog.get_data()
-                behavior = data['behavior']
-                if behavior['behavior_type'] == 'Jump':
-                    self.sequence.update_event(
-                        event_to_edit,
-                        channel_name=data['channel'],
-                        behavior=Jump(behavior['jump_target_value']),
-                        start_time=float(data["start_time"])
-                    )
+                print(data)
+                behavior = data['behavior_data']
+                if data['behavior_type'] == 'Jump':
+                    self.sequence.edit_event(
+                        edited_event=event_to_edit,
+
+
+
+                        jump_target_value=behavior.get('jump_target_value', None),
+                        new_relative_time= float(data.get ("relative_time",None)) if data.get ("relative_time",None) else None,
+                        new_reference_time= data.get ('reference_time',None),
+                        new_start_time=float(data.get ("start_time",None)) if data.get ("start_time",None) else None)    
+                        
                 else:
-                    self.sequence.update_event(
-                        event_to_edit,
-                        channel_name=data['channel'],
-                        behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
-                        start_time=float(data["start_time"])
-                    )
+                    self.sequence.edit_event(
+                        edited_event=event_to_edit,
+                        # channel_name=data['channel'],
+                        duration= behavior['duration'],
+                        start_value= behavior['start_value'],
+                        end_value= behavior['end_value'],
+                        ramp_type= behavior['ramp_type'],
+                        new_relative_time= float(data.get ("relative_time",None)) if data.get ("relative_time",None) else None,
+                        new_reference_time= data.get ('reference_time',None),
+                        new_start_time=float(data.get ("start_time",None)) if data.get ("start_time",None) else None
+                                                                )
                 self.refreshUI()
-        except Exception as e:
-            error_message = f"An error occurred: {str(e)}"
-            QMessageBox.critical(self, "Error", error_message)
+        # except Exception as e:
+        #     error_message = f"An error occurred: {str(e)}"
+        #     QMessageBox.critical(self,
+        # "Error", error_message)
     
     def sweep_event(self, event_to_sweep):
         try:
-            dialog = EditEventDialog(event_to_sweep)
+            dialog = SweepEventDialog(event_to_sweep)
+
             if dialog.exec_() == QDialog.Accepted:
-                data = dialog.get_data()
-                behavior = data['behavior']
-                if behavior['behavior_type'] == 'Jump':
-                    self.sequence.update_event(
-                        event_to_sweep,
-                        channel_name=data['channel'],
-                        behavior=Jump(behavior['jump_target_value']),
-                        start_time=float(data["start_time"])
-                    )
+                result = dialog.get_result()
+                if result:
+                    
+                    parameter_name, values = result
+                    self.sequence_manager.sweep_sequence(self.sequence.sequence_name, parameter_name, values,event_to_sweep=event_to_sweep)
+
                 else:
-                    self.sequence.update_event(
-                        event_to_sweep,
-                        channel_name=data['channel'],
-                        behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
-                        start_time=float(data["start_time"])
-                    )
-                self.refreshUI()
+                    print("No result")
+            else:
+                print("Dialog canceled")
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
 
+
 class SyncedTableWidget(QWidget):
-    def __init__(self, sequence, scale_factor: float = 100.0):
+    def __init__(self, sequence_manager, sequence, scale_factor: float = 100.0):
         super().__init__()
+        self.sequence_manager = sequence_manager
         self.scale_factor = scale_factor
         self.sequence = sequence
         self.syncing = False  # Flag to prevent multiple updates
+        self.layout_main = QGridLayout()
+        self.setLayout(self.layout_main)
         self.setup_ui()
         
     def setup_ui(self) -> None:
-        self.layout_main = QGridLayout()
+        
         self.layout_main.setHorizontalSpacing(0)  # Set horizontal spacing to 0 pixels
         self.layout_main.setVerticalSpacing(0)    # Set vertical spacing to 0 pixels
         self.layout_main.setContentsMargins(0, 0, 0, 0)  # Set content margins to 0 pixels on all sides
         
-        self.setLayout(self.layout_main)
+        
         
         # Create and configure widgets
         self.channel_list = ChannelLabelWidget(self.sequence)
-        self.data_table = EventsViewerWidget(self.sequence, self.scale_factor, parent=self)
+        self.data_table = EventsViewerWidget(self.sequence_manager,self.sequence, self.scale_factor, parent=self)
         self.data_table.changes_in_event.connect(self.refresh_UI)
         self.time_axis = TimeAxisWidget(self.data_table)
         
@@ -758,8 +769,30 @@ from sequencer.event import SequenceManager
 from PyQt5.QtWidgets import (
     QScrollArea, QHBoxLayout, QVBoxLayout, QInputDialog, QDialog, QMessageBox, QPushButton, QMenuBar, QAction, QFileDialog, QWidget, QApplication
 )
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor, QPalette
+from PyQt5.QtCore import Qt,QMimeData
+from PyQt5.QtGui import QColor, QPalette,QDrag
+
+class DraggableButton(QPushButton):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setAcceptDrops(True)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() != Qt.LeftButton:
+            return
+        drag = QDrag(self)
+        mime_data = QMimeData()
+        mime_data.setText(self.text())
+        drag.setMimeData(mime_data)
+        drag.exec_(Qt.MoveAction)
+
+    def dragEnterEvent(self, event):
+        event.accept()
+
+    def dropEvent(self, event):
+        if event.source() != self:
+            self.parent().move_button(self, event.source())
+
 
 class SequenceManagerWidget(QWidget):
     def __init__(self):
@@ -932,12 +965,16 @@ class SequenceManagerWidget(QWidget):
         else :
             sequence = list(self.sequence_manager.main_sequences.values())[-1]["seq"]
             sequence_name = sequence.sequence_name
+        
+        # print("Displaying sequence sweeps")
+        # print(self.sequence_manager.main_sequences[sequence_name]["sweep_list"])
+        
         for i in reversed(range(self.sequence_view_layout.count())):
             widget_to_remove = self.sequence_view_layout.itemAt(i).widget()
             self.sequence_view_layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
 
-        synced_table_widget = SyncedTableWidget(sequence)
+        synced_table_widget = SyncedTableWidget(self.sequence_manager,sequence)
         self.sequence_view_layout.addWidget(synced_table_widget)
 
         if self.selected_sequence_button:

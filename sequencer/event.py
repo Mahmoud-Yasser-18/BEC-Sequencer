@@ -667,9 +667,20 @@ class Sequence:
         self.all_events.sort(key=lambda event: event.start_time)
 
     # delete an event from the sequence
-    def delete_event(self, start_time: float, channel_name: str):
+    def delete_event(self, start_time: Optional[float]= None, channel_name: Optional[str]= None,event_to_delete: Optional[Event]=None):
+        
+        
         temp_sequence = copy.deepcopy(self)
         self.copy_original_events_to_new_sequence(self, temp_sequence)
+
+        if (event_to_delete is not None) and (start_time is not  None) and (channel_name is not None):
+            raise ValueError("Provide either event_to_delete or start_time and channel_name, not both.")
+        if event_to_delete is None and (start_time is None or channel_name is None):
+            raise ValueError("Provide either event_to_delete or start_time and channel_name.")
+        if event_to_delete is not None:
+            start_time = event_to_delete.start_time
+            channel_name = event_to_delete.channel.name
+        
         event = temp_sequence.find_event_by_time_and_channel(start_time, channel_name)
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
@@ -820,7 +831,7 @@ class Sequence:
             event.behavior.edit_ramp(duration, ramp_type, start_value, end_value, func, resolution)
             delta_duration = event.behavior.duration-  event.end_time+  event.start_time 
             if delta_duration:
-                print("delta_duration",delta_duration)
+                # print("delta_duration",delta_duration)
                 event.update_times_end(delta_duration)
 
         elif isinstance(event.behavior, Jump):
@@ -1575,24 +1586,22 @@ class SequenceManager:
      
      
 
-    def sweep_sequence(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, edited_event: Optional[Event] = None):
+    def sweep_sequence(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None):
         if sequence_name not in self.main_sequences:
             raise ValueError(f"Sequence with name {sequence_name} not found.")
 
         new_sweep_dict = dict()
         if  len(self.main_sequences[sequence_name]["sweep_list"])!=0:
-            # print("sweep_list is not empty")
-            # print(self.main_sequences[sequence_name])
             for old_key, old_seq in self.main_sequences[sequence_name]["sweep_list"].items():
 
-                temp_sweep = old_seq.sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, edited_event=edited_event)
+                temp_sweep = old_seq.sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, event_to_sweep=event_to_sweep)
                 for new_key, new_seq in temp_sweep.items():
 
                     new_sweep_dict[(new_key,old_key)] = new_seq
             self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
                 
         else:
-            new_sweep_dict = self.main_sequences[sequence_name]["seq"].sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, edited_event=edited_event)
+            new_sweep_dict = self.main_sequences[sequence_name]["seq"].sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, event_to_sweep=event_to_sweep)
             self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
 
     def get_main_sequence(self ):
@@ -1654,7 +1663,8 @@ class SequenceManager:
             data["sequences"].append({
                 "name": seq_name,
                 "index": seq_data["index"],
-                "sequence": seq_data["seq"].to_json()
+                "sequence": seq_data["seq"].to_json(),
+                "sweep_list": {key: seq.to_json() for key, seq in seq_data["sweep_list"].items()}   
             })
 
         if file_name:
@@ -1684,6 +1694,8 @@ class SequenceManager:
         for seq_data in data["sequences"]:
             sequence = Sequence.from_json(json_input=seq_data["sequence"])
             seq_manager.main_sequences[seq_data["name"]] = {"index":seq_data["index"], "seq":sequence}
+            #sweep_list
+            seq_manager.main_sequences[seq_data["name"]]["sweep_list"] = {key: Sequence.from_json(json_input=seq) for key, seq in seq_data["sweep_list"].items()}
 
         return seq_manager 
             
