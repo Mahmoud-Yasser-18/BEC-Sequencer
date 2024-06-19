@@ -1592,11 +1592,10 @@ class SequenceManager:
             self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
                 
         else:
-            print("else")
             new_sweep_dict = self.main_sequences[sequence_name]["seq"].sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, edited_event=edited_event)
             self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
 
-    def run_main_sequence(self ):
+    def get_main_sequence(self ):
 
         
         # put all sequences in a list and sort them by the index
@@ -1610,7 +1609,7 @@ class SequenceManager:
 
         return main_sequence
     
-    def run_sweep_sequences(self):
+    def get_sweep_sequences(self):
         # put all sequences in a list and sort them by the index
         seq_list = list(self.main_sequences.values())
         seq_list.sort(key=lambda seq: seq["index"])

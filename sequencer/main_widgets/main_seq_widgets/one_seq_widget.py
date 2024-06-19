@@ -58,6 +58,7 @@ class ChannelLabelWidget(QWidget):
                 border: 1px solid #1ABC9C;
                 border-radius: 5px;
                 padding: 5px;
+                color: #ECF0F1;  /* Text color for contrast */
             }
             QLabel:hover {
                 background-color: #1ABC9C;
@@ -94,16 +95,28 @@ class ChannelLabelWidget(QWidget):
             for channel in self.channels:
                 label = QLabel(channel, self)
                 label.setFixedHeight(50)
+                label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)  # Adjust size policy for width to fit content
                 label.setAlignment(Qt.AlignCenter)
                 label.setContextMenuPolicy(Qt.CustomContextMenu)
                 label.customContextMenuRequested.connect(self.show_context_menu)
+
                 self.layout.addWidget(label)
 
         self.container_widget.setLayout(self.layout)
-        self.container_widget.setFixedSize(100, len(self.channels) * 100 if self.channels else 100)
+        self.container_widget.setFixedHeight(len(self.channels) * 100 if self.channels else 100)
+        self.container_widget.adjustSize()  # Adjust size to fit contents
 
         scroll_area.setWidget(self.container_widget)
-        scroll_area.setFixedWidth(150)
+        scroll_area.verticalScrollBar().setStyleSheet("""
+            QScrollBar:vertical {
+                width: 10px;  /* Adjust the width as needed */
+            }
+                                    }
+        """)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+
+        scroll_area.setFixedWidth(200)
         return scroll_area
 
     def show_context_menu(self, position):
@@ -191,6 +204,7 @@ class EventButton(QPushButton):
     addChildEventSignal = pyqtSignal(object)
     deleteEventSignal = pyqtSignal(object)
     editEventSignal = pyqtSignal(object)
+    sweepEventSignal = pyqtSignal(object)
 
     def __init__(self, event, scale_factor, sequence, parent=None):
         super().__init__(parent)
@@ -200,19 +214,7 @@ class EventButton(QPushButton):
         self.initUI()
 
     def initUI(self):
-        if isinstance(self.event.behavior, Ramp):
-            duration = self.event.behavior.duration
-            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, int(duration * self.scale_factor), 50)
-            self.setText(str(self.event.behavior.ramp_type) + ' ' + str(self.event.behavior.start_value) + '->' + str(self.event.behavior.end_value))
-        elif isinstance(self.event.behavior, Jump):
-            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
-            self.setText('J')
-        else:
-            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 50, 50)
-
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.show_context_menu)
-        event_stylesheet = """
+        ramp_stylesheet = """
         QPushButton {
             background-color: #FF5733; /* Orange */
             border: 2px solid #C70039; /* Dark red border */
@@ -245,7 +247,63 @@ class EventButton(QPushButton):
             outline: 2px solid #007BFF; /* Blue outline */
         }
         """
-        self.setStyleSheet(event_stylesheet)
+
+        jump_stylesheet = """
+        QPushButton {
+            background-color: #FF3333; /* Red */
+            border: 2px solid #C70039; /* Dark red border */
+            padding: 10px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+        }
+
+        QPushButton:hover {
+            background-color: #D12828;
+        }
+
+        QPushButton:pressed {
+            background-color: #C02222;
+        }
+
+        QPushButton:checked {
+            background-color: #FFC300; /* Yellow for active state */
+            border: 2px solid #FFA500; /* Orange border */
+        }
+
+        QPushButton:disabled {
+            background-color: #9E9E9E; /* Grayed-out color */
+            border: 2px solid #616161; /* Darker gray border */
+            color: #333333; /* Dark text for contrast */
+        }
+
+        QPushButton:focus {
+            outline: 2px solid #007BFF; /* Blue outline */
+        }
+        """
+
+        if isinstance(self.event.behavior, Ramp):
+            duration = self.event.behavior.duration
+            # make sure the duration is at least 1
+            if int(duration * self.scale_factor) < 10:
+                self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
+                self.setText('R')
+            else:
+                self.setGeometry(int(self.event.start_time * self.scale_factor), 0, int(duration * self.scale_factor), 50)
+                self.setText(str(self.event.behavior.ramp_type) + ' ' + str(self.event.behavior.start_value) + '->' + str(self.event.behavior.end_value))
+            self.setStyleSheet(ramp_stylesheet)
+
+        elif isinstance(self.event.behavior, Jump):
+            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
+            self.setText('J')
+            self.setStyleSheet(jump_stylesheet)
+
+        else:
+            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 50, 50)
+
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
 
     def enterEvent(self, event):
         if isinstance(self.event.behavior, Ramp):
@@ -262,6 +320,7 @@ class EventButton(QPushButton):
         add_child_action = context_menu.addAction("Add Child Event")
         delete_action = context_menu.addAction("Delete Event")
         edit_action = context_menu.addAction("Edit Event")
+        sweep_action = context_menu.addAction("Sweep Event")
 
         action = context_menu.exec_(self.mapToGlobal(pos))
         if action == add_child_action:
@@ -270,6 +329,9 @@ class EventButton(QPushButton):
             self.deleteEventSignal.emit(self.event)
         elif action == edit_action:
             self.editEventSignal.emit(self.event)
+        elif action == sweep_action:
+            self.sweepEventSignal.emit(self.event)
+    
 
 class TimeAxisContent(QWidget):
     def __init__(self, max_time, scale_factor, parent=None):
@@ -305,19 +367,26 @@ class TimeAxisWidget(QWidget):
         self.max_time = parent.max_time  # Example max time
         self.scale_factor = parent.scale_factor  # Example scale factor
         self.initUI()
-        self.setFixedHeight(105)
+        self.setFixedHeight(80)
         self.setStyleSheet("""
             QWidget {
                 background-color: #2C3E50;
                 color: #ECF0F1;
                 font-size: 16px;
-                font-family: Arial, sans-serif;
+            }
+            
+            QScrollBar:horizontal {
+                height: 1px;  /* Adjust the height as needed */
+            }
+            
+            
             }
         """)
 
     def initUI(self) -> None:
         # Create the scroll area
         self.scroll_area = QScrollArea(self)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)  # Ensure horizontal scrollbar is always shown
 
         # Create the content widget for the scroll area
         content_widget = TimeAxisContent(self.max_time, self.scale_factor, self)
@@ -383,6 +452,13 @@ class EventsViewerWidget(QWidget):
         self.container_widget.setLayout(self.container_layout)
         self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
         scroll_area.setWidget(self.container_widget)
+        scroll_area.verticalScrollBar().setStyleSheet("""
+            QScrollBar:vertical {
+                width: 10px;  /* Adjust the width as needed */
+            }
+            }
+        """)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         return scroll_area
 
     def refreshUI(self) -> None:
@@ -540,6 +616,31 @@ class EventsViewerWidget(QWidget):
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
+    
+    def sweep_event(self, event_to_sweep):
+        try:
+            dialog = EditEventDialog(event_to_sweep)
+            if dialog.exec_() == QDialog.Accepted:
+                data = dialog.get_data()
+                behavior = data['behavior']
+                if behavior['behavior_type'] == 'Jump':
+                    self.sequence.update_event(
+                        event_to_sweep,
+                        channel_name=data['channel'],
+                        behavior=Jump(behavior['jump_target_value']),
+                        start_time=float(data["start_time"])
+                    )
+                else:
+                    self.sequence.update_event(
+                        event_to_sweep,
+                        channel_name=data['channel'],
+                        behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
+                        start_time=float(data["start_time"])
+                    )
+                self.refreshUI()
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
 
 class SyncedTableWidget(QWidget):
     def __init__(self, sequence, scale_factor: float = 100.0):
@@ -551,14 +652,19 @@ class SyncedTableWidget(QWidget):
         
     def setup_ui(self) -> None:
         self.layout_main = QGridLayout()
+        self.layout_main.setHorizontalSpacing(0)  # Set horizontal spacing to 0 pixels
+        self.layout_main.setVerticalSpacing(0)    # Set vertical spacing to 0 pixels
+        self.layout_main.setContentsMargins(0, 0, 0, 0)  # Set content margins to 0 pixels on all sides
+        
         self.setLayout(self.layout_main)
         
+        # Create and configure widgets
         self.channel_list = ChannelLabelWidget(self.sequence)
         self.data_table = EventsViewerWidget(self.sequence, self.scale_factor, parent=self)
         self.data_table.changes_in_event.connect(self.refresh_UI)
         self.time_axis = TimeAxisWidget(self.data_table)
         
-        self.channel_list.channel_right_clicked.connect(self.show_context_menu)        
+        self.channel_list.channel_right_clicked.connect(self.show_context_menu)
         self.channel_list.buttonclicked.connect(self.show_channel_dialog)
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
@@ -578,6 +684,8 @@ class SyncedTableWidget(QWidget):
         self.layout_main.addWidget(self.data_table, 1, 1)  # Bottom-right slot
         self.layout_main.setColumnStretch(0, 0)  # Column 0 (channel_list) - does not expand
         self.layout_main.setColumnStretch(1, 1)  # Column 1 (time_axis and data_table) - expands to fill space
+
+        
 
 
     def sync_scroll_vertical(self, value: int) -> None:
@@ -638,6 +746,8 @@ class SyncedTableWidget(QWidget):
             layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
         self.setup_ui()
+
+
 
 
 from sequencer.event import SequenceManager
