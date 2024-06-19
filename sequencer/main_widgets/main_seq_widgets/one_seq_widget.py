@@ -733,22 +733,26 @@ class SyncedTableWidget(QWidget):
             self.show_channel_dialog()
 
     def show_channel_dialog(self):
-        dialog = ChannelDialog(self)
-        if dialog.exec_() == QDialog.Accepted:
-            data = dialog.get_data()
-            if data['type'] == 'Analog':
-                self.sequence.add_analog_channel(
-                    name=data['name'],
-                    card_number=data['card_number'],
-                    channel_number=data['channel_number'],
-                    reset_value=data['reset_value'],
-                    max_voltage=data.get('max_voltage', 10),
-                    min_voltage=data.get('min_voltage', -10)
-                )
-            elif data['type'] == 'Digital':
-                # Add digital channel logic here, similar to analog channel
-                pass
-            self.refresh_UI()
+        try :
+            dialog = ChannelDialog(self)
+            if dialog.exec_() == QDialog.Accepted:
+                data = dialog.get_data()
+                if data['type'] == 'Analog':
+                    self.sequence.add_analog_channel(
+                        name=data['name'],
+                        card_number=data['card_number'],
+                        channel_number=data['channel_number'],
+                        reset_value=data['reset_value'],
+                        max_voltage=data.get('max_voltage', 10),
+                        min_voltage=data.get('min_voltage', -10)
+                    )
+                elif data['type'] == 'Digital':
+                    # Add digital channel logic here, similar to analog channel
+                    pass
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)    
+        self.refresh_UI()
 
     def refresh_UI(self):
         layout = self.layout()
@@ -778,6 +782,7 @@ class DraggableButton(QPushButton):
     save_sequence_signal = pyqtSignal(str)  # Signal to emit a number
     delete_sequence_signal = pyqtSignal(str)  # Signal to emit a number
     edit_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+    plot_sequence_signal = pyqtSignal(str)  # Signal to emit a numbero
 
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
@@ -816,6 +821,10 @@ class DraggableButton(QPushButton):
         edit_sequence_action.triggered.connect(self.edit_sequence)
         context_menu.addAction(edit_sequence_action)
         
+        plot_sequence_action = QAction('plot Sequence', self)
+        plot_sequence_action.triggered.connect(self.plot_sequence)
+        context_menu.addAction(plot_sequence_action)
+        
         
         context_menu.exec_(self.mapToGlobal(position))
         
@@ -829,6 +838,9 @@ class DraggableButton(QPushButton):
     def delete_sequence(self):
         print("text to emit",self.text_to_emit)
         self.delete_sequence_signal.emit(self.text_to_emit)
+    def plot_sequence(self):
+        print("text to emit",self.text_to_emit)
+        self.plot_sequence_signal.emit(self.text_to_emit)
 
 
 class SequenceManagerWidget(QWidget):
@@ -908,7 +920,12 @@ class SequenceManagerWidget(QWidget):
             self.sequence_manager.change_sequence_name(old_name=sequence_name, new_name=new_sequence_name)
             self.update_buttons()
             self.display_sequence(flag=True)
-
+    def plot_sequence(self, sequence_name):
+        channel_name, ok = QInputDialog.getText(self, "Plot Channel", "Enter Channel name:")
+        if ok and channel_name:
+            self.sequence_manager.main_sequences[sequence_name]["seq"].plot([channel_name])
+        else:  
+            self.sequence_manager.main_sequences[sequence_name]["seq"].plot()
     def update_buttons(self):
         for i in reversed(range(self.button_layout.count())):
             self.button_layout.itemAt(i).widget().setParent(None)
@@ -919,6 +936,7 @@ class SequenceManagerWidget(QWidget):
             button.save_sequence_signal.connect(self.save_sequence)
             button.delete_sequence_signal.connect(self.delete_sequence)
             button.edit_sequence_signal.connect(self.edit_sequence)
+            button.plot_sequence_signal.connect(self.plot_sequence)
 
 
             button.setStyleSheet(self.get_button_style(False))
@@ -1065,6 +1083,9 @@ class SequenceManagerWidget(QWidget):
             button = self.button_layout.itemAt(self.button_layout.count()-2).widget()
             self.selected_sequence_button = button
             self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
+
+# class Runner(QWidget):
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
