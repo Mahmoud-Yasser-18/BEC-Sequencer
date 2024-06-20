@@ -921,11 +921,15 @@ class SequenceManagerWidget(QWidget):
             self.update_buttons()
             self.display_sequence(flag=True)
     def plot_sequence(self, sequence_name):
-        channel_name, ok = QInputDialog.getText(self, "Plot Channel", "Enter Channel name:")
+        
+        #make a dialog to ask for channel name with a combobox
+        channels =["All Channels"]+ [ch.name for ch in self.sequence_manager.main_sequences[sequence_name]["seq"].channels] 
+        channel_name, ok = QInputDialog.getItem(self, "Select Channel", "CHannels:", channels, 0, False)
         if ok and channel_name:
-            self.sequence_manager.main_sequences[sequence_name]["seq"].plot([channel_name])
-        else:  
-            self.sequence_manager.main_sequences[sequence_name]["seq"].plot()
+            if channel_name != "All Channels":
+                self.sequence_manager.main_sequences[sequence_name]["seq"].plot([channel_name])
+            else:  
+                self.sequence_manager.main_sequences[sequence_name]["seq"].plot()
     def update_buttons(self):
         for i in reversed(range(self.button_layout.count())):
             self.button_layout.itemAt(i).widget().setParent(None)
