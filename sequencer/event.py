@@ -1517,6 +1517,7 @@ from collections import OrderedDict
 class SequenceManager:
     def __init__(self) -> None:
         self.main_sequences = OrderedDict()
+        self.custom_sequence= None
 
 
     def add_new_sequence(self,  sequence_name: str,index: Optional[int] = None):
@@ -1650,8 +1651,7 @@ class SequenceManager:
             self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
 
     def get_main_sequence(self ):
-
-        
+     
         # put all sequences in a list and sort them by the index
         seq_list = list(self.main_sequences.values())
         seq_list.sort(key=lambda seq: seq["index"])
@@ -1662,17 +1662,15 @@ class SequenceManager:
             main_sequence = main_sequence.add_sequence(seq["seq"])
 
         return main_sequence
-    
-    def get_sweep_sequences(self):
+
+    def get_sweep_sequences_main(self):
         # put all sequences in a list and sort them by the index
         seq_list = list(self.main_sequences.values())
         seq_list.sort(key=lambda seq: seq["index"])
 
         # make a list of all the sweep sequences and compine them according to the index
         sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [seq_list[0]["seq"]]
-        # print("""list (seq_list[0]["sweep_list"].values()) """)
-        # print(len(sweep_sequences))
-        # print(sweep_sequences)
+
         for seq in seq_list[1:]:
             if len(seq["sweep_list"].items())!=0:
                 new_sweep_sequences = []
@@ -1689,8 +1687,7 @@ class SequenceManager:
                 for sweep in sweep_sequences:
                     sweep.append(seq["seq"])
         
-        # print("sweep_sequences",sweep_sequences)
-        # print("len(sweep_sequences)",len(sweep_sequences))
+
         final_sweep_sequences = []
         for sweep in sweep_sequences:
             main_sweep = sweep[0]
@@ -1699,7 +1696,74 @@ class SequenceManager:
             final_sweep_sequences.append(main_sweep)
 
         return final_sweep_sequences
-    
+
+    def get_custom_sequence(self, sequence_name: List[str]) -> Sequence:
+        # put all sequences in a list and sort them by the index
+        seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
+
+        # Run the sequences in order
+        self.custom_sequence = seq_list[0]["seq"]
+        for seq in seq_list[1:]:
+            self.custom_sequence = self.custom_sequence.add_sequence(seq["seq"])
+
+        return self.custom_sequence
+
+    def get_sweep_sequences_custom(self, sequence_name: List[str]):
+        seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
+
+        # Make a list of all the sweep sequences and combine them according to the given sequence names
+        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items()) != 0 else [seq_list[0]["seq"]]
+
+        for seq in seq_list[1:]:
+            if len(seq["sweep_list"].items()) != 0:
+                new_sweep_sequences = []
+                for sweep_seq in seq["sweep_list"].values():
+                    for sweep in sweep_sequences:
+                        temp = copy.copy(sweep)
+                        temp.append(sweep_seq)
+                        new_sweep_sequences.append(temp)
+                sweep_sequences = new_sweep_sequences
+            else:
+                for sweep in sweep_sequences:
+                    sweep.append(seq["seq"])
+
+        final_sweep_sequences = []
+        for sweep in sweep_sequences:
+            custom_sweep = sweep[0]
+            for seq in sweep[1:]:
+                custom_sweep = custom_sweep.add_sequence(seq)
+            final_sweep_sequences.append(custom_sweep)
+
+        return final_sweep_sequences
+    def get_sweep_sequences_custom_remove(self, sequence_name: List[str]):
+        seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
+
+        # Make a list of all the sweep sequences and combine them according to the given sequence names
+        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items()) != 0 else [seq_list[0]["seq"]]
+
+        for seq in seq_list[1:]:
+            if len(seq["sweep_list"].items()) != 0:
+                new_sweep_sequences = []
+                for sweep_seq in seq["sweep_list"].values():
+                    for sweep in sweep_sequences:
+                        temp = copy.copy(sweep)
+                        temp.append(sweep_seq)
+                        new_sweep_sequences.append(temp)
+                sweep_sequences = new_sweep_sequences
+            else:
+                for sweep in sweep_sequences:
+                    sweep.append(seq["seq"])
+
+        final_sweep_sequences = []
+        for sweep in sweep_sequences:
+            custom_sweep = sweep[0]
+            for seq in sweep[1:]:
+                custom_sweep = custom_sweep.add_sequence(seq)
+            final_sweep_sequences.append(custom_sweep)
+
+        return final_sweep_sequences
+
+        
     def to_json(self,file_name: Optional[str] = None) -> str:
         data = {
             "sequences": []
@@ -1757,7 +1821,7 @@ def create_test_sequence(name: str = "test"):
     sequence = Sequence(name)
     analog_channel = sequence.add_analog_channel("Analog1", 2, 1)
     analog_channel = sequence.add_analog_channel("Analog2", 2, 2)
-    digital_channel = sequence.add_digital_channel("Digital1", 5, 1, 1, 1)
+
     
 
     # Create events for testing
@@ -1775,38 +1839,27 @@ def create_test_sequence(name: str = "test"):
     return sequence
 
 
-def create_test_sequence2(name: str = "test"):
-    #test saving and loading from json sequence manager
-    seq_manager = SequenceManager()
-    seq = create_test_sequence(name+"1")
-    seq_manager.load_sequence(seq)
-    seq2 = create_test_sequence(name+"2")
-    seq2.add_sequence(seq)
-    seq_manager.load_sequence(seq2)
-    seq3 = create_test_sequence(name+"3")
-    seq_manager.load_sequence(seq3)
-    
-    seq_manager.to_json("manager_test.json")
-    seq_manager2 = SequenceManager.from_json("manager_test.json")
-    return seq_manager,seq_manager2
-
-
-
 
 
 
 if __name__ == '__main__':
+    #test get_custom_sequence
+    seq_manager = SequenceManager()
+    seq_manager.add_new_sequence("test")
+    seq_manager.main_sequences["test"]["seq"] = create_test_sequence()
 
-    pass
-    # list_of_seqs = sequence1.sweep_event_parameters("duration", [1,2,3,4,5,6,16],start_time=2,channel_name= "Analog1")
+    seq_manager.add_new_sequence("test2")
+    seq_manager.main_sequences["test2"]["seq"] = create_test_sequence("test2")
 
-    # for key, seq in list_of_seqs.items():
-    #     seq.plot()
+    seq_manager.add_new_sequence("test3")
+    seq_manager.main_sequences["test3"]["seq"] = create_test_sequence("test3")
 
+    seq_manager.add_new_sequence("test4")
+    seq_manager.main_sequences["test4"]["seq"] = create_test_sequence("test4")
 
+    seq_manager.get_custom_sequence(["test","test4"]).plot()
     
-
-
+    
 
     
     # seq_manager = SequenceManager()

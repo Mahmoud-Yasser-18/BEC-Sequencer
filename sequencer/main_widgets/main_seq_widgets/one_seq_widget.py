@@ -32,7 +32,7 @@ from sequencer.event import Ramp, Jump, Sequence, SequenceManager
 
 
 class ChannelLabelWidget(QWidget):
-    channel_right_clicked = pyqtSignal(QPoint)
+    channel_right_clicked = pyqtSignal()
     buttonclicked = pyqtSignal()
 
     def __init__(self, sequence, parent=None):
@@ -119,8 +119,12 @@ class ChannelLabelWidget(QWidget):
         scroll_area.setFixedWidth(200)
         return scroll_area
 
-    def show_context_menu(self, position):
-        self.channel_right_clicked.emit(self.mapToGlobal(position))
+    def show_context_menu(self, pos):
+        context_menu = QMenu(self)
+        add_event_action = context_menu.addAction("Add Channel")
+        action = context_menu.exec_(self.mapToGlobal(pos))
+        if action == add_event_action:
+            self.channel_right_clicked.emit()
 
     def add_channel(self):
         self.buttonclicked.emit()
@@ -130,13 +134,14 @@ class GapButton(QPushButton):
 
     def __init__(self, channel, parent, previous_event):
         super().__init__(parent)
-        self.channel = channel
+        self.channel = channel  
         self.previous_event = previous_event
         self.initUI()
 
     def initUI(self):
         if self.previous_event is None:
             self.setText("Add Event")
+            self.clicked.connect(self.add_event)
         else:
             if isinstance(self.previous_event.behavior, Ramp):
                 self.setText(str(self.previous_event.behavior.end_value))
@@ -192,6 +197,9 @@ class GapButton(QPushButton):
         else:
             QToolTip.showText(event.globalPos(), "No previous event", self)
         super().enterEvent(event)
+
+    def add_event(self):
+        self.addEventSignal.emit(self.channel)
 
     def show_context_menu(self, pos):
         context_menu = QMenu(self)
@@ -675,7 +683,7 @@ class SyncedTableWidget(QWidget):
         self.data_table.changes_in_event.connect(self.refresh_UI)
         self.time_axis = TimeAxisWidget(self.data_table)
         
-        self.channel_list.channel_right_clicked.connect(self.show_context_menu)
+        self.channel_list.channel_right_clicked.connect(self.show_channel_dialog)
         self.channel_list.buttonclicked.connect(self.show_channel_dialog)
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
@@ -725,12 +733,12 @@ class SyncedTableWidget(QWidget):
         proportion = value / scroll_bar_from.maximum() if scroll_bar_from.maximum() != 0 else 0
         return int(proportion * scroll_bar_to.maximum())
 
-    def show_context_menu(self, position):
-        context_menu = QMenu(self)
-        add_channel_action = context_menu.addAction("Add Channel")
-        action = context_menu.exec_(position)
-        if action == add_channel_action:
-            self.show_channel_dialog()
+    # def show_context_menu(self, position):
+    #     context_menu = QMenu(self)
+    #     add_channel_action = context_menu.addAction("Add Channel")
+    #     action = context_menu.exec_(position)
+    #     if action == add_channel_action:
+    #         self.show_channel_dialog()
 
     def show_channel_dialog(self):
         try :
@@ -1088,7 +1096,7 @@ class SequenceManagerWidget(QWidget):
             self.selected_sequence_button = button
             self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
 
-# class Runner(QWidget):
+
 
 
 if __name__ == '__main__':
