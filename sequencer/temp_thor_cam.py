@@ -6,7 +6,7 @@ from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPixmap
 from PIL import Image
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
-from thorlabs_tsi_sdk.tl_camera_enums import SENSOR_TYPE
+from thorlabs_tsi_sdk.tl_camera_enums import SENSOR_TYPE,OPERATION_MODE
 from thorlabs_tsi_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
 
 try:
@@ -20,8 +20,8 @@ class ImageAcquisitionThread(threading.Thread):
     def __init__(self, camera):
         super(ImageAcquisitionThread, self).__init__()
         self._camera = camera
-        self._camera.exposure_time_us = 1000
-        self._camera.gain = 0
+        # self._camera.exposure_time_us = 1000
+        # self._camera.gain = 0
         self._previous_timestamp = 0
 
         if self._camera.camera_sensor_type != SENSOR_TYPE.BAYER:
@@ -117,11 +117,16 @@ class LiveViewWidget(QWidget):
             pass
 
 if __name__ == "__main__":
-    live_or_trigger='live'
+    live_or_trigger='trigger'
     with TLCameraSDK() as sdk:
         camera_list = sdk.discover_available_cameras()
         with sdk.open_camera(camera_list[0]) as camera:
             print("Generating app...")
+            if live_or_trigger == 'live':
+                camera.frames_per_trigger_zero_for_unlimited = 0
+            else:
+                camera.frames_per_trigger_zero_for_unlimited = 1
+                camera.operation_mode= OPERATION_MODE.HARDWARE_TRIGGERED
 
             app = QApplication(sys.argv)
             acquisition_thread = ImageAcquisitionThread(camera)
@@ -131,10 +136,6 @@ if __name__ == "__main__":
             window.show()
 
             print("Setting camera parameters...")
-            if live_or_trigger == 'live':
-                camera.frames_per_trigger_zero_for_unlimited = 0
-            else:
-                camera.frames_per_trigger_zero_for_unlimited = 1
 
 
             # camera.frames_per_trigger_zero_for_unlimited = 0
