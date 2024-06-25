@@ -374,60 +374,80 @@ class ADwin_Driver:
             print(f"Experiment {i + 1} Completed.")
 
 import matplotlib.pyplot as plt
+def test_camera_trigger_seq(r=1):
+    main_seq = Sequence("Camera Trigger")
+    main_seq.add_analog_channel("Camera Trigger", 2, 2)
+    t = 0
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    t = 1
+    main_seq.add_event("Camera Trigger", Jump(3.3), start_time=t)
+    t = 2
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
 
+    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
+    adwin_driver.add_to_queue(main_seq)
+    adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
+    adwin_driver.repeat_process(process_number=1, repeat=r,poll_interval=0.1)
+
+    
 
 if __name__ == "__main__":
+    test_camera_trigger_seq()
+    
+
+
+# if __name__ == "__main__":
 
     
 
-    main_seq = Sequence("MOT_loading")
+#     main_seq = Sequence("MOT_loading")
 
-    main_seq.add_analog_channel("MOT Coils", 2,1)
-    main_seq.add_analog_channel("Camera Trigger", 3, 7)
-    main_seq.add_analog_channel("Trap TTL", 2, 3)
-    main_seq.add_analog_channel("Trap FM", 2, 4)
-    main_seq.add_analog_channel("Trap AM", 2, 5)
-    main_seq.add_analog_channel("Repump TTL", 2, 6)
-    main_seq.add_analog_channel("Repump FM", 2, 7)
-    main_seq.add_analog_channel("Repump AM", 2, 8)
+#     main_seq.add_analog_channel("MOT Coils", 2,1)
+#     main_seq.add_analog_channel("Camera Trigger", 3, 7)
+#     main_seq.add_analog_channel("Trap TTL", 2, 3)
+#     main_seq.add_analog_channel("Trap FM", 2, 4)
+#     main_seq.add_analog_channel("Trap AM", 2, 5)
+#     main_seq.add_analog_channel("Repump TTL", 2, 6)
+#     main_seq.add_analog_channel("Repump FM", 2, 7)
+#     main_seq.add_analog_channel("Repump AM", 2, 8)
 
-    main_seq.add_analog_channel("Absorption FM", 3,1)
-    main_seq.add_analog_channel("Absorption AM", 3,4)
+#     main_seq.add_analog_channel("Absorption FM", 3,1)
+#     main_seq.add_analog_channel("Absorption AM", 3,4)
 
 
 
-    # Defualt values
-    t = 2
-    # main_seq.add_event("MOT Coils", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
-    #main_seq.add_event("Camera Trigger", Jump(0), start_time=t) # 
-    # main_seq.add_event("Trap TTL", Jump(3.3), start_time=t)
-    # Trap_FM_event = main_seq.add_event("Trap FM", Jump(2.5), start_time=t)
-    # main_seq.add_event("Trap AM", Jump(1.25), start_time=t)
-    # main_seq.add_event("Repump TTL", Jump(3.3), start_time=t)
-    # main_seq.add_event("Repump FM", Jump(2.5), start_time=t)
-    # main_seq.add_event("Repump AM", Jump(0.5), start_time=t)
-    Absorption_FM = main_seq.add_event("Absorption FM", Jump(8.75), start_time=t)
-    main_seq.add_event("Absorption AM", Jump(3.3), start_time=t) # 3.3 is the ON value for the AM and 0 is the OFF value
-
-    
-    # main_seq.to_json("MOT_loading.json")
-    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
-    # adwin_driver.add_to_queue(main_seq)
+#     # Defualt values
+#     t = 2
+#     # main_seq.add_event("MOT Coils", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+#     #main_seq.add_event("Camera Trigger", Jump(0), start_time=t) # 
+#     # main_seq.add_event("Trap TTL", Jump(3.3), start_time=t)
+#     # Trap_FM_event = main_seq.add_event("Trap FM", Jump(2.5), start_time=t)
+#     # main_seq.add_event("Trap AM", Jump(1.25), start_time=t)
+#     # main_seq.add_event("Repump TTL", Jump(3.3), start_time=t)
+#     # main_seq.add_event("Repump FM", Jump(2.5), start_time=t)
+#     # main_seq.add_event("Repump AM", Jump(0.5), start_time=t)
+#     Absorption_FM = main_seq.add_event("Absorption FM", Jump(8.75), start_time=t)
+#     main_seq.add_event("Absorption AM", Jump(3.3), start_time=t) # 3.3 is the ON value for the AM and 0 is the OFF value
 
     
+#     # main_seq.to_json("MOT_loading.json")
+#     adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
+#     # adwin_driver.add_to_queue(main_seq)
+
     
-    target = list(np.arange(7.5, 8.2, 0.1))
-    list_of_seq = main_seq.sweep_event_parameters("jump_target_value", target, event_to_sweep=Absorption_FM)
+    
+#     target = list(np.arange(7.5, 8.2, 0.1))
+#     list_of_seq = main_seq.sweep_event_parameters("jump_target_value", target, event_to_sweep=Absorption_FM)
     
     
     
 
-    for seq in list_of_seq.values():
-        # seq.print_sequence("Trap FM")
-        adwin_driver.add_to_queue(seq)
+#     for seq in list_of_seq.values():
+#         # seq.print_sequence("Trap FM")
+#         adwin_driver.add_to_queue(seq)
 
-    adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
-    # adwin_driver.repeat_process(process_number=1, repeat=1000,poll_interval=0.1)
+#     adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
+#     # adwin_driver.repeat_process(process_number=1, repeat=1000,poll_interval=0.1)
 
 
     
