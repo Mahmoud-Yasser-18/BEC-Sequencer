@@ -20,8 +20,8 @@ class ImageAcquisitionThread(threading.Thread):
     def __init__(self, camera):
         super(ImageAcquisitionThread, self).__init__()
         self._camera = camera
-        # self._camera.exposure_time_us = 1000
-        # self._camera.gain = 0
+        self._camera.exposure_time_us = 1000
+        self._camera.gain = 20
         self._previous_timestamp = 0
 
         if self._camera.camera_sensor_type != SENSOR_TYPE.BAYER:
