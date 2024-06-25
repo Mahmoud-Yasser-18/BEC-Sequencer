@@ -1735,6 +1735,8 @@ class SequenceManager:
             final_sweep_sequences.append(custom_sweep)
 
         return final_sweep_sequences
+    
+
     def get_sweep_sequences_custom_remove(self, sequence_name: List[str]):
         seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
 
@@ -1813,7 +1815,7 @@ class SequenceManager:
             
 
 
-            
+
 
         
 

@@ -29,6 +29,8 @@ from sequencer.Dialogs.event_dialog import ChildEventDialog, RootEventDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog
 from sequencer.event import Ramp, Jump, Sequence, SequenceManager
 
+from sequencer.imaging.THORCAM.imaging_software import ThorCamControlWidget
+from sequencer.main_widgets.main_seq_widgets.Runner_widget import Runner
 
 
 class ChannelLabelWidget(QWidget):
@@ -910,10 +912,14 @@ class SequenceManagerWidget(QWidget):
         
         return menu_bar
     def open_runner(self):
-        pass
+        self.runner_widget = Runner(self.sequence_manager)
+        self.runner_widget.show()
+
     def open_camera(self):
-        pass
+        self.camera_widget = ThorCamControlWidget()
+        self.camera_widget.show()
     
+
     def save_sequence_manager(self):
         file_dialog = QFileDialog(self)
         file_name, _ = file_dialog.getSaveFileName(self, "Save Sequence Manager", "", "JSON Files (*.json)")

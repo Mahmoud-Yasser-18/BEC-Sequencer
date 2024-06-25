@@ -7,8 +7,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from collections import OrderedDict
 from typing import List, Optional
+from PyQt5.QtCore import QTimer
+
 
 from sequencer.event import SequenceManager
+from sequencer.ADwin_Modules import ADwin_Driver
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView, QMessageBox
 from PyQt5.QtCore import Qt
@@ -115,7 +118,11 @@ class CustomSequenceWidget(QWidget):
             item = self.selected_sequences_list.itemAt(position)
             self.selected_sequences_list.takeItem(self.selected_sequences_list.row(item))
 
-
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QPushButton, QProgressBar, 
+    QMenuBar, QAction, QMessageBox
+)
+from PyQt5.QtGui import QIcon
 
 class Runner(QWidget):
     def __init__(self, sequence_manager: SequenceManager):
@@ -123,37 +130,76 @@ class Runner(QWidget):
         self.sequence_manager = sequence_manager
         self.initUI()
 
+    def boot_ADwin(self):
+        # load the default ADwin process
+        try:
+            self.ADwin = ADwin_Driver()
+            # show a message box to inform the user that the ADwin has been booted
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Information)
+            msg_box.setWindowTitle("ADwin")
+            msg_box.setText("ADwin booted successfully")
+            QTimer.singleShot(2000, msg_box.close)  # Close the message box after 2000 milliseconds (2 seconds)
+            msg_box.exec_()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+
     def initUI(self):
-        layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        # Create main layout
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+
+        # Create menu bar
+        menu_bar = QMenuBar(self)
+        tools_menu = menu_bar.addMenu('Tools')
+        
+        load_adwin_action = QAction('Load ADwin', self)
+        load_adwin_action.triggered.connect(self.boot_ADwin)
+        tools_menu.addAction(load_adwin_action)
+
+        # Add menu bar to the layout
+        main_layout.setMenuBar(menu_bar)
 
         # Run Main Button
         self.run_main_button = QPushButton("Run Main")
         self.run_main_button.clicked.connect(self.run_main)
-        layout.addWidget(self.run_main_button)
+        main_layout.addWidget(self.run_main_button)
 
         # Run Custom Sequence Widget
         self.custom_sequence_widget = CustomSequenceWidget(self.sequence_manager)
-        layout.addWidget(self.custom_sequence_widget)
+        main_layout.addWidget(self.custom_sequence_widget)
 
         # Run Sweep Button
         self.run_sweep_button = QPushButton("Run Sweep")
         self.run_sweep_button.clicked.connect(self.run_sweep)
-        layout.addWidget(self.run_sweep_button)
+        main_layout.addWidget(self.run_sweep_button)
 
         # Progress Bar
         self.progress_bar = QProgressBar()
-        layout.addWidget(self.progress_bar)
+        main_layout.addWidget(self.progress_bar)
 
-        self.setLayout(layout)
+        self.setLayout(main_layout)
         self.setWindowTitle('Runner Widget')
+        self.setWindowIcon(QIcon('path_to_icon.png'))  # Add path to your icon
         self.setStyleSheet("""
             QWidget {
                 background-color: #1e1e1e;
                 color: #f0f0f0;
                 font-family: Arial, sans-serif;
                 font-size: 14px;
+            }
+            QMenuBar {
+                background-color: #3e3e3e;
+                color: #f0f0f0;
+            }
+            QMenuBar::item {
+                background-color: #3e3e3e;
+                color: #f0f0f0;
+            }
+            QMenuBar::item:selected {
+                background-color: #505050;
             }
             QPushButton {
                 background-color: #3e3e3e;
@@ -199,6 +245,8 @@ class Runner(QWidget):
         # Placeholder for running the sequence; replace with actual logic
         print(f"Running sequence: {sequence.sequence_name}")
         self.progress_bar.setValue(100)
+
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

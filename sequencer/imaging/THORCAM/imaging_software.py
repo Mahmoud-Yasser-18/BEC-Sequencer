@@ -252,14 +252,15 @@ class THORCAM_HANDLER():
 
     
     def dispose_all_camera_resources(self):
-        try:
-            self.sdk.dispose()
-        except:
-            print('No sdk to dispose')
         try:        
             self.camera.dispose()
         except:
             print('No camera to dispose')
+
+        try:
+            self.sdk.dispose()
+        except:
+            print('No sdk to dispose')
 
     def start_acquisition_thread(self):
         self.kill_acquisition_thread()
@@ -376,6 +377,7 @@ class ThorCamControlWidget(QWidget):
 
 
     def close_camera(self):
+        self.thor_cam.kill_acquisition_thread()
         self.thor_cam.camera.dispose()
         self.live_view.timer.stop()
 
@@ -386,6 +388,7 @@ class ThorCamControlWidget(QWidget):
     
     # define what happens when the window is closed
     def closeEvent(self, event):
+        self.thor_cam.kill_acquisition_thread()
         self.thor_cam.dispose_all_camera_resources()
         event.accept()
 

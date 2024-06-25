@@ -5,71 +5,12 @@
 
 import ADwin
 import os
-
+import sys 
 from copy import deepcopy 
 import numpy as np
 from sequencer.event import Sequence,Digital_Channel, Analog_Channel, Jump, Ramp, Event, RampType, SequenceManager
 import time
 
-
-def calculate_sequence_data(sequence: Sequence) -> None:
-
-    all_events = sequence.all_events
-    sequence_duration = sequence.sequence_dauation() 
-    time_points = np.arange(0, sequence_duration, sequence.time_resolution) 
-    update_list = np.zeros(len(time_points)) 
-
-
-    done_events = []
-
-
-
-    channel_number = []
-    channel_value = [] 
-
-
-    start_time = time.time() 
-
-
-    # The inefficient way to do this is to loop through all the events and check if the time point is within the event time range 
-    for t in range(len(time_points)): 
-        for event in all_events: 
-            
-            
-            if event in done_events: 
-                continue
-
-
-            if event.start_time <= time_points[t] <= event.end_time: 
-                update_list[t]+=1 
-                if  isinstance(event.channel, Digital_Channel):
-
-                    channel_number.append(event.channel.channel_number)
-                    channel_value.append(event.behavior.target_value)
-                    done_events.append(event)
-
-                elif isinstance(event.channel, Analog_Channel): 
-                    
-                    if isinstance(event.behavior, Jump): 
-
-                        channel_number.append(event.channel.channel_number)
-                        channel_value.append(event.behavior.target_value)
-                        done_events.append(event)
-                    elif isinstance(event.behavior, Ramp): 
-
-                        channel_number.append(event.channel.channel_number)
-                        channel_value.append(event.behavior.func(time_points[t] - event.start_time))
-                        
-                        
-            elif time_points[t] > event.end_time:
-                # ramp is done 
-                done_events.append(event)            
-    total_time = time.time() - start_time 
-    
-
-    print("sequence duration: ", sequence_duration)
-    print(f"Total time taken: {total_time}")        
-    return update_list, channel_number, channel_value
 
 def encode_channel(type: int, channel: int, card: int) -> int:
     """
@@ -372,6 +313,11 @@ class ADwin_Driver:
             self.initiate_experiment(process_number, index=i,repeat=repeat)
             self.wait_for_process_to_complete()
             print(f"Experiment {i + 1} Completed.")
+    
+    def change_process(self, process_file):
+        self.adw.Clear_Process(1)
+        self.adw.Load_Process(process_file)
+        print("Process loaded\n")
 
 import matplotlib.pyplot as plt
 def test_camera_trigger_seq(r=0):
