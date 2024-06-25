@@ -108,7 +108,6 @@ class LiveViewWidget(QWidget):
                 data = image.tobytes("raw", "RGB")
                 q_image = QImage(data, image.width, image.height, QImage.Format_RGB888)
             else:  # Grayscale image
-                print("Grayscale image")
                 data = image.tobytes("raw", "L")
                 q_image = QImage(data, image.width, image.height, QImage.Format_Grayscale8)
             pixmap = QPixmap.fromImage(q_image)
@@ -116,42 +115,139 @@ class LiveViewWidget(QWidget):
         except queue.Empty:
             pass
 
+class THORCAM_HANDELER():
+    def __init__(self):
+        self.sdk=TLCameraSDK() 
+
+    def get_camera_list(self):
+        return self.sdk.discover_available_cameras()
+    
+    def open_camera(self, camera_index=None,serial_number=None):
+        try : 
+            self.camera.dispose()
+        except:
+            print('No camera to dispose')
+
+        if camera_index is None:
+            self.camera = self.sdk.open_camera(serial_number)
+        else:
+            self.camera = self.sdk.open_camera(self.get_camera_list()[camera_index])
+    
+    def change_mode(self, live_or_trigger):
+        self.camera_mode = live_or_trigger
+        self.camera.disarm()
+        if live_or_trigger == 'live':
+            self.camera.frames_per_trigger_zero_for_unlimited = 0
+        else:
+            self.camera.frames_per_trigger_zero_for_unlimited = 1
+            self.camera.operation_mode= OPERATION_MODE.HARDWARE_TRIGGER
+        
+        self.camera.arm(2)
+        if live_or_trigger == 'live':
+            self.camera.issue_software_trigger()
+    
+    def set_camera_params(self, exposure_time_us, gain):
+        self.camera.disarm()
+        self.camera.exposure_time_us = exposure_time_us
+        self.camera.gain = gain
+        self.camera.arm(2)
+        if self.camera_mode == 'live':
+            self.camera.issue_software_trigger()
+    
+    
+    def dispose_all_camera_resources(self):
+        try :
+            self.sdk.dispose()
+        except:
+            print('No sdk to dispose')
+        try:        
+            self.camera.dispose()
+        except:
+            print('No camera to dispose')
+
+
+    def start_acquisition_thread(self):
+        self.acquisition_thread = ImageAcquisitionThread(self.camera)
+        self.acquisition_thread.start()
+    
+    def kill_acquisition_thread(self):
+        try:
+            self.acquisition_thread.stop()
+            self.acquisition_thread.join()
+        except:
+            print('No thread to kill')
+# when the class is destroyed, the resources are automatically disposed
+    def __del__(self):
+        try :
+            self.dispose_all_camera_resources()
+        except:
+            print('No resources to dispose')
+        try :
+            self.kill_acquisition_thread()
+        except:
+            print('No thread to kill')
+
 if __name__ == "__main__":
-    live_or_trigger='trigger'
-    with TLCameraSDK() as sdk:
-        camera_list = sdk.discover_available_cameras()
-        with sdk.open_camera(camera_list[0]) as camera:
-            print("Generating app...")
-            if live_or_trigger == 'live':
-                camera.frames_per_trigger_zero_for_unlimited = 0
-            else:
-                camera.frames_per_trigger_zero_for_unlimited = 1
-                camera.operation_mode= OPERATION_MODE.HARDWARE_TRIGGERED
-
-            app = QApplication(sys.argv)
-            acquisition_thread = ImageAcquisitionThread(camera)
-            window = LiveViewWidget(image_queue=acquisition_thread.get_output_queue())
-            window.setWindowTitle(camera.name)
-            window.resize(800, 600)
-            window.show()
-
-            print("Setting camera parameters...")
+    # test THORCAM_HANDELER
+    live_or_trigger='live'
+    thor_cam = THORCAM_HANDELER()
+    camera_list = thor_cam.get_camera_list()
+    print(camera_list)
+    thor_cam.open_camera(serial_number=camera_list[0])
+    thor_cam.change_mode(live_or_trigger)
+    thor_cam.set_camera_params(1000, 20)
+    thor_cam.start_acquisition_thread()
+    app = QApplication(sys.argv)
+    window = LiveViewWidget(image_queue=thor_cam.acquisition_thread.get_output_queue())
+    window.setWindowTitle(thor_cam.camera.name)
+    window.resize(800, 600)
+    window.show()
+    app.exec_()
+    thor_cam.dispose_all_camera_resources()
 
 
-            # camera.frames_per_trigger_zero_for_unlimited = 0
-            camera.arm(2)
-            if live_or_trigger == 'live':
-                camera.issue_software_trigger()
+
+
+
+
+# if __name__ == "__main__":
+#     live_or_trigger='trigger'
+#     with TLCameraSDK() as sdk:
+#         camera_list = sdk.discover_available_cameras()
+#         with sdk.open_camera(camera_list[0]) as camera:
+#             print("Generating app...")
+#             if live_or_trigger == 'live':
+#                 camera.frames_per_trigger_zero_for_unlimited = 0
+#             else:
+#                 camera.frames_per_trigger_zero_for_unlimited = 1
+#                 camera.operation_mode= OPERATION_MODE.HARDWARE_TRIGGERED
+
+#             app = QApplication(sys.argv)
+#             acquisition_thread = ImageAcquisitionThread(camera)
+#             window = LiveViewWidget(image_queue=acquisition_thread.get_output_queue())
+#             window.setWindowTitle(camera.name)
+#             window.resize(800, 600)
+#             window.show()
+
+#             print("Setting camera parameters...")
+
+
+#             # camera.frames_per_trigger_zero_for_unlimited = 0
+#             camera.arm(2)
+#             if live_or_trigger == 'live':
+#                 camera.issue_software_trigger()
             
-            print("Starting image acquisition thread...")
-            acquisition_thread.start()
+#             print("Starting image acquisition thread...")
+#             acquisition_thread.start()
 
-            print("App starting")
-            app.exec_()
+#             print("App starting")
+#             app.exec_()
 
-            print("Waiting for image acquisition thread to finish...")
-            acquisition_thread.stop()
-            acquisition_thread.join()
+#             print("Waiting for image acquisition thread to finish...")
+#             acquisition_thread.stop()
+#             acquisition_thread.join()
+#             camera.dispose()
+#             sdk.dispose()
 
-            print("Closing resources...")
-    print("App terminated. Goodbye!")
+#             print("Closing resources...")
+#     print("App terminated. Goodbye!")
