@@ -374,7 +374,7 @@ class ADwin_Driver:
             print(f"Experiment {i + 1} Completed.")
 
 import matplotlib.pyplot as plt
-def test_camera_trigger_seq(r=1):
+def test_camera_trigger_seq(r=0):
     main_seq = Sequence("Camera Trigger")
     main_seq.add_analog_channel("Camera Trigger", 2, 2)
     t = 0
@@ -387,12 +387,13 @@ def test_camera_trigger_seq(r=1):
     adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
     adwin_driver.add_to_queue(main_seq)
     adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
-    adwin_driver.repeat_process(process_number=1, repeat=r,poll_interval=0.1)
+    if r :
+        adwin_driver.repeat_process(process_number=1, repeat=r,poll_interval=0.1)
 
     
 
 if __name__ == "__main__":
-    test_camera_trigger_seq()
+    test_camera_trigger_seq(r= 20)
     
 
 

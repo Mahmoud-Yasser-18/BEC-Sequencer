@@ -882,6 +882,7 @@ class SequenceManagerWidget(QWidget):
     def create_menu_bar(self):
         menu_bar = QMenuBar(self)
         file_menu = QMenu("File", self)
+        tools_menu = QMenu("tools", self)
 
         load_action = QAction("Load Sequence Manager", self)
         load_action.triggered.connect(self.load_sequence_manager)
@@ -891,9 +892,28 @@ class SequenceManagerWidget(QWidget):
         save_action.triggered.connect(self.save_sequence_manager)
         file_menu.addAction(save_action)
 
-        menu_bar.addMenu(file_menu)
-        return menu_bar
+        open_runner_action = QAction("Open Runner", self)
+        open_runner_action.triggered.connect(self.open_runner)
+        tools_menu.addAction(open_runner_action)
 
+
+        
+        open_camera_action = QAction("Open Camera", self)
+        open_camera_action.triggered.connect(self.open_camera)
+        tools_menu.addAction(open_camera_action)
+
+
+
+
+        menu_bar.addMenu(file_menu)
+        menu_bar.addMenu(tools_menu)
+        
+        return menu_bar
+    def open_runner(self):
+        pass
+    def open_camera(self):
+        pass
+    
     def save_sequence_manager(self):
         file_dialog = QFileDialog(self)
         file_name, _ = file_dialog.getSaveFileName(self, "Save Sequence Manager", "", "JSON Files (*.json)")
