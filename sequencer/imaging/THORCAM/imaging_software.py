@@ -1,7 +1,7 @@
 import sys
 import threading
 import queue
-from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, 
+from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QCheckBox,
                              QHBoxLayout, QPushButton, QComboBox, QSpinBox, 
                              QFormLayout)
 from PyQt5.QtCore import QTimer, Qt,QPoint, QRect
@@ -10,9 +10,9 @@ from PIL import Image
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
 from thorlabs_tsi_sdk.tl_camera_enums import SENSOR_TYPE, OPERATION_MODE
 from thorlabs_tsi_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
-
+import copy
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QFontMetrics
-
+import numpy as np
 
 try:
     # if on Windows, use the provided setup script to add the DLLs folder to the PATH
@@ -74,20 +74,24 @@ class ImageAcquisitionThread(threading.Thread):
     def _get_image(self, frame):
 
         scaled_image = frame.image_buffer >> (self._bit_depth - 8)
-        return Image.fromarray(scaled_image, mode='L')
+        # print(type(scaled_image))
+        # print(scaled_image.shape)
+        return Image.fromarray(scaled_image, mode='L'),scaled_image
 
     def run(self):
         while not self._stop_event.is_set():
             try:
                 frame = self._camera.get_pending_frame_or_null()
+                
                 if frame is not None:
+                    # print(type(frame))
                     if self._is_color:
                         pil_image = self._get_color_image(frame)
                     else:
 
-                        pil_image = self._get_image(frame)
+                        pil_image,numpy_data = self._get_image(frame)
 
-                    self._image_queue.put_nowait((pil_image, frame.time_stamp_relative_ns_or_null))
+                    self._image_queue.put_nowait((pil_image, frame.time_stamp_relative_ns_or_null,numpy_data))
             except queue.Full:
                 pass
             except Exception as error:
@@ -121,12 +125,15 @@ class LiveViewWidget(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_image)
         self.timer.start(10)
+        self.save = False
 
     def update_image(self):
         try:
             # Get the image and timestamp from the queue
-            image, timestamp = self.image_queue.get_nowait()
-
+            image, timestamp,numpy_data = self.image_queue.get_nowait()
+            if self.save:
+                #save numpy data
+                np.save(f"{timestamp}_image.npy",numpy_data)
             # Convert the timestamp from microseconds to seconds
             time_seconds = timestamp / 1e6  # Convert microseconds to seconds
 
@@ -178,7 +185,10 @@ class LiveViewWidget(QWidget):
         super(LiveViewWidget, self).resizeEvent(event)
 
         # Update the image to rescale it when the window is resized
+        temp_save = copy.deepcopy(self.save)
+        self.save = False
         self.update_image()
+        self.save = temp_save
 
 class THORCAM_HANDLER():
     def __init__(self):
@@ -204,7 +214,7 @@ class THORCAM_HANDLER():
         
         
     
-    def change_mode(self, live_or_trigger):
+    def change_camera_live_mode(self, live_or_trigger):
         self.camera_mode = live_or_trigger
         try:
             self.camera.disarm()
@@ -281,6 +291,40 @@ class THORCAM_HANDLER():
 
 # --- Custom PyQt Widget for THORCAM_HANDLER control ---
 
+from PyQt5.QtWidgets import QApplication, QMainWindow, QSpinBox, QVBoxLayout, QWidget
+from PyQt5.QtCore import pyqtSignal, QTimer
+
+
+class CustomSpinBox(QSpinBox):
+    valueConfirmed = pyqtSignal(int)  # Custom signal to emit when value is confirmed
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._value_before_edit = self.value()
+
+        # Initialize the timer
+        self.confirmationTimer = QTimer(self)
+        self.confirmationTimer.setSingleShot(True)
+
+        # self.confirmationTimer.timeout.connect(self.emitValueConfirmed)
+        # self.valueChanged.connect(self.startConfirmationTimer)
+
+    def keyPressEvent(self, event):
+        super().keyPressEvent(event)
+        if event.key() in (Qt.Key_Enter, Qt.Key_Return):
+            self.emitValueConfirmed()
+
+    def emitValueConfirmed(self):
+        if self.value() != self._value_before_edit:
+            self.valueConfirmed.emit(self.value())
+            self._value_before_edit = self.value()
+            self.confirmationTimer.stop()
+
+    def startConfirmationTimer(self):
+        self.confirmationTimer.start(2000)
+
+
+
 class ThorCamControlWidget(QWidget):
     def __init__(self, parent=None):
         super(ThorCamControlWidget, self).__init__(parent)
@@ -295,12 +339,16 @@ class ThorCamControlWidget(QWidget):
         # Layouts
         main_layout = QVBoxLayout()
         controls_layout = QHBoxLayout()
-        settings_layout = QFormLayout()
+        settings_layout = QHBoxLayout()
+        save_layout = QHBoxLayout()
 
         # Live View
         self.live_view = LiveViewWidget(image_queue=queue.Queue())
         
         # Camera List
+        self.refresh_cameras_button = QPushButton("Refresh Cameras")
+        self.refresh_cameras_button.clicked.connect(self.refresh_cameras)
+
         self.camera_list = QComboBox()
         self.refresh_cameras()
         self.camera_list.currentIndexChanged.connect(self.camera_selected)
@@ -314,45 +362,125 @@ class ThorCamControlWidget(QWidget):
 
 
         # Camera Parameters
-        self.exposure_spin = QSpinBox()
-        self.exposure_spin.setRange(1, 1000000)
+        self.exposure_spin = CustomSpinBox()
+        self.exposure_spin.setRange(64, 1000000)
         self.exposure_spin.setValue(1000)
+        QSpinBox
+        
 
-        self.gain_spin = QSpinBox()
+        self.gain_spin = CustomSpinBox()
         self.gain_spin.setRange(0, 100)
         self.gain_spin.setValue(20)
 
-        self.camera_mode = QComboBox()
-        self.camera_mode.addItems([ 'Trigger','Live'])
-        self.camera_mode.currentIndexChanged.connect(self.change_mode)
+
+        self.exposure_spin.valueConfirmed.connect(self.apply_params)
+        self.gain_spin.valueConfirmed.connect(self.apply_params)
+
+        self.gain_spin.confirmationTimer.timeout.connect(self.gain_spin.emitValueConfirmed)
+        self.gain_spin.valueChanged.connect(self.gain_spin.startConfirmationTimer)
+        self.exposure_spin.confirmationTimer.timeout.connect(self.exposure_spin.emitValueConfirmed)
+        self.exposure_spin.valueChanged.connect(self.exposure_spin.startConfirmationTimer)
 
 
-        self.apply_params_button = QPushButton("Apply Parameters")
-        self.apply_params_button.clicked.connect(self.apply_params)
+        self.camera_mode_compo = QComboBox()
+        self.camera_mode_compo.addItems([ 'Live','Trigger'])
+        self.camera_mode_compo.currentIndexChanged.connect(self.change_camera_live_mode)
+
+
+
+
+
 
         # Adding widgets to layouts
-        settings_layout.addRow("Exposure Time (us):", self.exposure_spin)
-        settings_layout.addRow("Gain:", self.gain_spin)
-        settings_layout.addRow(self.apply_params_button)
-        settings_layout.addRow("Camera Mode:", self.camera_mode)
+        settings_layout.addWidget(QLabel("Exposure Time (us):"))
+        settings_layout.addWidget( self.exposure_spin)
+        settings_layout.addWidget(QLabel("Gain:"))
+        settings_layout.addWidget( self.gain_spin)
+        
+        settings_layout.addWidget(QLabel("Camera Mode:"))
+        settings_layout.addWidget( self.camera_mode_compo,2)
+
 
         controls_layout.addWidget(QLabel("Select Camera:"))
         controls_layout.addWidget(self.camera_list)
+        controls_layout.addWidget(self.refresh_cameras_button)
         controls_layout.addWidget(self.open_button)
         controls_layout.addWidget(self.close_button)
 
 
+
+
+
+        # Experiment and Save Layout 
+        self.experiment_mode = QComboBox()
+        self.experiment_mode.addItems(['No Experiment', 'On going Experiment'])
+        self.experiment_mode.currentIndexChanged.connect(self.change_experiment_mode)
+
+        self.save_checkbox = QCheckBox("Save Images")
+        self.save_checkbox.stateChanged.connect(self.save_images)
+
+
+        self.save_folder_button = QPushButton("Select Folder")
+
+        save_layout.addWidget(QLabel("Experiment Mode:"))
+        save_layout.addWidget(self.experiment_mode)
+        save_layout.addWidget(QLabel("Save Images:"))
+        save_layout.addWidget(self.save_checkbox)
+        save_layout.addWidget(QLabel("Save Folder:"))
+        save_layout.addWidget(self.save_folder_button)
+        self.close_button.setEnabled(False)
+                                     
+
+
+
+
+
+
         main_layout.addLayout(controls_layout)
         main_layout.addLayout(settings_layout)
+        main_layout.addLayout(save_layout)
         main_layout.addWidget(self.live_view,2)
 
         self.setLayout(main_layout)
 
-    def change_mode(self):
+    def save_images(self,state):
+        if state == Qt.Checked:
+            self.camera_mode_compo.setCurrentIndex(1)
+            self.camera_mode_compo.setEnabled(False)
+            self.live_view.save = True
 
-        mode = self.camera_mode.currentText()
+        else:
+            self.live_view.save = False
+            self.camera_mode_compo.setEnabled(True)
+            
+
+    def saving_folder(self):
+        pass
+    
+    def change_save_mode(self):
+        if self.save_checkbox.isChecked():
+            self.camera_mode_compo.setCurrentIndex(1)
+            self.camera_mode_compo.setEnabled(False)
+        else:
+            self.camera_mode_compo.setEnabled(True)
+
+
+    def change_experiment_mode(self):
+        # change the mode of the experiment
+        # make the camera mode to trigger
+        if self.experiment_mode.currentText() == 'On going Experiment':
+            self.camera_mode_compo.setCurrentIndex(1)
+            self.camera_mode_compo.setEnabled(False)
+        else:
+            self.camera_mode_compo.setEnabled(True)
+
+
+
+    def change_camera_live_mode(self):
+
+        mode = self.camera_mode_compo.currentText()
         try:
-            self.thor_cam.change_mode(mode)
+            self.thor_cam.change_camera_live_mode(mode)
         except:
             print('No camera to change mode')
     def refresh_cameras(self):
@@ -369,10 +497,13 @@ class ThorCamControlWidget(QWidget):
         index = self.camera_list.currentIndex()
         if index >= 0:
             self.thor_cam.open_camera(camera_index=index)
-            self.thor_cam.change_mode(self.camera_mode.currentText())
+            print('Camera opened HERE')
+            self.thor_cam.change_camera_live_mode(self.camera_mode_compo.currentText())
             self.thor_cam.start_acquisition_thread()
             self.live_view.image_queue = self.thor_cam.acquisition_thread.get_output_queue()
             self.live_view.timer.start(10)
+            self.open_button.setEnabled(False)
+            self.close_button.setEnabled(True)
             print('Camera opened')
 
 
@@ -380,6 +511,8 @@ class ThorCamControlWidget(QWidget):
         self.thor_cam.kill_acquisition_thread()
         self.thor_cam.camera.dispose()
         self.live_view.timer.stop()
+        self.open_button.setEnabled(True)
+        self.close_button.setEnabled(False)
 
     def apply_params(self):
         exposure_time_us = self.exposure_spin.value()
