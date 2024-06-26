@@ -376,23 +376,29 @@ class ParameterListWidget(QWidget):
         }
         self.update_parameters(new_parameters)
 
+import os
+import json
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton, QCheckBox, QFileDialog
+from PyQt5.QtCore import Qt
+import queue
 
 class ThorCamControlWidget(QWidget):
     def __init__(self, parent=None):
         super(ThorCamControlWidget, self).__init__(parent)
 
-        # load default parameters
-        #folder paths is in the same directory as the script
+        # Load default parameters
+        # Folder paths are in the same directory as the script
         self.paramerters_path = os.path.join(os.path.dirname(__file__), 'camera_default_settings.json')
 
         with open(self.paramerters_path, 'r') as json_file:
             loaded_settings = json.load(json_file)
-            self.default_source_path=loaded_settings["default_source_path"]
-            self.default_destination_path=loaded_settings["default_destination_path"]
-            self.default_saving_path=loaded_settings["default_saving_path"]
-            self.default_exposure_time=loaded_settings["default_exposure_time"]
-            self.default_gain=loaded_settings["default_gain"]
-        # create these folders if they don't exist 
+            self.default_source_path = loaded_settings["default_source_path"]
+            self.default_destination_path = loaded_settings["default_destination_path"]
+            self.default_saving_path = loaded_settings["default_saving_path"]
+            self.default_exposure_time = loaded_settings["default_exposure_time"]
+            self.default_gain = loaded_settings["default_gain"]
+
+        # Create these folders if they don't exist 
         if not os.path.exists(self.default_source_path):
             os.makedirs(self.default_source_path)
         if not os.path.exists(self.default_destination_path):
@@ -400,19 +406,17 @@ class ThorCamControlWidget(QWidget):
         if not os.path.exists(self.default_saving_path):
             os.makedirs(self.default_saving_path)
         
-
         self.thor_cam = THORCAM_HANDLER()
         self.init_ui()
 
     def save_as_default_settings(self):
-
         # Define the default settings
         camera_default_settings = {
-            "default_source_path":self.default_source_path,
-            "default_destination_path":self.default_destination_path,
-            "default_saving_path":self.default_saving_path,
-            "default_exposure_time":self.exposure_spin.value(),
-            "default_gain":self.gain_spin.value()
+            "default_source_path": self.default_source_path,
+            "default_destination_path": self.default_destination_path,
+            "default_saving_path": self.default_saving_path,
+            "default_exposure_time": self.exposure_spin.value(),
+            "default_gain": self.gain_spin.value()
         }
 
         # Write the settings to a JSON file
@@ -492,8 +496,13 @@ class ThorCamControlWidget(QWidget):
         self.save_checkbox.stateChanged.connect(self.save_images)
 
         self.save_folder_button = QPushButton("Select Save Folder")
+        self.save_folder_button.clicked.connect(self.select_save_folder)
+        
         self.destination_folder_button = QPushButton("Select Destination Folder")
+        self.destination_folder_button.clicked.connect(self.select_destination_folder)
+        
         self.source_folder_button = QPushButton("Select Source Folder")
+        self.source_folder_button.clicked.connect(self.select_source_folder)
 
         self.save_layout.addWidget(QLabel("Experiment Mode:"))
         self.save_layout.addWidget(self.experiment_mode)
@@ -504,10 +513,10 @@ class ThorCamControlWidget(QWidget):
         self.main_layout.addLayout(self.save_layout)
 
         self.live_params = QHBoxLayout()
-        self.paramerter_list  = ParameterListWidget()
+        self.paramerter_list = ParameterListWidget()
         
         self.live_params.addWidget(self.paramerter_list)
-        self.live_params.addWidget(self.live_view,2)
+        self.live_params.addWidget(self.live_view, 2)
         self.main_layout.addLayout(self.live_params, 2)
 
         self.setLayout(self.main_layout)
@@ -563,6 +572,24 @@ class ThorCamControlWidget(QWidget):
             if self.save_checkbox.isChecked():
                 self.save_layout.addWidget(self.save_folder_button)
 
+    def select_save_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Save Folder", self.default_saving_path)
+        if folder:
+            self.default_saving_path = folder
+            self.save_as_default_settings()
+
+    def select_destination_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Destination Folder", self.default_destination_path)
+        if folder:
+            self.default_destination_path = folder
+            self.save_as_default_settings()
+
+    def select_source_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Source Folder", self.default_source_path)
+        if folder:
+            self.default_source_path = folder
+            self.save_as_default_settings()
+
     def change_camera_live_mode(self):
         mode = self.camera_mode_compo.currentText()
         try:
@@ -577,7 +604,8 @@ class ThorCamControlWidget(QWidget):
         if cameras:
             self.camera_list.setCurrentIndex(0)
 
-
+    def camera_selected(self, index):
+        pass
 
     def open_camera(self):
         index = self.camera_list.currentIndex()
@@ -601,7 +629,7 @@ class ThorCamControlWidget(QWidget):
         exposure_time_us = self.exposure_spin.value()
         gain = self.gain_spin.value()
         self.thor_cam.set_camera_params(exposure_time_us, gain)
-    
+
     def closeEvent(self, event):
         self.thor_cam.kill_acquisition_thread()
         self.thor_cam.dispose_all_camera_resources()
