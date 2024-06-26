@@ -1335,6 +1335,8 @@ class Sequence:
                     reset_value=channel_data["reset_value"]
                 )
             channel_map[channel_data["name"]] = channel
+        
+        
 
         def deserialize_event(event_data: dict, parent: Optional[Event] = None) -> Event:
             behavior_data = event_data["behavior"]

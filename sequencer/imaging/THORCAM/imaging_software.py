@@ -2,7 +2,7 @@ import sys
 import threading
 import queue
 from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QCheckBox,
-                             QHBoxLayout, QPushButton, QComboBox, QSpinBox, 
+                             QHBoxLayout, QPushButton, QComboBox, QSpinBox, QMessageBox,
                              QFormLayout)
 from PyQt5.QtCore import QTimer, Qt,QPoint, QRect
 from PyQt5.QtGui import QImage, QPixmap,QPainter 
@@ -13,7 +13,7 @@ from thorlabs_tsi_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
 import copy
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QFontMetrics
 import numpy as np
-
+from sequencer.event import Sequence
 try:
     # if on Windows, use the provided setup script to add the DLLs folder to the PATH
     from sequencer.imaging.THORCAM.windows_setup import configure_path
@@ -110,11 +110,44 @@ from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt5.QtCore import QTimer, Qt, QPoint
 from PyQt5.QtGui import QImage, QPixmap, QPainter
 import queue
+import datetime
+
+class DataItem:
+    def __init__(self, json_str=None, images=None):
+        self.json_str = json_str
+        self.images = images if images is not None else []
+
+    def save(self, filename):
+        # Convert the JSON string to a dictionary
+        # json_dict = json.loads(self.json_str)
+        
+        # Create a dictionary to save
+        # save_dict = {'json': json_dict}
+        save_dict = {'json': self.json_str}
+        for i, img in enumerate(self.images):
+            save_dict[f'image_{i}'] = img
+        
+        # Save the dictionary as a .npz file
+        np.savez(filename, **save_dict)
+
+    @staticmethod
+    def load(filename):
+        # Load the .npz file
+        data = np.load(filename, allow_pickle=True)
+        
+        # Extract the JSON string and images
+        json_str = json.dumps(data['json'].item())
+        images = [data[f'image_{i}'] for i in range(len(data.files) - 1)]
+        
+        return DataItem(json_str, images)
+
+
 
 class LiveViewWidget(QWidget):
-    def __init__(self, image_queue):
+    def __init__(self, image_queue,main_camera:'ThorCamControlWidget'):
         super(LiveViewWidget, self).__init__()
         self.image_queue = image_queue
+        self.main_camera = main_camera
 
         self.image_label = QLabel(self)
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -127,13 +160,76 @@ class LiveViewWidget(QWidget):
         self.timer.start(10)
         self.save = False
 
+    def save_images(self,numpy_data):
+        # check if the save checkbox is checked 
+        
+            # check if the experiment mode is ongoing
+        if self.main_camera.experiment_mode.currentText() == 'Ongoing Experiment':
+                # in the source folder the sequence should start with "current"
+            print(self.main_camera.default_source_path)
+            current_source_file = [file for file in os.listdir(self.main_camera.default_source_path) if file.startswith("current")]
+            if current_source_file:
+                current_source_file= current_source_file[0]
+            
+            print(current_source_file)
+            print(os.path.join(self.main_camera.default_source_path,current_source_file))
+            
+            temp_seq = Sequence.from_json(file_name=os.path.join(self.main_camera.default_source_path,current_source_file))
+            print(temp_seq.all_events)
+            paramters = temp_seq.get_parameter_dict()
+            self.main_camera.paramerter_list.update_parameters(paramters)
+            
+            if self.main_camera.save_checkbox.isChecked():
+                    # check if current file is also the current file 
+                    current_destination_file = [file for file in os.listdir(self.main_camera.default_destination_path) if file.startswith("current")]
+                    if current_destination_file:
+                        current_destination_file = current_destination_file[0]
+                        if current_destination_file == current_source_file:
+                            # save to the destination path
+                            # unpack the file and save it again to the destination path
+                            
+                            old_data =DataItem.load(os.path.join(self.main_camera.default_destination_path,current_destination_file))
+                            old_data.images.append(numpy_data)
+                            old_data.save(os.path.join(self.main_camera.default_destination_path,current_destination_file))
+                        else:
+                            # save to the default saving path
+                            # rename the current file in the destination path folder to be without current
+                            os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
+                            # save to the default saving path
+                            print('saving to the default saving path')
+                            new_data = DataItem(json_str=json.load(open(os.path.join(self.main_camera.default_source_path, current_source_file))), images=[numpy_data])
+                            new_data.save(os.path.join(self.main_camera.default_saving_path,current_source_file))
+                    else:
+                        # save to the default saving path
+                        # rename the current file in the destination path folder to be without current
+                        # os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
+                        # save to the default saving path
+                        print('saving to the default saving path')
+                        new_data = DataItem(json_str=json.load(open(os.path.join(self.main_camera.default_source_path, current_source_file))), images=[numpy_data])
+                        new_data.save(os.path.join(self.main_camera.default_saving_path,current_source_file))
+                            
+
+        else:
+            # save to the default saving path
+            if self.main_camera.save_checkbox.isChecked():
+                # get the default saving path
+                now = datetime.datetime.now()
+                time_stamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+                file_name = f"{time_stamp}.png"
+                file_path = os.path.join(self.main_camera.default_saving_path, file_name)
+                np.save(file_path,numpy_data)
+
+
+
+
+
     def update_image(self):
         try:
             # Get the image and timestamp from the queue
             image, timestamp,numpy_data = self.image_queue.get_nowait()
-            if self.save:
-                #save numpy data
-                np.save(f"{timestamp}_image.npy",numpy_data)
+            
+            
+            self.save_images(numpy_data)
             # Convert the timestamp from microseconds to seconds
             time_seconds = timestamp / 1e6  # Convert microseconds to seconds
 
@@ -208,7 +304,16 @@ class THORCAM_HANDLER():
             print('No camera to dispose')
 
         if camera_index is not None:
-            self.camera = self.sdk.open_camera(self.get_camera_list()[camera_index])
+            try:
+                self.camera = self.sdk.open_camera(self.get_camera_list()[camera_index])
+            except:
+                # error message
+                error_message = f"An error occurred: {str(e)}"
+                QMessageBox.critical(self, "Error", error_message)
+
+
+
+            
         elif serial_number is not None:
             self.camera = self.sdk.open_camera(serial_number)
         
@@ -434,7 +539,7 @@ class ThorCamControlWidget(QWidget):
         self.save_layout = QHBoxLayout()
 
         # Live View
-        self.live_view = LiveViewWidget(image_queue=queue.Queue())
+        self.live_view = LiveViewWidget(image_queue=queue.Queue(),main_camera=self)
         
         # Camera List
         self.refresh_cameras_button = QPushButton("Refresh Cameras")

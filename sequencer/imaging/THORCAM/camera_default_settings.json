@@ -1,6 +1,6 @@
 {
-    "default_source_path": "../data/source_folder",
-    "default_destination_path": "../data/destination_folder",
+    "default_source_path": "C:/Users/Mahmoud Yasser/Desktop/BEC/Code/data/source_folder",
+    "default_destination_path": "C:/Users/Mahmoud Yasser/Desktop/BEC/Code/data/destination_folder",
     "default_saving_path": "../data/saving_folder",
     "default_exposure_time": 1000,
     "default_gain": 0

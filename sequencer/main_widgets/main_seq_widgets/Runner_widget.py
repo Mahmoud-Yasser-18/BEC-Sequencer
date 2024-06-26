@@ -442,8 +442,9 @@ class Runner(QWidget):
             sequence.to_json(filename=os.path.join(self.save_path, f"current_{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
         
         self.ADwin.add_to_queue(sequence)
-        self.ADwin.initiate_all_experiments()
         print(f"Running sequence: {sequence.sequence_name}")
+        self.ADwin.initiate_all_experiments()
+        
         
 
     
