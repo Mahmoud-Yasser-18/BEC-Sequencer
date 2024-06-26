@@ -1744,7 +1744,7 @@ class SequenceManager:
         # make a list of all the sweep sequences and compine them according to the index
         sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [seq_list[0]["seq"]]
         sweep_sequences_keys = [[s] for s in seq_list[0]["sweep_list"].keys()  ]if len(seq_list[0]["sweep_list"].items())!=0 else [] 
-        print("sweep_sequences_keys",sweep_sequences_keys)
+
         for seq in seq_list[1:]:
             if len(seq["sweep_list"].items())!=0:
                 
@@ -1758,7 +1758,7 @@ class SequenceManager:
                         for sweep in sweep_sequences_keys:
                             temp_key = copy.copy(sweep)
                             temp_key.append(sweep_seq_key)
-                            new_sweep_sequences_key.append(temp_key)
+                            new_sweep_sequences_key.append(tuple(temp_key))
                     
                     sweep_sequences_keys = new_sweep_sequences_key
 
@@ -1791,8 +1791,8 @@ class SequenceManager:
                 main_sweep = main_sweep.add_sequence(seq)
 
             final_sweep_sequences.append(main_sweep)
-
-        return final_sweep_sequences,sweep_sequences_keys
+        final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
+        return final_dictionary
 
     def get_custom_sequence(self, sequence_name: List[str]) -> Sequence:
         # put all sequences in a list and sort them by the index
@@ -1810,7 +1810,7 @@ class SequenceManager:
         # make a list of all the sweep sequences and compine them according to the index
         sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [seq_list[0]["seq"]]
         sweep_sequences_keys = [[s] for s in seq_list[0]["sweep_list"].keys()  ]if len(seq_list[0]["sweep_list"].items())!=0 else [] 
-        print("sweep_sequences_keys",sweep_sequences_keys)
+
         for seq in seq_list[1:]:
             if len(seq["sweep_list"].items())!=0:
                 
@@ -1824,7 +1824,7 @@ class SequenceManager:
                         for sweep in sweep_sequences_keys:
                             temp_key = copy.copy(sweep)
                             temp_key.append(sweep_seq_key)
-                            new_sweep_sequences_key.append(temp_key)
+                            new_sweep_sequences_key.append(tuple(temp_key))
                     
                     sweep_sequences_keys = new_sweep_sequences_key
 
@@ -1857,6 +1857,12 @@ class SequenceManager:
                 main_sweep = main_sweep.add_sequence(seq)
 
             final_sweep_sequences.append(main_sweep)
+
+
+        # final_dictionary = dict()
+        # for key,seq in zip(sweep_sequences_keys,final_sweep_sequences):
+        #     final_dictionary[key]
+            
 
         return final_sweep_sequences,sweep_sequences_keys
         # make a list of all the sweep sequences and compine them according to the index
@@ -1940,12 +1946,7 @@ def create_test_sequence(name: str = "test"):
     return sequence
 
 
-
-
-
-if __name__ == '__main__':
-
-    
+def create_test_seq_manager():
     seq_manager = SequenceManager()
     seq_manager.add_new_sequence("test")
     seq_manager.main_sequences["test"]["seq"] = create_test_sequence()
@@ -1961,16 +1962,20 @@ if __name__ == '__main__':
     seq_manager.sweep_sequence("test2","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
     # print(seq_manager.main_sequences)
     seq_manager.sweep_sequence("test2","duration", [1,2,3],start_time=2,channel_name= "Analog1")
-    # print(seq_manager.main_sequences)
+    # print([str(k ) for k in seq_manager.get_sweep_sequences_main().keys()])
+    return seq_manager
+
+    
+
+
+if __name__ == '__main__':
+
+    
+    pass     # print(seq_manager.main_sequences)
     # print(seq_manager.main_sequences["test"]["sweep_list"][('duration', 2)].all_events[0].reference_original_event.start_time)
     # print(seq_manager.main_sequences["test"]["sweep_list"].keys()) 
-    main_seq,pram_list = seq_manager. get_sweep_sequences_main()
-    print(len(pram_list))
-
-    for p in pram_list:
-        print(len(p))
-        print(p)
-    # print(len(main_seq))
+    
+        # print(len(main_seq))
     # print(len(pram_list[0]))
     # print(pram_list[0])
     
