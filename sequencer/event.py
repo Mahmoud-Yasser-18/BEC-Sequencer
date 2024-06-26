@@ -12,6 +12,17 @@ import copy
 import matplotlib.cm as cm
 import numpy as np
 
+
+class Parameter:
+    def __init__(self, name: str, value: Any,event: 'Event'):
+        self.name = name
+        self.value = value
+        self.event = event
+        
+
+
+
+
 class RampType(Enum):
     LINEAR = 'linear'
     QUADRATIC = 'quadratic'
@@ -257,6 +268,7 @@ class Event:
 
         self.is_sweept = False
         self.reference_original_event = self
+        self.associated_parameters = []
 
         if start_time is not None:
             self.start_time = start_time
@@ -347,6 +359,7 @@ class Event:
             f"    parent={self.parent.channel.name if self.parent else None}\n"
             f")"
         )
+    
 
     def print_event_hierarchy(self, level: int = 0, indent: str = "    "):
         """Prints the event and its children recursively with indentation, avoiding duplicates."""
@@ -354,11 +367,16 @@ class Event:
 
         for child in self.children:
             child.print_event_hierarchy(level + 1, indent)
+    
+
+
+
 
 class Sequence:
     def __init__(self,name:str):
         
         self.sequence_name=name
+        self.parameters_list = []
         
         # list of all channels in the sequence 
         self.channels: List[Channel] = []
@@ -368,7 +386,27 @@ class Sequence:
     def check_for_overlapping_events(self):
         for channel in self.channels:
             channel.check_for_overlapping_events()
+    
 
+    def add_parameter_to_event(self,event: Event,parameter_name,parameter_value):
+        # ff the event is not in the sequence
+        if event not in self.all_events:
+            raise ValueError("Event not found in the sequence")
+        event.associated_parameters.append(Parameter(parameter_name,parameter_value,event))
+
+        self.parameters_list.append(parameter_name)
+
+    def remove_parameter(self,parameter_name):
+        for event in self.all_events:
+            for p in event.associated_parameters:
+                if p.name == parameter_name:
+                    event.associated_parameters.remove(p)
+                    self.parameters_list.remove(parameter_name)
+                    return
+        raise ValueError("Parameter not found in the sequence")
+    
+    
+        
 
     # add a new analog channel to the sequence
     def add_analog_channel(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10) -> Analog_Channel:
@@ -492,6 +530,7 @@ class Sequence:
         for event in channel.events:
             self.delete_event(start_time=event.start_time,channel_name=name)
         self.channels.remove(channel)
+
 
 
     # add a new event to the sequence
@@ -1160,6 +1199,10 @@ class Sequence:
                     "details": {}
                 },
                 "reference_time": event.reference_time,
+                "associated_parameters": [
+                    {"name": param.name, "value": param.value} for param in event.associated_parameters
+                ],
+
                 "children": [serialize_event(child) for child in event.children]
             }
             if isinstance(event.behavior, Jump):
@@ -1283,6 +1326,11 @@ class Sequence:
                 reference_time=event_data["reference_time"],
                 parent_event=parent
             )
+            for param_data in event_data["associated_parameters"]:
+                param = Parameter(name=param_data["name"], value=param_data["value"], event=event)
+                event.associated_parameters.append(param)
+                sequence.parameters_list.append(param)
+
 
             for child_data in event_data["children"]:
                 deserialize_event(child_data, event)
@@ -1859,9 +1907,8 @@ if __name__ == '__main__':
     seq_manager.add_new_sequence("test4")
     seq_manager.main_sequences["test4"]["seq"] = create_test_sequence("test4")
 
-    seq_manager.get_custom_sequence(["test","test4"]).plot()
     
-    
+    seq_manager.to_json("Tester_manager.json")
 
     
     # seq_manager = SequenceManager()

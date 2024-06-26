@@ -14,7 +14,7 @@ from PyQt5.QtCore import Qt, QRect, pyqtSignal, QPoint
 from sequencer.Dialogs.channel_dialog import ChannelDialog
 from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog,SweepEventDialog
-from sequencer.event import Ramp, Jump, Sequence
+from sequencer.event import Ramp, Jump, Sequence,Event
 
 import sys
 from typing import List, Optional
@@ -215,8 +215,9 @@ class EventButton(QPushButton):
     deleteEventSignal = pyqtSignal(object)
     editEventSignal = pyqtSignal(object)
     sweepEventSignal = pyqtSignal(object)
+    addParameterSignal = pyqtSignal(object)
 
-    def __init__(self, event, scale_factor, sequence, parent=None):
+    def __init__(self, event: Event , scale_factor, sequence, parent=None):
         super().__init__(parent)
         self.event = event
         self.scale_factor = scale_factor
@@ -224,73 +225,60 @@ class EventButton(QPushButton):
         self.initUI()
 
     def initUI(self):
-        ramp_stylesheet = """
-        QPushButton {
-            background-color: #FF5733; /* Orange */
-            border: 2px solid #C70039; /* Dark red border */
+        base_stylesheet = """
+        QPushButton {{
+            background-color: {background_color}; 
+            border: {border_size} solid {border_color}; 
             padding: 10px;
-            border-radius: 10px;
+            border-radius: {border_radius};
             color: white;
             font-weight: bold;
-        }
+        }}
 
-        QPushButton:hover {
-            background-color: #D14928;
-        }
+        QPushButton:hover {{
+            background-color: {hover_color};
+        }}
 
-        QPushButton:pressed {
-            background-color: #C04022;
-        }
+        QPushButton:pressed {{
+            background-color: {pressed_color};
+        }}
 
-        QPushButton:checked {
+        QPushButton:checked {{
             background-color: #FFC300; /* Yellow for active state */
             border: 2px solid #FFA500; /* Orange border */
-        }
+        }}
 
-        QPushButton:disabled {
+        QPushButton:disabled {{
             background-color: #9E9E9E; /* Grayed-out color */
             border: 2px solid #616161; /* Darker gray border */
             color: #333333; /* Dark text for contrast */
-        }
+        }}
 
-        QPushButton:focus {
+        QPushButton:focus {{
             outline: 2px solid #007BFF; /* Blue outline */
-        }
+        }}
         """
 
-        jump_stylesheet = """
-        QPushButton {
-            background-color: #FF3333; /* Red */
-            border: 2px solid #C70039; /* Dark red border */
-            padding: 10px;
-            border-radius: 10px;
-            color: white;
-            font-weight: bold;
+        ramp_styles = {
+            "background_color": "#FF5733",  # Orange
+            "border_color": "#C70039",  # Dark red border
+            "hover_color": "#D14928",
+            "pressed_color": "#C04022",
+            "border_radius": "15px",
+            "border_size": "2px"
         }
 
-        QPushButton:hover {
-            background-color: #D12828;
+        jump_styles = {
+            "background_color": "#8A2BE2",  # Blue Violet
+            "border_color": "#4B0082",  # Indigo
+            "hover_color": "#7B68EE",  # Medium Slate Blue
+            "pressed_color": "#6A5ACD",  # Slate Blue
+              "border_radius": "15px",
+              "border_size": "2px"
         }
 
-        QPushButton:pressed {
-            background-color: #C02222;
-        }
 
-        QPushButton:checked {
-            background-color: #FFC300; /* Yellow for active state */
-            border: 2px solid #FFA500; /* Orange border */
-        }
 
-        QPushButton:disabled {
-            background-color: #9E9E9E; /* Grayed-out color */
-            border: 2px solid #616161; /* Darker gray border */
-            color: #333333; /* Dark text for contrast */
-        }
-
-        QPushButton:focus {
-            outline: 2px solid #007BFF; /* Blue outline */
-        }
-        """
 
         if isinstance(self.event.behavior, Ramp):
             duration = self.event.behavior.duration
@@ -301,15 +289,22 @@ class EventButton(QPushButton):
             else:
                 self.setGeometry(int(self.event.start_time * self.scale_factor), 0, int(duration * self.scale_factor), 50)
                 self.setText(str(self.event.behavior.ramp_type) + ' ' + str(self.event.behavior.start_value) + '->' + str(self.event.behavior.end_value))
-            self.setStyleSheet(ramp_stylesheet)
+            stylesheet_data = ramp_styles
 
         elif isinstance(self.event.behavior, Jump):
             self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
             self.setText('J')
-            self.setStyleSheet(jump_stylesheet)
+            stylesheet_data =  jump_styles
 
-        else:
-            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 50, 50)
+        if self.event.associated_parameters:
+            stylesheet_data["border_color"] = "#9E9E9E"  # Purple border
+            stylesheet_data["border_radius"] = "0px"
+            stylesheet_data["border_size"] = "5px"
+            
+
+        # Apply the stylesheet
+        stylesheet = base_stylesheet.format(**stylesheet_data)
+        self.setStyleSheet(stylesheet)
 
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -331,6 +326,8 @@ class EventButton(QPushButton):
         delete_action = context_menu.addAction("Delete Event")
         edit_action = context_menu.addAction("Edit Event")
         sweep_action = context_menu.addAction("Sweep Event")
+        add_parameter_action = context_menu.addAction("Add Parameter")
+
 
         action = context_menu.exec_(self.mapToGlobal(pos))
         if action == add_child_action:
@@ -341,6 +338,10 @@ class EventButton(QPushButton):
             self.editEventSignal.emit(self.event)
         elif action == sweep_action:
             self.sweepEventSignal.emit(self.event)
+        elif action == add_parameter_action:
+            self.addParameterSignal.emit(self.event)
+
+        
     
 
 class TimeAxisContent(QWidget):
@@ -530,6 +531,7 @@ class EventsViewerWidget(QWidget):
             button.deleteEventSignal.connect(self.delete_event)
             button.editEventSignal.connect(self.edit_event)
             button.sweepEventSignal.connect(self.sweep_event)
+            button.addParameterSignal.connect(self.add_parameter)
 
             previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10 / self.scale_factor)
 
@@ -545,6 +547,17 @@ class EventsViewerWidget(QWidget):
         gap_button.addEventSignal.connect(self.add_event)
         
         return buttons_container
+    def add_parameter(self, event):
+        try:
+            parameter_name, ok = QInputDialog.getText(self, "Add Parameter", "Enter the parameter name:")
+            parameter_value, ok = QInputDialog.getText(self, "Add Parameter", "Enter the parameter value:")
+
+            if ok:
+                self.sequence.add_parameter_to_event(event, parameter_name=parameter_name,parameter_value=parameter_value)
+                self.refreshUI()
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
 
     def add_event(self, channel):
         try:
