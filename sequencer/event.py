@@ -296,6 +296,31 @@ class Event:
         index = bisect.bisect_left([e.start_time for e in self.channel.events], self.start_time)
         self.channel.events.insert(index, self)
 
+
+    def get_event_attributes(self):
+        if isinstance(self.behavior, Jump):
+            
+                
+            return {
+                "jump_target_value": self.behavior.target_value,
+                "start_time": self.start_time,
+                "relative_time": self.relative_time,
+                "reference_time" : self.reference_time    
+                }
+
+        elif isinstance(self.behavior, Ramp):
+            return {
+                "duration": self.behavior.duration,
+                "ramp_type": self.behavior.ramp_type,
+                "start_value": self.behavior.start_value,
+                "end_value": self.behavior.end_value,
+                "func": self.behavior.func,
+                "resolution": self.behavior.resolution,
+                "start_time": self.start_time,
+                "relative_time": self.relative_time,
+                "reference_time" : self.reference_time    
+                }   
+
     def update_times(self, delta: float):
         self.start_time += delta
         self.end_time += delta
@@ -401,7 +426,7 @@ class Sequence:
             for p in event.associated_parameters:
                 if p.name == parameter_name:
                     event.associated_parameters.remove(p)
-                    self.parameters_list.remove(parameter_name)
+                    self.parameters_list.remove(p)
                     return
         raise ValueError("Parameter not found in the sequence")
     
@@ -1865,6 +1890,8 @@ class SequenceManager:
 
 
 
+
+
         
 
 def create_test_sequence(name: str = "test"):
@@ -1886,6 +1913,7 @@ def create_test_sequence(name: str = "test"):
     event3 = sequence.add_event("Analog2", Jump(0.0),  start_time=8)
     event4 = sequence.add_event("Analog2", Ramp(2, RampType.EXPONENTIAL, 5, 10), start_time=15)
     
+    print(event3.get_event_attributes())
     return sequence
 
 
@@ -1908,7 +1936,7 @@ if __name__ == '__main__':
     seq_manager.main_sequences["test4"]["seq"] = create_test_sequence("test4")
 
     
-    seq_manager.to_json("Tester_manager.json")
+    # seq_manager.to_json("Tester_manager.json")
 
     
     # seq_manager = SequenceManager()

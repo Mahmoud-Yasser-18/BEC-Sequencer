@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt, QRect, pyqtSignal, QPoint
 
 
 from sequencer.Dialogs.channel_dialog import ChannelDialog
-from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog
+from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog,ParameterDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog,SweepEventDialog
 from sequencer.event import Ramp, Jump, Sequence,Event
 
@@ -216,6 +216,7 @@ class EventButton(QPushButton):
     editEventSignal = pyqtSignal(object)
     sweepEventSignal = pyqtSignal(object)
     addParameterSignal = pyqtSignal(object)
+    removeParameterSignal = pyqtSignal(object)
 
     def __init__(self, event: Event , scale_factor, sequence, parent=None):
         super().__init__(parent)
@@ -310,13 +311,18 @@ class EventButton(QPushButton):
         self.customContextMenuRequested.connect(self.show_context_menu)
 
 
-    def enterEvent(self, event):
+    def enterEvent(self, event:Event):
         if isinstance(self.event.behavior, Ramp):
             behavior = f"{self.event.behavior.ramp_type} Ramp of {self.event.behavior.duration} from {self.event.behavior.start_value} to {self.event.behavior.end_value}"
         elif isinstance(self.event.behavior, Jump):
             behavior = f"Jump to {self.event.behavior.target_value}"
         else:
             behavior = "Unknown behavior"
+        if self.event.associated_parameters:
+            behavior += "\n\nAssociated Parameters:"
+            # associated_parameters is a list 
+            for p in self.event.associated_parameters:
+                behavior += f"\n{p.name}: {p.value}"
         QToolTip.showText(event.globalPos(), behavior, self)
         super().enterEvent(event)
 
@@ -327,7 +333,7 @@ class EventButton(QPushButton):
         edit_action = context_menu.addAction("Edit Event")
         sweep_action = context_menu.addAction("Sweep Event")
         add_parameter_action = context_menu.addAction("Add Parameter")
-
+        remove_parameter_action = context_menu.addAction("Remove Parameter")
 
         action = context_menu.exec_(self.mapToGlobal(pos))
         if action == add_child_action:
@@ -340,6 +346,9 @@ class EventButton(QPushButton):
             self.sweepEventSignal.emit(self.event)
         elif action == add_parameter_action:
             self.addParameterSignal.emit(self.event)
+        elif action == remove_parameter_action:
+            self.removeParameterSignal.emit(self.event)
+
 
         
     
@@ -532,6 +541,7 @@ class EventsViewerWidget(QWidget):
             button.editEventSignal.connect(self.edit_event)
             button.sweepEventSignal.connect(self.sweep_event)
             button.addParameterSignal.connect(self.add_parameter)
+            button.removeParameterSignal.connect(self.remove_parameter)
 
             previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10 / self.scale_factor)
 
@@ -547,14 +557,34 @@ class EventsViewerWidget(QWidget):
         gap_button.addEventSignal.connect(self.add_event)
         
         return buttons_container
-    def add_parameter(self, event):
+    
+    def remove_parameter(self, event:Event):
         try:
-            parameter_name, ok = QInputDialog.getText(self, "Add Parameter", "Enter the parameter name:")
-            parameter_value, ok = QInputDialog.getText(self, "Add Parameter", "Enter the parameter value:")
 
-            if ok:
-                self.sequence.add_parameter_to_event(event, parameter_name=parameter_name,parameter_value=parameter_value)
+            parameter_name=QInputDialog.getItem(self, 'Remove Parameter', 'Enter the parameter name to remove',[p.name for p in event.associated_parameters], 0, False)
+            print(parameter_name)
+            self.sequence.remove_parameter(parameter_name=parameter_name[0])
+            self.refreshUI()
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+    def add_parameter(self, event:Event):
+        try:
+            possible_parameters = event.get_event_attributes()
+            
+            dialog = ParameterDialog(possible_parameters)
+            if dialog.exec_() == QDialog.Accepted:
+                data = dialog.getInputs()
+                parameter_name = data[0]
+                parameter_name_new: str = data[1]
+
+                
+                if parameter_name_new is None or parameter_name_new.strip == "":
+                    raise Exception("Parameter name cannot be empty")
+
+                self.sequence.add_parameter_to_event(event, parameter_name=parameter_name_new.strip(),parameter_value=possible_parameters[parameter_name])
                 self.refreshUI()
+
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
@@ -971,7 +1001,7 @@ class SequenceManagerWidget(QWidget):
         
         #make a dialog to ask for channel name with a combobox
         channels =["All Channels"]+ [ch.name for ch in self.sequence_manager.main_sequences[sequence_name]["seq"].channels] 
-        channel_name, ok = QInputDialog.getItem(self, "Select Channel", "CHannels:", channels, 0, False)
+        channel_name, ok = QInputDialog.getItem(self, "Select Channel", "Channels:", channels, 0, False)
         if ok and channel_name:
             if channel_name != "All Channels":
                 self.sequence_manager.main_sequences[sequence_name]["seq"].plot([channel_name])

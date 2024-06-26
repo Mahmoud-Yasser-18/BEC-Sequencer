@@ -4,6 +4,54 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QDoubleValidator
 
+class ParameterDialog(QDialog):
+    def __init__(self, possible_parameters, parent=None):
+        super(ParameterDialog, self).__init__(parent)
+
+        self.possible_parameters = possible_parameters
+
+        self.setWindowTitle("Add Parameter")
+
+        # Layout
+        layout = QVBoxLayout()
+
+        # Dropdown for parameter names
+        self.comboBox = QComboBox()
+        self.comboBox.addItems(self.possible_parameters.keys())
+        layout.addWidget(QLabel("Select the parameter to add:"))
+        layout.addWidget(self.comboBox)
+
+        # Text box for new name
+        self.newNameLineEdit = QLineEdit()
+        layout.addWidget(QLabel("Enter the parameter name:"))
+        layout.addWidget(self.newNameLineEdit)
+
+        # OK and Cancel buttons
+        self.okButton = QPushButton("OK")
+        self.cancelButton = QPushButton("Cancel")
+        self.okButton.setEnabled(False)  # Initially disable the OK button
+        self.okButton.clicked.connect(self.accept)
+        self.cancelButton.clicked.connect(self.reject)
+
+        layout.addWidget(self.okButton)
+        layout.addWidget(self.cancelButton)
+
+        self.setLayout(layout)
+
+        # Connect the textChanged signal to a slot
+        self.newNameLineEdit.textChanged.connect(self.check_input)
+
+    def check_input(self):
+        if self.newNameLineEdit.text().strip():
+            self.okButton.setEnabled(True)
+        else:
+            self.okButton.setEnabled(False)
+
+    def getInputs(self):
+        return self.comboBox.currentText(), self.newNameLineEdit.text()
+
+
+
 class BaseEventDialog(QDialog):
     def __init__(self, channels):
         super().__init__()
