@@ -324,20 +324,82 @@ class CustomSpinBox(QSpinBox):
         self.confirmationTimer.start(2000)
 
 import json
+import os
+
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, QPushButton
+
+class ParameterListWidget(QWidget):
+    def __init__(self, parameters=None, parent=None):
+        super(ParameterListWidget, self).__init__(parent)
+        if parameters is None:
+            parameters = []
+        # Create the main layout
+        self.layout = QVBoxLayout()
+
+        # Create the QTableWidget
+        self.table_widget = QTableWidget()
+        self.table_widget.setColumnCount(2)
+        self.table_widget.setHorizontalHeaderLabels(["Parameter", "Value"])
+
+        # Populate the table with parameter names and values
+        self.populate_table(parameters)
+
+        # Add the QTableWidget to the layout
+        self.layout.addWidget(self.table_widget)
+
+        # Add a button to demonstrate updating parameters
+        self.update_button = QPushButton("Update Parameters")
+        self.update_button.clicked.connect(self.update_parameters_demo)
+        self.layout.addWidget(self.update_button)
+
+        # Set the layout for the widget
+        self.setLayout(self.layout)
+
+    def populate_table(self, parameters):
+        """Populates the QTableWidget with parameter names and values."""
+        self.table_widget.setRowCount(len(parameters))
+        for row, (name, value) in enumerate(parameters):
+            self.table_widget.setItem(row, 0, QTableWidgetItem(name))
+            self.table_widget.setItem(row, 1, QTableWidgetItem(value))
+
+    def update_parameters(self, new_parameters):
+        """Updates the QTableWidget with new parameters."""
+        self.populate_table(new_parameters)
+
+    def update_parameters_demo(self):
+        """Demonstration method to update parameters."""
+        new_parameters = {
+            "New Parameter 1": "New Value 1",
+            "New Parameter 2": "New Value 2",
+            "New Parameter 3": "New Value 3",
+            "New Parameter 4": "New Value 4"
+        }
+        self.update_parameters(new_parameters)
+
 
 class ThorCamControlWidget(QWidget):
     def __init__(self, parent=None):
         super(ThorCamControlWidget, self).__init__(parent)
 
         # load default parameters
-        with open('camera_default_settings.json', 'r') as json_file:
+        #folder paths is in the same directory as the script
+        self.paramerters_path = os.path.join(os.path.dirname(__file__), 'camera_default_settings.json')
+
+        with open(self.paramerters_path, 'r') as json_file:
             loaded_settings = json.load(json_file)
             self.default_source_path=loaded_settings["default_source_path"]
             self.default_destination_path=loaded_settings["default_destination_path"]
             self.default_saving_path=loaded_settings["default_saving_path"]
             self.default_exposure_time=loaded_settings["default_exposure_time"]
             self.default_gain=loaded_settings["default_gain"]
-
+        # create these folders if they don't exist 
+        if not os.path.exists(self.default_source_path):
+            os.makedirs(self.default_source_path)
+        if not os.path.exists(self.default_destination_path):
+            os.makedirs(self.default_destination_path)
+        if not os.path.exists(self.default_saving_path):
+            os.makedirs(self.default_saving_path)
+        
 
         self.thor_cam = THORCAM_HANDLER()
         self.init_ui()
@@ -354,7 +416,7 @@ class ThorCamControlWidget(QWidget):
         }
 
         # Write the settings to a JSON file
-        with open('camera_default_settings.json', 'w') as json_file:
+        with open(self.paramerters_path, 'w') as json_file:
             json.dump(camera_default_settings, json_file, indent=4)
 
     def init_ui(self):
@@ -440,7 +502,13 @@ class ThorCamControlWidget(QWidget):
         self.main_layout.addLayout(self.controls_layout)
         self.main_layout.addLayout(self.settings_layout)
         self.main_layout.addLayout(self.save_layout)
-        self.main_layout.addWidget(self.live_view, 2)
+
+        self.live_params = QHBoxLayout()
+        self.paramerter_list  = ParameterListWidget()
+        
+        self.live_params.addWidget(self.paramerter_list)
+        self.live_params.addWidget(self.live_view,2)
+        self.main_layout.addLayout(self.live_params, 2)
 
         self.setLayout(self.main_layout)
 
@@ -509,8 +577,7 @@ class ThorCamControlWidget(QWidget):
         if cameras:
             self.camera_list.setCurrentIndex(0)
 
-    def camera_selected(self, index):
-        pass
+
 
     def open_camera(self):
         index = self.camera_list.currentIndex()
