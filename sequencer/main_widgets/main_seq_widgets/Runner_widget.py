@@ -435,7 +435,11 @@ class Runner(QWidget):
             now = datetime.datetime.now()
             
             sequence.to_json(filename=os.path.join(self.save_path, f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
-            sequence.to_json(filename=os.path.join(self.save_path, "current.json"))
+            #remove current data from the folder 
+            for file in os.listdir(self.save_path):
+                if file.startswith("current"):
+                    os.remove(os.path.join(self.save_path, file))
+            sequence.to_json(filename=os.path.join(self.save_path, f"current_{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
         
         self.ADwin.add_to_queue(sequence)
         self.ADwin.initiate_all_experiments()

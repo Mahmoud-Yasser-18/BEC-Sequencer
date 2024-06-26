@@ -431,8 +431,13 @@ class Sequence:
         raise ValueError("Parameter not found in the sequence")
     
     
+    def get_parameter_dict(self):
+        parameter_dict = {}
+        for parameter in self.parameters_list:
+            parameter_dict[parameter.name] = parameter.value
+        return parameter_dict
         
-
+        
     # add a new analog channel to the sequence
     def add_analog_channel(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10) -> Analog_Channel:
         for channel in self.channels:
