@@ -313,6 +313,9 @@ class ADwin_Driver:
             self.initiate_experiment(process_number, index=i,repeat=repeat)
             self.wait_for_process_to_complete()
             print(f"Experiment {i + 1} Completed.")
+        #clear the queue after all the experiments have been completed
+        self.queue = []
+    
     
     def change_process(self, process_file):
         self.adw.Clear_Process(1)
@@ -320,6 +323,20 @@ class ADwin_Driver:
         print("Process loaded\n")
 
 import matplotlib.pyplot as plt
+
+def test_camera_trigger():
+    main_seq = Sequence("Camera Trigger")
+    main_seq.add_analog_channel("Camera Trigger", 2, 2)
+    t = 0
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    t = 1
+    main_seq.add_event("Camera Trigger", Jump(3.3), start_time=t)
+    t = 2
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    seq_manager = SequenceManager()
+    seq_manager.load_sequence(main_seq)
+    return seq_manager
+
 def test_camera_trigger_seq(r=0):
     main_seq = Sequence("Camera Trigger")
     main_seq.add_analog_channel("Camera Trigger", 2, 2)

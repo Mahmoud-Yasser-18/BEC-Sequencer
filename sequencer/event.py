@@ -1742,7 +1742,7 @@ class SequenceManager:
         seq_list.sort(key=lambda seq: seq["index"])
 
         # make a list of all the sweep sequences and compine them according to the index
-        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [seq_list[0]["seq"]]
+        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [[seq_list[0]["seq"]]]
         sweep_sequences_keys = [[s] for s in seq_list[0]["sweep_list"].keys()  ]if len(seq_list[0]["sweep_list"].items())!=0 else [] 
 
         for seq in seq_list[1:]:
@@ -1756,9 +1756,10 @@ class SequenceManager:
                     new_sweep_sequences_key = []
                     for sweep_seq_key in seq["sweep_list"].keys():
                         for sweep in sweep_sequences_keys:
-                            temp_key = copy.copy(sweep)
+                            temp_key = list(copy.copy(sweep))
+                            print("temp_key",temp_key)
                             temp_key.append(sweep_seq_key)
-                            new_sweep_sequences_key.append(tuple(temp_key))
+                            new_sweep_sequences_key.append(tuple((temp_key)))
                     
                     sweep_sequences_keys = new_sweep_sequences_key
 
@@ -1784,13 +1785,19 @@ class SequenceManager:
         final_sweep_sequences = []
 
         
-        for sweep in sweep_sequences:
+        
+        if sweep_sequences_keys:
+            for sweep in sweep_sequences:
 
-            main_sweep = sweep[0]
-            for seq in sweep[1:]:
-                main_sweep = main_sweep.add_sequence(seq)
-
-            final_sweep_sequences.append(main_sweep)
+                main_sweep = sweep[0]
+                for seq in sweep[1:]:
+                    main_sweep = main_sweep.add_sequence(seq)   
+                final_sweep_sequences.append(main_sweep)
+            
+            if len(sweep_sequences_keys[0]) <2:
+                new_sweep_sequences_key = [tuple(s) for s in sweep_sequences_keys]
+                sweep_sequences_keys= new_sweep_sequences_key
+                
         final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
         return final_dictionary
 
@@ -1806,9 +1813,12 @@ class SequenceManager:
         return self.custom_sequence
 
     def get_sweep_sequences_custom(self, sequence_name: List[str]):
+        print(sequence_name)
         seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
+        # print(seq_list)
+
         # make a list of all the sweep sequences and compine them according to the index
-        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [seq_list[0]["seq"]]
+        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [[seq_list[0]["seq"]]]
         sweep_sequences_keys = [[s] for s in seq_list[0]["sweep_list"].keys()  ]if len(seq_list[0]["sweep_list"].items())!=0 else [] 
 
         for seq in seq_list[1:]:
@@ -1822,9 +1832,9 @@ class SequenceManager:
                     new_sweep_sequences_key = []
                     for sweep_seq_key in seq["sweep_list"].keys():
                         for sweep in sweep_sequences_keys:
-                            temp_key = copy.copy(sweep)
+                            temp_key = list(copy.copy(sweep))
                             temp_key.append(sweep_seq_key)
-                            new_sweep_sequences_key.append(tuple(temp_key))
+                            new_sweep_sequences_key.append(tuple((temp_key)))
                     
                     sweep_sequences_keys = new_sweep_sequences_key
 
@@ -1845,26 +1855,28 @@ class SequenceManager:
             else:
                 for sweep in sweep_sequences:
                     sweep.append(seq["seq"])
-        
+        print(sweep_sequences)
+        print(sweep_sequences_keys)
 
         final_sweep_sequences = []
 
         
-        for sweep in sweep_sequences:
 
-            main_sweep = sweep[0]
-            for seq in sweep[1:]:
-                main_sweep = main_sweep.add_sequence(seq)
+        if sweep_sequences_keys:
+            print("sweep_sequences_keys",sweep_sequences_keys)
+            for sweep in sweep_sequences:
+                main_sweep = sweep[0]
+                for seq in sweep[1:]:
+                    main_sweep = main_sweep.add_sequence(seq)   
+                final_sweep_sequences.append(main_sweep)
 
-            final_sweep_sequences.append(main_sweep)
-
-
-        # final_dictionary = dict()
-        # for key,seq in zip(sweep_sequences_keys,final_sweep_sequences):
-        #     final_dictionary[key]
-            
-
-        return final_sweep_sequences,sweep_sequences_keys
+            if len(sweep_sequences_keys[0]) <2:
+                new_sweep_sequences_key = [tuple(s) for s in sweep_sequences_keys]
+                sweep_sequences_keys= new_sweep_sequences_key
+                
+            final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
+            return final_dictionary
+        return None
         # make a list of all the sweep sequences and compine them according to the index
 
         
@@ -1966,6 +1978,18 @@ def create_test_seq_manager():
     return seq_manager
 
     
+def test_camera_trigger():
+    main_seq = Sequence("Camera Trigger")
+    main_seq.add_analog_channel("Camera Trigger", 2, 2)
+    t = 0
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    t = 1
+    main_seq.add_event("Camera Trigger", Jump(3.3), start_time=t)
+    t = 2
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    seq_manager = SequenceManager()
+    seq_manager.load_sequence(main_seq)
+    return seq_manager
 
 
 if __name__ == '__main__':
