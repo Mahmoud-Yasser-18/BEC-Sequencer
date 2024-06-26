@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QCom
 from PyQt5.QtCore import Qt, QPoint
 
 class CustomSequenceWidget(QWidget):
-    def __init__(self, sequence_manager):
+    def __init__(self, sequence_manager: SequenceManager):
         super().__init__()
         self.sequence_manager = sequence_manager
         self.initUI()
@@ -119,16 +119,22 @@ class CustomSequenceWidget(QWidget):
             self.selected_sequences_list.takeItem(self.selected_sequences_list.row(item))
 
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QPushButton, QProgressBar, 
+    QApplication, QWidget, QVBoxLayout, QPushButton, QProgressBar, QCheckBox,
     QMenuBar, QAction, QMessageBox
 )
 from PyQt5.QtGui import QIcon
+import os 
 
 class Runner(QWidget):
     def __init__(self, sequence_manager: SequenceManager):
         super().__init__()
         self.sequence_manager = sequence_manager
         self.initUI()
+        self.save_path = "../data/source"
+        self.sweep_queue = []
+        # create the folder if it does not exist 
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
 
     def boot_ADwin(self):
         # load the default ADwin process
@@ -174,7 +180,23 @@ class Runner(QWidget):
         # Run Sweep Button
         self.run_sweep_button = QPushButton("Run Sweep")
         self.run_sweep_button.clicked.connect(self.run_sweep)
-        main_layout.addWidget(self.run_sweep_button)
+
+
+        self.combo_sweep = QComboBox()
+        self.combo_sweep.addItems(["main","custom"])
+        self.combo_sweep.currentIndexChanged.connect(self.check_sweep)
+        self.randomize_queue_button = QPushButton("Randomize")
+        self.randomize_queue_button.clicked.connect(self.randomize_queue)
+
+
+        self.sweep_runner_layout = QHBoxLayout()
+        self.sweep_runner_layout.addWidget(self.run_sweep_button)
+        self.sweep_runner_layout.addWidget(self.combo_sweep)
+        self.sweep_runner_layout.addWidget(self.randomize_queue_button)
+
+
+
+        main_layout.addLayout(self.sweep_runner_layout)
 
         # Progress Bar
         self.progress_bar = QProgressBar()
@@ -225,6 +247,21 @@ class Runner(QWidget):
             }
         """)
         self.show()
+    def randomize_queue(self):
+        pass
+
+    def check_sweep(self):
+        try:
+            if self.combo_sweep.currentText() == "main":
+                sweep_sequences = self.sequence_manager.get_sweep_sequences_main()
+                for seq in sweep_sequences:
+                    self.run_sequence(seq)
+            else:
+                sweep_sequences = self.sequence_manager.get_sweep_sequences_custom()
+                for seq in sweep_sequences:
+                    self.run_sequence(seq)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
 
     def run_main(self):
         try:
@@ -235,9 +272,16 @@ class Runner(QWidget):
 
     def run_sweep(self):
         try:
-            sweep_sequences = self.sequence_manager.get_sweep_sequences()
-            for seq in sweep_sequences:
-                self.run_sequence(seq)
+            if self.combo_sweep.currentText() == "main":
+                sweep_sequences = self.sequence_manager.get_sweep_sequences_main()
+                for seq in sweep_sequences:
+                    self.run_sequence(seq)
+            else:
+                sweep_sequences = self.sequence_manager.get_sweep_sequences_custom()
+                for seq in sweep_sequences:
+                    self.run_sequence(seq)
+
+
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 

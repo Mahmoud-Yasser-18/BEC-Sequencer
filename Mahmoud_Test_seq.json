@@ -1,9 +1,0 @@
-{
-    "sequences": [
-        {
-            "name": "Mahmoud",
-            "index": 0,
-            "sequence": "{\n    \"name\": \"sequence_name\",\n    \"channels\": [\n        {\n            \"name\": \"MOT Coils\",\n            \"card_number\": 2,\n            \"channel_number\": 1,\n            \"reset\": false,\n            \"reset_value\": 0.0,\n            \"type\": \"Analog\",\n            \"extra\": {\n                \"default_voltage_func\": null,\n                \"max_voltage\": 10.0,\n                \"min_voltage\": -10.0\n            }\n        }\n    ],\n    \"events\": [\n        {\n            \"channel_name\": \"MOT Coils\",\n            \"start_time\": 0.0,\n            \"end_time\": 0.0,\n            \"behavior\": {\n                \"type\": \"Jump\",\n                \"details\": {\n                    \"target_value\": 2.0\n                }\n            },\n            \"reference_time\": null,\n            \"children\": [\n                {\n                    \"channel_name\": \"MOT Coils\",\n                    \"start_time\": 2.0,\n                    \"end_time\": 2.0,\n                    \"behavior\": {\n                        \"type\": \"Jump\",\n                        \"details\": {\n                            \"target_value\": 1.0\n                        }\n                    },\n                    \"reference_time\": \"start\",\n                    \"children\": []\n                }\n            ]\n        },\n        {\n            \"channel_name\": \"MOT Coils\",\n            \"start_time\": 20.0,\n            \"end_time\": 20.0,\n            \"behavior\": {\n                \"type\": \"Jump\",\n                \"details\": {\n                    \"target_value\": 5.0\n                }\n            },\n            \"reference_time\": null,\n            \"children\": []\n        }\n    ]\n}"
-        }
-    ]
-}
