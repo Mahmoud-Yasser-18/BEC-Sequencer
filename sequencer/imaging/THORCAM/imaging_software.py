@@ -323,24 +323,49 @@ class CustomSpinBox(QSpinBox):
     def startConfirmationTimer(self):
         self.confirmationTimer.start(2000)
 
-
+import json
 
 class ThorCamControlWidget(QWidget):
     def __init__(self, parent=None):
         super(ThorCamControlWidget, self).__init__(parent)
 
+        # load default parameters
+        with open('camera_default_settings.json', 'r') as json_file:
+            loaded_settings = json.load(json_file)
+            self.default_source_path=loaded_settings["default_source_path"]
+            self.default_destination_path=loaded_settings["default_destination_path"]
+            self.default_saving_path=loaded_settings["default_saving_path"]
+            self.default_exposure_time=loaded_settings["default_exposure_time"]
+            self.default_gain=loaded_settings["default_gain"]
+
+
         self.thor_cam = THORCAM_HANDLER()
         self.init_ui()
+
+    def save_as_default_settings(self):
+
+        # Define the default settings
+        camera_default_settings = {
+            "default_source_path":self.default_source_path,
+            "default_destination_path":self.default_destination_path,
+            "default_saving_path":self.default_saving_path,
+            "default_exposure_time":self.exposure_spin.value(),
+            "default_gain":self.gain_spin.value()
+        }
+
+        # Write the settings to a JSON file
+        with open('camera_default_settings.json', 'w') as json_file:
+            json.dump(camera_default_settings, json_file, indent=4)
 
     def init_ui(self):
         self.setWindowTitle("ThorCam Control Panel")
         self.resize(800, 600)
 
         # Layouts
-        main_layout = QVBoxLayout()
-        controls_layout = QHBoxLayout()
-        settings_layout = QHBoxLayout()
-        save_layout = QHBoxLayout()
+        self.main_layout = QVBoxLayout()
+        self.controls_layout = QHBoxLayout()
+        self.settings_layout = QHBoxLayout()
+        self.save_layout = QHBoxLayout()
 
         # Live View
         self.live_view = LiveViewWidget(image_queue=queue.Queue())
@@ -360,18 +385,14 @@ class ThorCamControlWidget(QWidget):
         self.close_button = QPushButton("Close Camera")
         self.close_button.clicked.connect(self.close_camera)
 
-
         # Camera Parameters
         self.exposure_spin = CustomSpinBox()
         self.exposure_spin.setRange(64, 1000000)
-        self.exposure_spin.setValue(1000)
-        QSpinBox
-        
+        self.exposure_spin.setValue(self.default_exposure_time)
 
         self.gain_spin = CustomSpinBox()
         self.gain_spin.setRange(0, 100)
-        self.gain_spin.setValue(20)
-
+        self.gain_spin.setValue(self.default_gain)
 
         self.exposure_spin.valueConfirmed.connect(self.apply_params)
         self.gain_spin.valueConfirmed.connect(self.apply_params)
@@ -381,69 +402,49 @@ class ThorCamControlWidget(QWidget):
         self.exposure_spin.confirmationTimer.timeout.connect(self.exposure_spin.emitValueConfirmed)
         self.exposure_spin.valueChanged.connect(self.exposure_spin.startConfirmationTimer)
 
-
         self.camera_mode_compo = QComboBox()
-        self.camera_mode_compo.addItems([ 'Live','Trigger'])
+        self.camera_mode_compo.addItems(['Live', 'Trigger'])
         self.camera_mode_compo.currentIndexChanged.connect(self.change_camera_live_mode)
 
-
-
-
-
-
         # Adding widgets to layouts
-        settings_layout.addWidget(QLabel("Exposure Time (us):"))
-        settings_layout.addWidget( self.exposure_spin)
-        settings_layout.addWidget(QLabel("Gain:"))
-        settings_layout.addWidget( self.gain_spin)
+        self.settings_layout.addWidget(QLabel("Exposure Time (us):"))
+        self.settings_layout.addWidget(self.exposure_spin)
+        self.settings_layout.addWidget(QLabel("Gain:"))
+        self.settings_layout.addWidget(self.gain_spin)
         
-        settings_layout.addWidget(QLabel("Camera Mode:"))
-        settings_layout.addWidget( self.camera_mode_compo,2)
+        self.settings_layout.addWidget(QLabel("Camera Mode:"))
+        self.settings_layout.addWidget(self.camera_mode_compo, 2)
 
+        self.controls_layout.addWidget(QLabel("Select Camera:"))
+        self.controls_layout.addWidget(self.camera_list)
+        self.controls_layout.addWidget(self.refresh_cameras_button)
+        self.controls_layout.addWidget(self.open_button)
+        self.controls_layout.addWidget(self.close_button)
 
-        controls_layout.addWidget(QLabel("Select Camera:"))
-        controls_layout.addWidget(self.camera_list)
-        controls_layout.addWidget(self.refresh_cameras_button)
-        controls_layout.addWidget(self.open_button)
-        controls_layout.addWidget(self.close_button)
-
-
-
-
-
-        # Experiment and Save Layout 
+        # Experiment and Save Layout
         self.experiment_mode = QComboBox()
-        self.experiment_mode.addItems(['No Experiment', 'On going Experiment'])
+        self.experiment_mode.addItems(['No Experiment', 'Ongoing Experiment'])
         self.experiment_mode.currentIndexChanged.connect(self.change_experiment_mode)
 
         self.save_checkbox = QCheckBox("Save Images")
         self.save_checkbox.stateChanged.connect(self.save_images)
 
+        self.save_folder_button = QPushButton("Select Save Folder")
+        self.destination_folder_button = QPushButton("Select Destination Folder")
+        self.source_folder_button = QPushButton("Select Source Folder")
 
-        self.save_folder_button = QPushButton("Select Folder")
+        self.save_layout.addWidget(QLabel("Experiment Mode:"))
+        self.save_layout.addWidget(self.experiment_mode)
+        self.save_layout.addWidget(self.save_checkbox)
 
-        save_layout.addWidget(QLabel("Experiment Mode:"))
-        save_layout.addWidget(self.experiment_mode)
-        save_layout.addWidget(QLabel("Save Images:"))
-        save_layout.addWidget(self.save_checkbox)
-        save_layout.addWidget(QLabel("Save Folder:"))
-        save_layout.addWidget(self.save_folder_button)
-        self.close_button.setEnabled(False)
-                                     
+        self.main_layout.addLayout(self.controls_layout)
+        self.main_layout.addLayout(self.settings_layout)
+        self.main_layout.addLayout(self.save_layout)
+        self.main_layout.addWidget(self.live_view, 2)
 
+        self.setLayout(self.main_layout)
 
-
-
-
-
-        main_layout.addLayout(controls_layout)
-        main_layout.addLayout(settings_layout)
-        main_layout.addLayout(save_layout)
-        main_layout.addWidget(self.live_view,2)
-
-        self.setLayout(main_layout)
-
-    def save_images(self,state):
+    def save_images(self, state):
         if state == Qt.Checked:
             self.camera_mode_compo.setCurrentIndex(1)
             self.camera_mode_compo.setEnabled(False)
@@ -452,37 +453,55 @@ class ThorCamControlWidget(QWidget):
         else:
             self.live_view.save = False
             self.camera_mode_compo.setEnabled(True)
-            
 
-    def saving_folder(self):
-        pass
-    
-    def change_save_mode(self):
-        if self.save_checkbox.isChecked():
-            self.camera_mode_compo.setCurrentIndex(1)
-            self.camera_mode_compo.setEnabled(False)
-        else:
-            self.camera_mode_compo.setEnabled(True)
-
+        if self.experiment_mode.currentText() == 'No Experiment':
+            if state == Qt.Checked:
+                self.save_layout.addWidget(self.save_folder_button)
+            else:
+                self.save_layout.removeWidget(self.save_folder_button)
+                self.save_folder_button.setParent(None)
+        elif self.experiment_mode.currentText() == 'Ongoing Experiment':
+            if state == Qt.Checked:
+                self.save_layout.addWidget(self.destination_folder_button)
+            else:
+                self.save_layout.removeWidget(self.destination_folder_button)
+                self.destination_folder_button.setParent(None)
 
     def change_experiment_mode(self):
-        # change the mode of the experiment
-        # make the camera mode to trigger
-        if self.experiment_mode.currentText() == 'On going Experiment':
+        if self.experiment_mode.currentText() == 'Ongoing Experiment':
             self.camera_mode_compo.setCurrentIndex(1)
             self.camera_mode_compo.setEnabled(False)
+            self.save_layout.addWidget(self.source_folder_button)
+            
+            # Remove the save folder button if it is there
+            if self.save_folder_button.parent() is not None:
+                self.save_layout.removeWidget(self.save_folder_button)
+                self.save_folder_button.setParent(None)
+            
+            # Add destination folder button if save checkbox is checked
+            if self.save_checkbox.isChecked():
+                self.save_layout.addWidget(self.destination_folder_button)
         else:
             self.camera_mode_compo.setEnabled(True)
+            self.save_layout.removeWidget(self.source_folder_button)
+            self.source_folder_button.setParent(None)
 
+            # Remove the destination folder button if it is there
+            if self.destination_folder_button.parent() is not None:
+                self.save_layout.removeWidget(self.destination_folder_button)
+                self.destination_folder_button.setParent(None)
 
+            # Add save folder button if save checkbox is checked
+            if self.save_checkbox.isChecked():
+                self.save_layout.addWidget(self.save_folder_button)
 
     def change_camera_live_mode(self):
-
         mode = self.camera_mode_compo.currentText()
         try:
             self.thor_cam.change_camera_live_mode(mode)
-        except:
-            print('No camera to change mode')
+        except Exception as e:
+            print(f'Error changing camera mode: {e}')
+
     def refresh_cameras(self):
         self.camera_list.clear()
         cameras = self.thor_cam.get_camera_list()
@@ -491,21 +510,18 @@ class ThorCamControlWidget(QWidget):
             self.camera_list.setCurrentIndex(0)
 
     def camera_selected(self, index):
-        # self.open_camera()
         pass
+
     def open_camera(self):
         index = self.camera_list.currentIndex()
         if index >= 0:
             self.thor_cam.open_camera(camera_index=index)
-            print('Camera opened HERE')
             self.thor_cam.change_camera_live_mode(self.camera_mode_compo.currentText())
             self.thor_cam.start_acquisition_thread()
             self.live_view.image_queue = self.thor_cam.acquisition_thread.get_output_queue()
             self.live_view.timer.start(10)
             self.open_button.setEnabled(False)
             self.close_button.setEnabled(True)
-            print('Camera opened')
-
 
     def close_camera(self):
         self.thor_cam.kill_acquisition_thread()
@@ -519,7 +535,6 @@ class ThorCamControlWidget(QWidget):
         gain = self.gain_spin.value()
         self.thor_cam.set_camera_params(exposure_time_us, gain)
     
-    # define what happens when the window is closed
     def closeEvent(self, event):
         self.thor_cam.kill_acquisition_thread()
         self.thor_cam.dispose_all_camera_resources()
