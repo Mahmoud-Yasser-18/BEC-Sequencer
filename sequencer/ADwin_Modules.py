@@ -356,7 +356,7 @@ def test_camera_trigger_seq(r=0):
     
 
 if __name__ == "__main__":
-    test_camera_trigger_seq(r= 20)
+    # test_camera_trigger_seq(r= 20)
     
 
 
@@ -364,19 +364,60 @@ if __name__ == "__main__":
 
     
 
-#     main_seq = Sequence("MOT_loading")
+    main_seq = Sequence("MOT_loading")
 
-#     main_seq.add_analog_channel("MOT Coils", 2,1)
-#     main_seq.add_analog_channel("Camera Trigger", 3, 7)
-#     main_seq.add_analog_channel("Trap TTL", 2, 3)
-#     main_seq.add_analog_channel("Trap FM", 2, 4)
-#     main_seq.add_analog_channel("Trap AM", 2, 5)
-#     main_seq.add_analog_channel("Repump TTL", 2, 6)
-#     main_seq.add_analog_channel("Repump FM", 2, 7)
-#     main_seq.add_analog_channel("Repump AM", 2, 8)
+    main_seq.add_analog_channel("MOT Coils", 2,1)
+    main_seq.add_analog_channel("Camera Trigger", 2, 2)
+    main_seq.add_analog_channel("Trap TTL", 2, 3)
+    main_seq.add_analog_channel("Trap FM", 2, 4)
+    main_seq.add_analog_channel("Trap AM", 2, 5)
+    main_seq.add_analog_channel("Repump TTL", 2, 6)
+    main_seq.add_analog_channel("Repump FM", 2, 7)
+    main_seq.add_analog_channel("Repump AM", 2, 8)
+    main_seq.add_analog_channel("D1 AOM FM", 3,1)
+    main_seq.add_analog_channel("D1 AOM AM", 3,2)
+    main_seq.add_analog_channel("D1 EOM FM", 3,3)
+    main_seq.add_analog_channel("D1 EOM AM", 3,4)
+    main_seq.add_analog_channel("Absorption imaging FM", 3,5)
+    main_seq.add_analog_channel("Absorption imaging TTL", 3,6)
+    main_seq.add_analog_channel("test7", 3,7)
+    main_seq.add_analog_channel("test8", 3,8)
+    t= 1
 
-#     main_seq.add_analog_channel("Absorption FM", 3,1)
-#     main_seq.add_analog_channel("Absorption AM", 3,4)
+    main_seq.add_event("MOT Coils", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    main_seq.add_event("Trap TTL", Jump(3.3), start_time=t) 
+    main_seq.add_event("Trap FM", Jump(2.8), start_time=t) 
+    main_seq.add_event("Trap AM", Jump(1.5), start_time=t) 
+    main_seq.add_event("Repump TTL", Jump(3.3), start_time=t) 
+    main_seq.add_event("Repump FM", Jump(1.6), start_time=t) 
+    main_seq.add_event("Repump AM", Jump(0.5), start_time=t) 
+    main_seq.add_event("D1 AOM FM", Jump(0), start_time=t) 
+    main_seq.add_event("D1 AOM AM", Jump(10), start_time=t) 
+    main_seq.add_event("D1 EOM FM", Jump(0), start_time=t) 
+    main_seq.add_event("D1 EOM AM", Jump(0), start_time=t) 
+    main_seq.add_event("Absorption imaging FM", Jump(7.5), start_time=t) 
+    main_seq.add_event("Absorption imaging TTL", Jump(3.3), start_time=t) 
+    main_seq.add_event("test7", Jump(0), start_time=t) 
+    main_seq.add_event("test8", Jump(0), start_time=t) 
+
+
+    
+
+
+
+
+
+
+    # sweep_D1 = main_seq.add_event("D1 AOM FM", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    # main_seq.add_event("D1 AOM FM", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    # main_seq.add_event("D1 AOM AM", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    # main_seq.add_event("test3", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    # main_seq.add_event("test4", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    # main_seq.add_event("test5", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    # main_seq.add_event("test6", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    # main_seq.add_event("test7", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
+    # main_seq.add_event("test8", Jump(0), start_time=t) # 0 is the ON value for the MOT Coils and 3.3 is the OFF value
 
 
 
@@ -395,22 +436,22 @@ if __name__ == "__main__":
 
     
 #     # main_seq.to_json("MOT_loading.json")
-#     adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
-#     # adwin_driver.add_to_queue(main_seq)
+    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
+    adwin_driver.add_to_queue(main_seq)
 
     
     
-#     target = list(np.arange(7.5, 8.2, 0.1))
-#     list_of_seq = main_seq.sweep_event_parameters("jump_target_value", target, event_to_sweep=Absorption_FM)
+    # target = list(np.arange(-2.5,2.5, 0.5))
+    # list_of_seq = main_seq.sweep_event_parameters("jump_target_value", target, event_to_sweep=sweep_D1)
     
     
     
 
-#     for seq in list_of_seq.values():
-#         # seq.print_sequence("Trap FM")
-#         adwin_driver.add_to_queue(seq)
+    # for seq in list_of_seq.values():
+    #     # seq.print_sequence("Trap FM")
+    #     adwin_driver.add_to_queue(seq)
 
-#     adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
+    adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
 #     # adwin_driver.repeat_process(process_number=1, repeat=1000,poll_interval=0.1)
 
 
