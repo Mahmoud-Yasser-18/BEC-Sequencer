@@ -1141,6 +1141,8 @@ class SequenceManagerWidget(QWidget):
             sequence_name = button.text()
             sequence = self.sequence_manager.main_sequences[sequence_name]["seq"]
         else:
+            if len(self.sequence_manager.main_sequences.items() )== 0 :
+                return
             sequence = list(self.sequence_manager.main_sequences.values())[-1]["seq"]
             sequence_name = sequence.sequence_name
         
