@@ -476,7 +476,7 @@ class TimeAxisWidget(QWidget):
 class EventsViewerWidget(QWidget):
     changes_in_event = pyqtSignal()
 
-    def __init__(self,sequence_manager:SequenceManager , sequence: Sequence, scale_factor: float, parent: QWidget,view_type: str = "Linear"):
+    def __init__(self,sequence_manager:SequenceManager , sequence: Sequence, scale_factor: float, parent: QWidget):
         super().__init__()
         self.sequence_manager = sequence_manager
         self.sequence = sequence
@@ -484,7 +484,7 @@ class EventsViewerWidget(QWidget):
         self.parent = parent
         self.main_layout = QVBoxLayout(self)
         self.setLayout(self.main_layout)
-        self.view_type = view_type
+
 
         self.sequence_range_index = {}
         
@@ -535,10 +535,10 @@ class EventsViewerWidget(QWidget):
         self.populate_events()
 
         self.container_widget.setLayout(self.container_layout)
-        if self.view_type == "Linear" or self.view_type == "Linear Event":
+        if self.sequence_manager.view_type == "Linear" or self.sequence_manager.view_type == "Linear Event":
 
             self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
-        elif self.view_type == "Event":
+        elif self.sequence_manager.view_type == "Event":
             self.container_widget.setFixedSize(int(len(self.sequence_range_index.items()) * self.scale_factor*2) + 50, self.num_channels * 100)
         scroll_area.setWidget(self.container_widget)
         scroll_area.verticalScrollBar().setStyleSheet("""
@@ -553,9 +553,9 @@ class EventsViewerWidget(QWidget):
     def refreshUI(self) -> None:
         self.clear_layout(self.container_layout)
         self.populate_events()
-        if self.view_type == "Linear" or self.view_type == "Linear Event":
+        if self.sequence_manager.view_type == "Linear" or self.sequence_manager.view_type == "Linear Event":
             self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
-        elif self.view_type == "Event":
+        elif self.sequence_manager.view_type == "Event":
             self.container_widget.setFixedSize(int(len(self.sequence_range_index.items()) * self.scale_factor*2) + 50, self.num_channels * 100)
 
         self.changes_in_event.emit()
@@ -597,7 +597,7 @@ class EventsViewerWidget(QWidget):
         buttons_container.setFixedHeight(50)
         previous_end_time = 0.0
         previous_event = None
-        if self.view_type == "Linear" or self.view_type == "Linear Event":
+        if self.sequence_manager.view_type == "Linear" or self.sequence_manager.view_type == "Linear Event":
                 
 
             for event in channel.events:
@@ -632,7 +632,7 @@ class EventsViewerWidget(QWidget):
             gap_button.addEventSignal.connect(self.add_event)
             
             return buttons_container
-        elif self.view_type == "Event":
+        elif self.sequence_manager.view_type == "Event":
             previous_end_time = 0
             time_ranges = calculate_time_ranges(channel.events)
             time_ranges2 =[time_range for time_range in time_ranges if time_range[1] != []]
@@ -654,7 +654,7 @@ class EventsViewerWidget(QWidget):
                     print("event",event)
                     previous_event = event
                     i+=1
-                    button = EventButton(event, self.scale_factor, self.sequence, buttons_container,view_type=self.view_type)
+                    button = EventButton(event, self.scale_factor, self.sequence, buttons_container,view_type=self.sequence_manager.view_type)
                     button.setGeometry(int(j * self.scale_factor*2), 0, int( 2* self.scale_factor), 50)
                     button.addChildEventSignal.connect(self.add_child_event)
                     button.deleteEventSignal.connect(self.delete_event)
@@ -822,17 +822,24 @@ class EventsViewerWidget(QWidget):
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
 
-
+import copy
 class SyncedTableWidget(QWidget):
-    def __init__(self, sequence_manager, sequence, scale_factor: float = 100.0):
+    def __init__(self, sequence_manager:SequenceManager, sequence:Sequence, scale_factor: float = 100.0,view_type="Linear"):
         super().__init__()
         self.sequence_manager = sequence_manager
         self.scale_factor = scale_factor
         self.sequence = sequence
         self.syncing = False  # Flag to prevent multiple updates
         self.layout_main = QGridLayout()
-        self.view_type = "Linear"
+        
         self.setLayout(self.layout_main)
+        self.combo_box_type = QComboBox()
+        option_list = ["Linear","Linear Event","Event"]
+        option_list.remove(copy.deepcopy(self.sequence_manager.view_type))
+
+        self.combo_box_type.addItems([copy.deepcopy(self.sequence_manager.view_type)]+option_list)
+        self.combo_box_type.currentTextChanged.connect(self.change_view_type)
+
         self.setup_ui()
         
     def setup_ui(self) -> None:
@@ -845,9 +852,9 @@ class SyncedTableWidget(QWidget):
         
         # Create and configure widgets
         self.channel_list = ChannelLabelWidget(self.sequence)
-        self.data_table = EventsViewerWidget(self.sequence_manager,self.sequence, self.scale_factor, parent=self,view_type=self.view_type)
+        self.data_table = EventsViewerWidget(self.sequence_manager,self.sequence, self.scale_factor, parent=self)
         self.data_table.changes_in_event.connect(self.refresh_UI)
-        self.time_axis = TimeAxisWidget(sequence=self.sequence,parent=self.data_table,view_type=self.view_type)
+        self.time_axis = TimeAxisWidget(sequence=self.sequence,parent=self.data_table,view_type=self.sequence_manager.view_type)
         
         self.channel_list.channel_right_clicked.connect(self.show_channel_dialog)
         self.channel_list.buttonclicked.connect(self.show_channel_dialog)
@@ -864,9 +871,6 @@ class SyncedTableWidget(QWidget):
 
 
 
-        self.combo_box_type = QComboBox()
-        self.combo_box_type.addItems(["Linear","Linear Event","Event"])
-        self.combo_box_type.currentTextChanged.connect(self.change_view_type)
 
         self.layout_main.addWidget(self.combo_box_type, 0, 0)
 
@@ -879,7 +883,7 @@ class SyncedTableWidget(QWidget):
         
 
     def change_view_type(self,view_type):
-        self.view_type = view_type
+        self.sequence_manager.view_type =view_type
         self.refresh_UI()
         
     def sync_scroll_vertical(self, value: int) -> None:
@@ -1031,11 +1035,13 @@ class SequenceManagerWidget(QWidget):
         super().__init__()
         self.sequence_manager = SequenceManager()
         self.selected_sequence_button = None
+        self.view_type ="Linear"
         self.initUI()
 
     def initUI(self):
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
+        
 
         self.menu_bar = self.create_menu_bar()
         self.layout.addWidget(self.menu_bar)
@@ -1278,8 +1284,8 @@ class SequenceManagerWidget(QWidget):
             widget_to_remove = self.sequence_view_layout.itemAt(i).widget()
             self.sequence_view_layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
-
-        synced_table_widget = SyncedTableWidget(self.sequence_manager, sequence)
+        
+        synced_table_widget = SyncedTableWidget(self.sequence_manager, sequence,view_type=self.view_type)
         self.sequence_view_layout.addWidget(synced_table_widget)
 
         if self.selected_sequence_button:
