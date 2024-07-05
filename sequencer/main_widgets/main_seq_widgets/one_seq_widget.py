@@ -702,7 +702,7 @@ class EventsViewerWidget(QWidget):
                 if parameter_name_new is None or parameter_name_new.strip == "":
                     raise Exception("Parameter name cannot be empty")
 
-                self.sequence.add_parameter_to_event(event, parameter_name=parameter_name_new.strip(),parameter_value=possible_parameters[parameter_name])
+                self.sequence.add_parameter_to_event(event, parameter_name=parameter_name_new.strip(),parameter_value=possible_parameters[parameter_name],parameter_origin=parameter_name )
                 self.refreshUI()
 
         except Exception as e:

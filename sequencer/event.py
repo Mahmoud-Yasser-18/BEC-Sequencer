@@ -14,10 +14,13 @@ import numpy as np
 
 
 class Parameter:
-    def __init__(self, name: str, value: Any,event: 'Event'):
+    def __init__(self, name: str,event: 'Event',parameter_origin):
         self.name = name
-        self.value = value
         self.event = event
+        self.parameter_origin = parameter_origin
+    def get_value(self): 
+        self.event.get_event_attributes()[self.parameter_origin]
+
         
 
 
@@ -416,11 +419,11 @@ class Sequence:
             channel.check_for_overlapping_events()
     
 
-    def add_parameter_to_event(self,event: Event,parameter_name,parameter_value):
+    def add_parameter_to_event(self,event: Event,parameter_name,parameter_value,parameter_origin):
         # ff the event is not in the sequence
         if event not in self.all_events:
             raise ValueError("Event not found in the sequence")
-        event.associated_parameters.append(Parameter(parameter_name,parameter_value,event))
+        event.associated_parameters.append(Parameter(parameter_name,event,parameter_origin))
 
         self.parameters_list.append(parameter_name)
 
@@ -436,8 +439,8 @@ class Sequence:
     
     def get_parameter_dict(self):
         parameter_dict = {}
-        for parameter in self.parameters_list:
-            parameter_dict[parameter.name] = parameter.value
+        for parameter  in self.parameters_list:
+            parameter_dict[parameter.name] = parameter.get_value()
         return parameter_dict
         
         
@@ -833,6 +836,8 @@ class Sequence:
         else:
             event = temp_sequence.find_event_by_original_reference(edited_event)
 
+
+
         if event is None:
             raise ValueError(f"Event not found for start_time {start_time} and channel {channel_name}")
 
@@ -908,6 +913,12 @@ class Sequence:
 
         elif isinstance(event.behavior, Jump):
             event.behavior.edit_jump(jump_target_value)
+        
+        
+        if event.associated_parameters: 
+            # update associated_parameters
+            
+            pass 
 
         
         self.all_events.sort(key=lambda event: event.start_time)
@@ -1233,7 +1244,7 @@ class Sequence:
                 },
                 "reference_time": event.reference_time,
                 "associated_parameters": [
-                    {"name": param.name, "value": param.value} for param in event.associated_parameters
+                    {"name": param.name, "origin": param.parameter_origin} for param in event.associated_parameters
                 ],
 
                 "children": [serialize_event(child) for child in event.children]
@@ -1362,7 +1373,7 @@ class Sequence:
                 parent_event=parent
             )
             for param_data in event_data["associated_parameters"]:
-                param = Parameter(name=param_data["name"], value=param_data["value"], event=event)
+                param = Parameter(name=param_data["name"], event=event,parameter_origin=param_data["origin"])
                 event.associated_parameters.append(param)
                 sequence.parameters_list.append(param)
 
@@ -1590,6 +1601,11 @@ class Sequence:
 
             # add the event to the channel events list in the original sequence            
             temp_original_sequence.find_channel_by_name(event.channel.name).events.append(event)
+        
+        try: 
+            temp_original_sequence.check_for_overlapping_events()
+        except: 
+            print("There is an overlapping events in the end")
 
         return temp_original_sequence
 
@@ -1601,6 +1617,7 @@ class SequenceManager:
     def __init__(self) -> None:
         self.main_sequences = OrderedDict()
         self.custom_sequence= None
+        self.view_type = "Linear"
 
 
     def add_new_sequence(self,  sequence_name: str,index: Optional[int] = None):
