@@ -3,7 +3,7 @@
 import sys
 from typing import List, Optional
 from PyQt5.QtWidgets import (
-    QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
+   QComboBox, QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
 )
 from PyQt5.QtCore import Qt, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen
@@ -15,6 +15,8 @@ from sequencer.Dialogs.channel_dialog import ChannelDialog
 from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog,ParameterDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog,SweepEventDialog
 from sequencer.event import Ramp, Jump, Sequence,Event
+from sequencer.ADwin_Modules import calculate_time_ranges
+
 
 import sys
 from typing import List, Optional
@@ -218,11 +220,12 @@ class EventButton(QPushButton):
     addParameterSignal = pyqtSignal(object)
     removeParameterSignal = pyqtSignal(object)
 
-    def __init__(self, event: Event , scale_factor, sequence, parent=None):
+    def __init__(self, event: Event , scale_factor, sequence, parent=None, view_type= "Linear"):
         super().__init__(parent)
         self.event = event
         self.scale_factor = scale_factor
         self.sequence = sequence
+        self.view_type = view_type
         self.initUI()
 
     def initUI(self):
@@ -279,23 +282,33 @@ class EventButton(QPushButton):
         }
 
 
+        if self.view_type == "Linear" or self.view_type == "Linear Event":
+                
 
+            if isinstance(self.event.behavior, Ramp):
+                duration = self.event.behavior.duration
+                # make sure the duration is at least 1
+                if int(duration * self.scale_factor) < 10:
+                    self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
+                    self.setText('R')
+                else:
+                    self.setGeometry(int(self.event.start_time * self.scale_factor), 0, int(duration * self.scale_factor), 50)
+                    self.setText(str(self.event.behavior.ramp_type) + ' ' + str(self.event.behavior.start_value) + '->' + str(self.event.behavior.end_value))
+                stylesheet_data = ramp_styles
 
-        if isinstance(self.event.behavior, Ramp):
-            duration = self.event.behavior.duration
-            # make sure the duration is at least 1
-            if int(duration * self.scale_factor) < 10:
+            elif isinstance(self.event.behavior, Jump):
                 self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
-                self.setText('R')
-            else:
-                self.setGeometry(int(self.event.start_time * self.scale_factor), 0, int(duration * self.scale_factor), 50)
+                self.setText('J')
+                stylesheet_data =  jump_styles
+        elif self.view_type == "Event":
+            self.setFixedSize(int(self.scale_factor*2), 50)
+            if isinstance(self.event.behavior, Ramp):
                 self.setText(str(self.event.behavior.ramp_type) + ' ' + str(self.event.behavior.start_value) + '->' + str(self.event.behavior.end_value))
-            stylesheet_data = ramp_styles
+                stylesheet_data = ramp_styles
+            elif isinstance(self.event.behavior, Jump):
+                self.setText(f'Jump to {self.event.behavior.target_value}')
+                stylesheet_data =  jump_styles
 
-        elif isinstance(self.event.behavior, Jump):
-            self.setGeometry(int(self.event.start_time * self.scale_factor), 0, 10, 50)
-            self.setText('J')
-            stylesheet_data =  jump_styles
 
         if self.event.associated_parameters:
             stylesheet_data["border_color"] = "#9E9E9E"  # Purple border
@@ -313,9 +326,9 @@ class EventButton(QPushButton):
 
     def enterEvent(self, event:Event):
         if isinstance(self.event.behavior, Ramp):
-            behavior = f"{self.event.behavior.ramp_type} Ramp of {self.event.behavior.duration} from {self.event.behavior.start_value} to {self.event.behavior.end_value}"
+            behavior = f"Start time: {self.event.start_time}\n{self.event.behavior.ramp_type} Ramp of duration {self.event.behavior.duration} from {self.event.behavior.start_value} to {self.event.behavior.end_value}"
         elif isinstance(self.event.behavior, Jump):
-            behavior = f"Jump to {self.event.behavior.target_value}"
+            behavior = f"Start time: {self.event.start_time}\nJump to {self.event.behavior.target_value}"
         else:
             behavior = "Unknown behavior"
         if self.event.associated_parameters:
@@ -354,14 +367,29 @@ class EventButton(QPushButton):
     
 
 class TimeAxisContent(QWidget):
-    def __init__(self, max_time, scale_factor, parent=None):
+    def __init__(self,sequence, max_time, scale_factor, parent=None,view_type: str = "Linear"):
         super().__init__(parent)
         self.max_time = max_time
         self.scale_factor = scale_factor
+        self.sequence = sequence
+        self.view_type = view_type
         self.initUI()
 
     def initUI(self) -> None:
-        self.setFixedSize(int(self.max_time * self.scale_factor) + 50, 50)
+        if self.view_type == "Linear" or self.view_type == "Linear Event":
+            self.setFixedSize(int(self.max_time * self.scale_factor) + 50, 50)
+        elif self.view_type == "Event":
+            time_ranges = calculate_time_ranges(self.sequence.all_events)
+            i=0
+            for time_range in time_ranges:
+                if time_range[0][0] ==time_range[0][1]:
+                    continue
+                i+=1
+            
+            self.setFixedSize(int(i * self.scale_factor*2) + 50, 50)
+
+
+            
         self.setStyleSheet("""
             QWidget {
                 background-color: #2C3E50;
@@ -377,15 +405,41 @@ class TimeAxisContent(QWidget):
 
     def draw_time_axis(self, painter: QPainter) -> None:
         painter.drawLine(0, 25, self.width(), 25)
-        for time in range(int(self.max_time) + 1):
-            x = int(time * self.scale_factor)
-            painter.drawLine(x, 20, x, 30)
-            painter.drawText(QRect(x - 10, 30, 20, 20), Qt.AlignCenter, str(time))
+        if self.view_type == "Linear":
+            for time in range(int(self.max_time) + 1):
+                x = int(time * self.scale_factor)
+                painter.drawLine(x, 20, x, 30)
+                painter.drawText(QRect(x - 10, 30, 20, 20), Qt.AlignCenter, str(time))
+        elif self.view_type == "Linear Event":
+            time_ranges=calculate_time_ranges(self.sequence.all_events) 
+
+            for time_range in time_ranges:
+                start_time, end_time = time_range[0]
+                x_start = int(start_time * self.scale_factor)
+                painter.drawLine(x_start, 20, x_start, 30)
+                painter.drawText(QRect(x_start-10, 30, 20, 20), Qt.AlignCenter, f"{start_time}")
+        elif self.view_type == "Event":
+            time_ranges=calculate_time_ranges(self.sequence.all_events)
+            i=0
+            for time_range in time_ranges:
+                if time_range[0][0] ==time_range[0][1]:
+                    continue
+                start_time, end_time = time_range[0]
+                # x_start = int(start_time * self.scale_factor)
+                x_start_i = int(i * self.scale_factor*2)
+                painter.drawLine(x_start_i, 20, x_start_i, 30)
+                painter.drawText(QRect(x_start_i-10, 30, 20, 20), Qt.AlignCenter, f"{start_time}")
+                i+=1
+
+
+
 class TimeAxisWidget(QWidget):
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self,sequence, parent: Optional[QWidget] = None,view_type: str = "Linear"):
         super().__init__(parent)
         self.max_time = parent.max_time  # Example max time
         self.scale_factor = parent.scale_factor  # Example scale factor
+        self.view_type = view_type
+        self.sequence = sequence
         self.initUI()
         self.setFixedHeight(80)
         self.setStyleSheet("""
@@ -409,7 +463,7 @@ class TimeAxisWidget(QWidget):
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)  # Ensure horizontal scrollbar is always shown
 
         # Create the content widget for the scroll area
-        content_widget = TimeAxisContent(self.max_time, self.scale_factor, self)
+        content_widget = TimeAxisContent(sequence=self.sequence,max_time=self.max_time,scale_factor= self.scale_factor, parent=self,view_type=self.view_type)
         self.scroll_area.setWidget(content_widget)
 
         # Create a layout and add the scroll area to it
@@ -422,7 +476,7 @@ class TimeAxisWidget(QWidget):
 class EventsViewerWidget(QWidget):
     changes_in_event = pyqtSignal()
 
-    def __init__(self,sequence_manager:SequenceManager , sequence: Sequence, scale_factor: float, parent: QWidget):
+    def __init__(self,sequence_manager:SequenceManager , sequence: Sequence, scale_factor: float, parent: QWidget,view_type: str = "Linear"):
         super().__init__()
         self.sequence_manager = sequence_manager
         self.sequence = sequence
@@ -430,6 +484,16 @@ class EventsViewerWidget(QWidget):
         self.parent = parent
         self.main_layout = QVBoxLayout(self)
         self.setLayout(self.main_layout)
+        self.view_type = view_type
+
+        self.sequence_range_index = {}
+        
+        for  index,range in enumerate(calculate_time_ranges(self.sequence.all_events)):
+            if range[0][0] ==range[0][1]:
+                continue
+            self.sequence_range_index[range[0][0]] = index
+        print   ("self.sequence_range_index",self.sequence_range_index)
+
         self.initUI()
 
     def initUI(self) -> None:
@@ -471,7 +535,11 @@ class EventsViewerWidget(QWidget):
         self.populate_events()
 
         self.container_widget.setLayout(self.container_layout)
-        self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
+        if self.view_type == "Linear" or self.view_type == "Linear Event":
+
+            self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
+        elif self.view_type == "Event":
+            self.container_widget.setFixedSize(int(len(self.sequence_range_index.items()) * self.scale_factor*2) + 50, self.num_channels * 100)
         scroll_area.setWidget(self.container_widget)
         scroll_area.verticalScrollBar().setStyleSheet("""
             QScrollBar:vertical {
@@ -485,7 +553,11 @@ class EventsViewerWidget(QWidget):
     def refreshUI(self) -> None:
         self.clear_layout(self.container_layout)
         self.populate_events()
-        self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
+        if self.view_type == "Linear" or self.view_type == "Linear Event":
+            self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
+        elif self.view_type == "Event":
+            self.container_widget.setFixedSize(int(len(self.sequence_range_index.items()) * self.scale_factor*2) + 50, self.num_channels * 100)
+
         self.changes_in_event.emit()
 
     def clear_layout(self, layout: QVBoxLayout) -> None:
@@ -525,44 +597,92 @@ class EventsViewerWidget(QWidget):
         buttons_container.setFixedHeight(50)
         previous_end_time = 0.0
         previous_event = None
+        if self.view_type == "Linear" or self.view_type == "Linear Event":
+                
 
-        for event in channel.events:
-            start_time = event.start_time
-            if start_time > previous_end_time:
-                gap_duration = start_time - previous_end_time
-                gap_button = GapButton(channel, buttons_container, previous_event)
-                gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
-                gap_button.addEventSignal.connect(self.add_event)
+            for event in channel.events:
+                start_time = event.start_time
+                if start_time > previous_end_time:
+                    gap_duration = start_time - previous_end_time
+                    gap_button = GapButton(channel, buttons_container, previous_event)
+                    gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
+                    gap_button.addEventSignal.connect(self.add_event)
 
-            previous_event = event
-            button = EventButton(event, self.scale_factor, self.sequence, buttons_container)
-            button.addChildEventSignal.connect(self.add_child_event)
-            button.deleteEventSignal.connect(self.delete_event)
-            button.editEventSignal.connect(self.edit_event)
-            button.sweepEventSignal.connect(self.sweep_event)
-            button.addParameterSignal.connect(self.add_parameter)
-            button.removeParameterSignal.connect(self.remove_parameter)
+                previous_event = event
+                button = EventButton(event, self.scale_factor, self.sequence, buttons_container)
 
-            previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10 / self.scale_factor)
+                button.addChildEventSignal.connect(self.add_child_event)
+                button.deleteEventSignal.connect(self.delete_event)
+                button.editEventSignal.connect(self.edit_event)
+                button.sweepEventSignal.connect(self.sweep_event)
+                button.addParameterSignal.connect(self.add_parameter)
+                button.removeParameterSignal.connect(self.remove_parameter)
 
-        if previous_event:
-            gap_duration = self.max_time - previous_end_time
-            if gap_duration > 0:
-                gap_button = GapButton(channel, buttons_container, previous_event)
-                gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
-                gap_button.addEventSignal.connect(self.add_event)
-        
-        gap_button = GapButton(channel, buttons_container, previous_event)
-        gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int((self.max_time - previous_end_time+1) * self.scale_factor), 50)
-        gap_button.addEventSignal.connect(self.add_event)
-        
-        return buttons_container
+                previous_end_time = start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 10 / self.scale_factor)
+
+            if previous_event:
+                gap_duration = self.max_time - previous_end_time
+                if gap_duration > 0:
+                    gap_button = GapButton(channel, buttons_container, previous_event)
+                    gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
+                    gap_button.addEventSignal.connect(self.add_event)
+            
+            gap_button = GapButton(channel, buttons_container, previous_event)
+            gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int((self.max_time - previous_end_time+1) * self.scale_factor), 50)
+            gap_button.addEventSignal.connect(self.add_event)
+            
+            return buttons_container
+        elif self.view_type == "Event":
+            previous_end_time = 0
+            time_ranges = calculate_time_ranges(channel.events)
+            time_ranges2 =[time_range for time_range in time_ranges if time_range[1] != []]
+            print("time_ranges",time_ranges)
+            time_ranges_start = [time_range[0][0] for time_range in time_ranges if time_range[1] != []]
+            j=0
+            i=0
+            for key, value in self.sequence_range_index.items():
+                if key not in time_ranges_start:
+                    # make a gap button 
+                    gap_button = GapButton(channel, buttons_container, previous_event)
+
+                    gap_button.setGeometry(int(j * self.scale_factor*2), 0, int( 2* self.scale_factor), 50)
+                    gap_button.addEventSignal.connect(self.add_event)
+                    previous_end_time = key
+                else:
+                    # make an event button 
+                    event = time_ranges2[i][1][0]
+                    print("event",event)
+                    previous_event = event
+                    i+=1
+                    button = EventButton(event, self.scale_factor, self.sequence, buttons_container,view_type=self.view_type)
+                    button.setGeometry(int(j * self.scale_factor*2), 0, int( 2* self.scale_factor), 50)
+                    button.addChildEventSignal.connect(self.add_child_event)
+                    button.deleteEventSignal.connect(self.delete_event)
+                    button.editEventSignal.connect(self.edit_event)
+                    button.sweepEventSignal.connect(self.sweep_event)
+                    button.addParameterSignal.connect(self.add_parameter)
+                    button.removeParameterSignal.connect(self.remove_parameter)
+
+                j+=1
+
+            return buttons_container
+
+                    
+                
+                    
+                        
+
+
+
+            
+
+
     
     def remove_parameter(self, event:Event):
         try:
 
             parameter_name=QInputDialog.getItem(self, 'Remove Parameter', 'Enter the parameter name to remove',[p.name for p in event.associated_parameters], 0, False)
-            print(parameter_name)
+
             self.sequence.remove_parameter(parameter_name=parameter_name[0])
             self.refreshUI()
         except Exception as e:
@@ -652,7 +772,7 @@ class EventsViewerWidget(QWidget):
             dialog = EditEventDialog( event_to_edit)
             if dialog.exec_() == QDialog.Accepted:
                 data = dialog.get_data()
-                print(data)
+
                 behavior = data['behavior_data']
                 if data['behavior_type'] == 'Jump':
                     self.sequence.edit_event(
@@ -660,7 +780,7 @@ class EventsViewerWidget(QWidget):
 
 
 
-                        jump_target_value=behavior.get('jump_target_value', None),
+                        jump_target_value=behavior.get('target_value', None),
                         new_relative_time= float(data.get ("relative_time",None)) if data.get ("relative_time",None) else None,
                         new_reference_time= data.get ('reference_time',None),
                         new_start_time=float(data.get ("start_time",None)) if data.get ("start_time",None) else None)    
@@ -695,9 +815,9 @@ class EventsViewerWidget(QWidget):
                     self.sequence_manager.sweep_sequence(self.sequence.sequence_name, parameter_name, values,event_to_sweep=event_to_sweep)
 
                 else:
-                    print("No result")
+                    pass
             else:
-                print("Dialog canceled")
+                pass
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
@@ -711,6 +831,7 @@ class SyncedTableWidget(QWidget):
         self.sequence = sequence
         self.syncing = False  # Flag to prevent multiple updates
         self.layout_main = QGridLayout()
+        self.view_type = "Linear"
         self.setLayout(self.layout_main)
         self.setup_ui()
         
@@ -724,9 +845,9 @@ class SyncedTableWidget(QWidget):
         
         # Create and configure widgets
         self.channel_list = ChannelLabelWidget(self.sequence)
-        self.data_table = EventsViewerWidget(self.sequence_manager,self.sequence, self.scale_factor, parent=self)
+        self.data_table = EventsViewerWidget(self.sequence_manager,self.sequence, self.scale_factor, parent=self,view_type=self.view_type)
         self.data_table.changes_in_event.connect(self.refresh_UI)
-        self.time_axis = TimeAxisWidget(self.data_table)
+        self.time_axis = TimeAxisWidget(sequence=self.sequence,parent=self.data_table,view_type=self.view_type)
         
         self.channel_list.channel_right_clicked.connect(self.show_channel_dialog)
         self.channel_list.buttonclicked.connect(self.show_channel_dialog)
@@ -741,8 +862,14 @@ class SyncedTableWidget(QWidget):
         self.scroll_bar3.valueChanged.connect(self.sync_scroll_vertical)
         self.scroll_bar4.valueChanged.connect(self.sync_scroll_vertical)
 
-        # Adding widgets to the grid layout
-        self.layout_main.addWidget(QWidget(), 0, 0)  # Empty top-left slot
+
+
+        self.combo_box_type = QComboBox()
+        self.combo_box_type.addItems(["Linear","Linear Event","Event"])
+        self.combo_box_type.currentTextChanged.connect(self.change_view_type)
+
+        self.layout_main.addWidget(self.combo_box_type, 0, 0)
+
         self.layout_main.addWidget(self.time_axis, 0, 1)  # Top-right slot
         self.layout_main.addWidget(self.channel_list, 1, 0)  # Bottom-left slot
         self.layout_main.addWidget(self.data_table, 1, 1)  # Bottom-right slot
@@ -751,7 +878,10 @@ class SyncedTableWidget(QWidget):
 
         
 
-
+    def change_view_type(self,view_type):
+        self.view_type = view_type
+        self.refresh_UI()
+        
     def sync_scroll_vertical(self, value: int) -> None:
         if self.syncing:
             return
@@ -883,16 +1013,16 @@ class DraggableButton(QPushButton):
         
 
     def save_sequence(self):
-        print("text to emit",self.text_to_emit)
+
         self.save_sequence_signal.emit(self.text_to_emit)
     def edit_sequence(self):
-        print("text to emit",self.text_to_emit)
+
         self.edit_sequence_signal.emit(self.text_to_emit)
     def delete_sequence(self):
-        print("text to emit",self.text_to_emit)
+
         self.delete_sequence_signal.emit(self.text_to_emit)
     def plot_sequence(self):
-        print("text to emit",self.text_to_emit)
+
         self.plot_sequence_signal.emit(self.text_to_emit)
 
 
@@ -1045,19 +1175,17 @@ class SequenceManagerWidget(QWidget):
     def move_button(self, target, source):
         source_index = self.button_layout.indexOf(source)
         target_index = self.button_layout.indexOf(target)
-        # print(f"Moving {source.text()} from index {source_index} to index {target_index}")
+
         #rearrange the sequences in the sequence manager
         # target_index_manager = self.sequence_manager.main_sequences[target.text()]["index"]
-        print("="*10)
-        print([(key,value["index"]) for key, value in self.sequence_manager.main_sequences.items()])
+
 
         self.sequence_manager.move_sequence_to_index(source.text(),target_index )
-        # print(self.sequence_manager.main_sequences)
+
 
         self.button_layout.insertWidget(target_index, source)
 
-        print(f"Moved {source.text()} from index {source_index} to index {target_index}")
-        print([(key,value["index"]) for key, value in self.sequence_manager.main_sequences.items()])
+
 
     def get_button_style(self, selected):
         if selected:
@@ -1145,10 +1273,7 @@ class SequenceManagerWidget(QWidget):
                 return
             sequence = list(self.sequence_manager.main_sequences.values())[-1]["seq"]
             sequence_name = sequence.sequence_name
-        
-        # print("Displaying sequence sweeps")
-        # print(self.sequence_manager.main_sequences[sequence_name]["sweep_list"])
-        
+
         for i in reversed(range(self.sequence_view_layout.count())):
             widget_to_remove = self.sequence_view_layout.itemAt(i).widget()
             self.sequence_view_layout.removeWidget(widget_to_remove)

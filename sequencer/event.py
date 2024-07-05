@@ -408,6 +408,9 @@ class Sequence:
         # list of all events in the sequence 
         self.all_events: List[Event] = []
 
+
+
+
     def check_for_overlapping_events(self):
         for channel in self.channels:
             channel.check_for_overlapping_events()
@@ -1899,11 +1902,12 @@ class SequenceManager:
                 "name": seq_name,
                 "index": seq_data["index"],
                 "sequence": seq_data["seq"].to_json(),
-                "sweep_list": {key: seq.to_json() for key, seq in seq_data["sweep_list"].items()}   
+                "sweep_list": {str(key): seq.to_json() for key, seq in seq_data["sweep_list"].items()}   
             })
 
         if file_name:
             with open(file_name, 'w') as file:
+                print(data)
                 json.dump(data, file, indent=4)
             
         return json.dumps(data, indent=4)

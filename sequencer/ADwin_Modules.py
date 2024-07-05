@@ -436,7 +436,7 @@ if __name__ == "__main__":
 
     
 #     # main_seq.to_json("MOT_loading.json")
-    adwin_driver = ADwin_Driver(process_file="transfer_seq_data.TC1",processdelay=1000)
+    adwin_driver = ADwin_Driver()
     adwin_driver.add_to_queue(main_seq)
 
     
