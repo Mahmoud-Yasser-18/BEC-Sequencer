@@ -422,8 +422,7 @@ class EventButton(QPushButton):
             self.addParameterSignal.emit(self.event)
         elif action == remove_parameter_action:
             self.removeParameterSignal.emit(self.event)
-        else:
-            raise Exception("Unknown action")
+
         
 
         
@@ -659,6 +658,7 @@ class EventsViewerWidget(QWidget):
         buttons_container.setFixedHeight(50)
         previous_end_time = 0.0
         previous_event = None
+        event = None
         if self.sequence_manager.view_type == "Linear" or self.sequence_manager.view_type == "Linear Event":
                 
 
@@ -705,15 +705,16 @@ class EventsViewerWidget(QWidget):
             for key, value in self.sequence_range_index.items():
                 if key not in time_ranges_start:
                     # make a gap button 
-                    gap_button = GapButton(channel, buttons_container, previous_event)
-
-                    gap_button.setGeometry(int(j * self.scale_factor*2), 0, int( 2* self.scale_factor), 50)
-                    gap_button.addEventSignal.connect(self.add_event)
-                    previous_end_time = key
+                    try:
+                        gap_button = GapButton(channel, buttons_container, previous_event,event=time_ranges2[i][1][0])
+                        gap_button.setGeometry(int(j * self.scale_factor*2), 0, int( 2* self.scale_factor), 50)
+                        gap_button.addEventSignal.connect(self.add_event)
+                        previous_end_time = key
+                    except:
+                        pass
                 else:
                     # make an event button 
                     event = time_ranges2[i][1][0]
-                    print("event",event)
                     previous_event = event
                     i+=1
                     button = EventButton(event, self.scale_factor, self.sequence, buttons_container,view_type=self.sequence_manager.view_type)
