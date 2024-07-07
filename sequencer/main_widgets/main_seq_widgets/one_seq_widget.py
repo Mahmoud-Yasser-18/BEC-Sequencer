@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 
-from sequencer.Dialogs.channel_dialog import ChannelDialog,Edit_Analog_Channel,Edit_Digital_Channel
+from sequencer.Dialogs.channel_dialog import ChannelDialog,Edit_Analog_Channel,Edit_Digital_Channel,CustomDialog
 
 from sequencer.Dialogs.event_dialog import ChildEventDialog, RootEventDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog
@@ -969,7 +969,7 @@ class SyncedTableWidget(QWidget):
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
-            
+
 
     
     def delete_channel(self, channel_name: str) -> None:
@@ -1152,13 +1152,21 @@ class SequenceManagerWidget(QWidget):
         
         return menu_bar
     def open_runner(self):
-        self.runner_widget = Runner(self.sequence_manager)
-        self.runner_widget.show()
-
+        try:
+            self.runner_widget = Runner(self.sequence_manager)
+            self.runner_widget.show()
+        except Exception as e:
+            error_message = f"Can not Open Runner, An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
     def open_camera(self):
-        self.camera_widget = ThorCamControlWidget()
-        self.camera_widget.show()
-    
+        try:
+            self.camera_widget = ThorCamControlWidget()
+            self.camera_widget.show()
+        except Exception as e:
+            error_message = f"Can not Open Camera, An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+            
+            
 
     def save_sequence_manager(self):
         file_dialog = QFileDialog(self)
@@ -1198,12 +1206,25 @@ class SequenceManagerWidget(QWidget):
         
         #make a dialog to ask for channel name with a combobox
         channels =["All Channels"]+ [ch.name for ch in self.sequence_manager.main_sequences[sequence_name]["seq"].channels] 
-        channel_name, ok = QInputDialog.getItem(self, "Select Channel", "Channels:", channels, 0, False)
-        if ok and channel_name:
+        types = ["Normal","With Relations"]
+        dialog = CustomDialog(channels, types)
+        if dialog.exec_() == QDialog.Accepted:
+            channel_name, channel_type,resolution = dialog.get_values()
+            print(f"Selected Channel: {channel_name}, Type: {channel_type}")
+
             if channel_name != "All Channels":
-                self.sequence_manager.main_sequences[sequence_name]["seq"].plot([channel_name])
+                if channel_type == "Normal":
+                    self.sequence_manager.main_sequences[sequence_name]["seq"].plot([channel_name],resolution=resolution)
+                else :
+                    self.sequence_manager.main_sequences[sequence_name]["seq"].plot_all([channel_name],resolution=resolution)
+
             else:  
-                self.sequence_manager.main_sequences[sequence_name]["seq"].plot()
+                if channel_type == "Normal":
+                    self.sequence_manager.main_sequences[sequence_name]["seq"].plot(resolution=resolution)
+                else :
+                    self.sequence_manager.main_sequences[sequence_name]["seq"].plot_all(resolution=resolution)
+
+
     def update_buttons(self):
         for i in reversed(range(self.button_layout.count())):
             self.button_layout.itemAt(i).widget().setParent(None)
