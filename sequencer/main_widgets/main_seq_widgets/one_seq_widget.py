@@ -367,7 +367,7 @@ class EventButton(QPushButton):
     
 
 class TimeAxisContent(QWidget):
-    def __init__(self,sequence, max_time, scale_factor, parent=None,view_type: str = "Linear"):
+    def __init__(self,sequence:Sequence, max_time, scale_factor, parent=None,view_type: str = "Linear"):
         super().__init__(parent)
         self.max_time = max_time
         self.scale_factor = scale_factor
@@ -382,11 +382,11 @@ class TimeAxisContent(QWidget):
             time_ranges = calculate_time_ranges(self.sequence.all_events)
             i=0
             for time_range in time_ranges:
-                if time_range[0][0] ==time_range[0][1]:
+                if time_range[0][0] ==time_range[0][1]and (self.sequence.all_events[-1].end_time!=time_range[0][1] ):
                     continue
                 i+=1
             
-            self.setFixedSize(int(i * self.scale_factor*2) + 50, 50)
+            self.setFixedSize(int((i+1) * self.scale_factor*2) , 50)
 
 
             
@@ -422,7 +422,7 @@ class TimeAxisContent(QWidget):
             time_ranges=calculate_time_ranges(self.sequence.all_events)
             i=0
             for time_range in time_ranges:
-                if time_range[0][0] ==time_range[0][1]:
+                if time_range[0][0] ==time_range[0][1] and (self.sequence.all_events[-1].end_time!=time_range[0][1] ):
                     continue
                 start_time, end_time = time_range[0]
                 # x_start = int(start_time * self.scale_factor)
@@ -489,7 +489,7 @@ class EventsViewerWidget(QWidget):
         self.sequence_range_index = {}
         
         for  index,range in enumerate(calculate_time_ranges(self.sequence.all_events)):
-            if range[0][0] ==range[0][1]:
+            if range[0][0] ==range[0][1] and (self.sequence.all_events[-1].end_time!=range[0][1] ):
                 continue
             self.sequence_range_index[range[0][0]] = index
         print   ("self.sequence_range_index",self.sequence_range_index)
@@ -539,7 +539,7 @@ class EventsViewerWidget(QWidget):
 
             self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
         elif self.sequence_manager.view_type == "Event":
-            self.container_widget.setFixedSize(int(len(self.sequence_range_index.items()) * self.scale_factor*2) + 50, self.num_channels * 100)
+            self.container_widget.setFixedSize(int((len(self.sequence_range_index.items())+1) * self.scale_factor*2) + 50, self.num_channels * 100)
         scroll_area.setWidget(self.container_widget)
         scroll_area.verticalScrollBar().setStyleSheet("""
             QScrollBar:vertical {
@@ -636,7 +636,7 @@ class EventsViewerWidget(QWidget):
             previous_end_time = 0
             time_ranges = calculate_time_ranges(channel.events)
             time_ranges2 =[time_range for time_range in time_ranges if time_range[1] != []]
-            print("time_ranges",time_ranges)
+            print("time_ranges2",time_ranges2)
             time_ranges_start = [time_range[0][0] for time_range in time_ranges if time_range[1] != []]
             j=0
             i=0
@@ -666,14 +666,6 @@ class EventsViewerWidget(QWidget):
                 j+=1
 
             return buttons_container
-
-                    
-                
-                    
-                        
-
-
-
             
 
 
