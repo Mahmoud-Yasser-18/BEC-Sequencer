@@ -11,7 +11,7 @@ from PyQt5.QtGui import QPainter, QPen
 from PyQt5.QtCore import Qt, QRect, pyqtSignal, QPoint
 
 
-from sequencer.Dialogs.channel_dialog import ChannelDialog
+
 from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog,ParameterDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog,SweepEventDialog
 from sequencer.event import Ramp, Jump, Sequence,Event
@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 
-from sequencer.Dialogs.channel_dialog import ChannelDialog,Edit_Analog_Channel,Edit_Digital_Channel,CustomDialog
+from sequencer.Dialogs.channel_dialog import ChannelDialog,Edit_Analog_Channel,Edit_Digital_Channel,CustomDialog,ExistingChannelDialog
 
 from sequencer.Dialogs.event_dialog import ChildEventDialog, RootEventDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog
@@ -56,7 +56,8 @@ class ChannelLabel(QWidget):
 
     def show_context_menu(self, pos):
         context_menu = QMenu(self)
-        add_channel_action = context_menu.addAction("Add Channel")
+        add_channel_action = context_menu.addAction("Add New Channel")
+        add_existing_channel_action = context_menu.addAction("Add Existing Channel from another Sequence")
         edit_channel_action = context_menu.addAction("Edit Channel")
         delete_channel_action = context_menu.addAction("Delete Channel")
 
@@ -67,10 +68,12 @@ class ChannelLabel(QWidget):
             self.parent.on_delete_channel(self.channel_name)
         elif action == add_channel_action:
             self.parent.on_add_channel()
-
+        elif action == add_existing_channel_action:
+            self.parent.on_add_existing_channel()
 
 class ChannelLabelWidget(QWidget):
     add_channel_clicked = pyqtSignal()
+    add_existing_channel_clicked = pyqtSignal()
     edit_channel_clicked = pyqtSignal(str)
     delete_channel_clicked = pyqtSignal(str)
     buttonclicked = pyqtSignal()
@@ -130,6 +133,11 @@ class ChannelLabelWidget(QWidget):
             add_channel_button = QPushButton("Add Channel", self)
             add_channel_button.setFixedHeight(20)
             add_channel_button.clicked.connect(self.add_channel)
+            # add right click menu 
+            add_channel_button.setContextMenuPolicy(Qt.CustomContextMenu)
+            add_channel_button.customContextMenuRequested.connect(self.show_context_menu_for_button)
+            #add right click which has option to add existing channel and connect it to the no_add_existing_channel
+            
             self.layout.addWidget(add_channel_button, alignment=Qt.AlignCenter)
         else:
             for channel in self.channels:
@@ -149,6 +157,18 @@ class ChannelLabelWidget(QWidget):
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         scroll_area.setFixedWidth(200)
         return scroll_area
+    
+    def show_context_menu_for_button(self, pos):
+        context_menu = QMenu(self)
+        add_channel_action = context_menu.addAction("Add New Channel")
+        add_existing_channel_action = context_menu.addAction("Add Existing Channel from another Sequence")
+
+        action = context_menu.exec_(self.mapToGlobal(pos))
+        if action == add_channel_action:
+            self.on_add_channel()
+        elif action == add_existing_channel_action:
+            self.on_add_existing_channel()
+
 
     def on_edit_channel(self, channel_name):
         self.edit_channel_clicked.emit(channel_name)
@@ -159,6 +179,8 @@ class ChannelLabelWidget(QWidget):
     def on_add_channel(self): 
         self.add_channel_clicked.emit()
 
+    def on_add_existing_channel(self):
+        self.add_existing_channel_clicked.emit()
 
     def add_channel(self):
         self.buttonclicked.emit()
@@ -889,6 +911,7 @@ class SyncedTableWidget(QWidget):
         self.time_axis = TimeAxisWidget(sequence=self.sequence,parent=self.data_table,view_type=self.sequence_manager.view_type)
         
         self.channel_list.add_channel_clicked.connect(self.show_channel_dialog)
+        self.channel_list.add_existing_channel_clicked.connect(self.show_existing_channel_dialog)
         self.channel_list.buttonclicked.connect(self.show_channel_dialog)
         self.channel_list.edit_channel_clicked.connect(self.edit_channel)
         self.channel_list.delete_channel_clicked.connect(self.delete_channel)
@@ -913,6 +936,13 @@ class SyncedTableWidget(QWidget):
         self.layout_main.addWidget(self.data_table, 1, 1)  # Bottom-right slot
         self.layout_main.setColumnStretch(0, 0)  # Column 0 (channel_list) - does not expand
         self.layout_main.setColumnStretch(1, 1)  # Column 1 (time_axis and data_table) - expands to fill space
+
+    def show_existing_channel_dialog(self):
+        dialog = ExistingChannelDialog(self.sequence_manager,self.sequence)
+        if dialog.exec_() == QDialog.Accepted:
+            Channel_name = dialog.get_data()
+            self.sequence_manager.add_existing_channel_to_sequence(self.sequence.sequence_name, Channel_name)
+            self.refresh_UI()
 
         
 

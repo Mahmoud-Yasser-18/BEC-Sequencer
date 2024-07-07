@@ -1657,8 +1657,63 @@ class SequenceManager:
         self.main_sequences = OrderedDict()
         self.custom_sequence= None
         self.view_type = "Linear"
+        
+        
+    def get_all_channels_names(self): 
+        all_channels_names = []
+        all_channels_references = []
+        for sequence in self.main_sequences.values():
+            for channel in sequence["seq"].channels:
+                if channel.name not in all_channels_names: 
+                    all_channels_names.append(channel.name)
+                    all_channels_references.append(channel)
+        return all_channels_names,all_channels_references 
+    
+    def create_new_existing_channel(self, channel_name):
+        all_channels,all_channels_references = self.get_all_channels_names()
+        if channel_name not in all_channels:
+            raise ValueError(f"Channel with name {channel_name} does not exist.")
+        target_channel   = all_channels_references[all_channels.index(channel_name)]
+        # create a new channel with the same properties as the target channel 
+        if isinstance(target_channel, Analog_Channel):
+            new_channel = Analog_Channel(
+                name=target_channel.name,
+                card_number=target_channel.card_number,
+                channel_number=target_channel.channel_number,
+                reset=target_channel.reset,
+                reset_value=target_channel.reset_value,
+                max_voltage=target_channel.max_voltage,
+                min_voltage=target_channel.min_voltage
+            )
+        elif isinstance(target_channel, Digital_Channel):
+            new_channel = Digital_Channel(
+                name=target_channel.name,
+                card_number=target_channel.card_number,
+                channel_number=target_channel.channel_number,
+                reset=target_channel.reset,
+                reset_value=target_channel.reset_value,
+                card_id=target_channel.card_id,
+                bitpos=target_channel.bitpos
+            )
+        return new_channel
+    def add_existing_channel_to_sequence(self, sequence_name, channel_name): 
+        print(self.main_sequences.keys())  
+        print(sequence_name)
+        sequence = self.main_sequences[sequence_name]["seq"]
+        new_channel = self.create_new_existing_channel(channel_name)
+        # chen
+        for channel in sequence.channels:
+            if channel.name == new_channel.name:
+                raise ValueError(f"Channel already exists in the sequence.")
+            
+        # Ensure combination of card_number and channel_number is unique
+        for channel in sequence.channels:
+            if channel.card_number == new_channel.card_number and channel.channel_number == new_channel.channel_number:
+                raise ValueError(f"Card number {new_channel.card_number} and channel number {new_channel.channel_number} combination is already in use.")
 
+        sequence.channels.append(new_channel)
 
+        
     def add_new_sequence(self,  sequence_name: str,index: Optional[int] = None):
         #assert non conflicting index or name
         if sequence_name in self.main_sequences:
@@ -1668,7 +1723,7 @@ class SequenceManager:
         
         if index is None:
             index = len(self.main_sequences)
-        self.main_sequences[sequence_name] = {"index":index, "seq":Sequence('sequence_name'),"sweep_list":OrderedDict()}
+        self.main_sequences[sequence_name] = {"index":index, "seq":Sequence(sequence_name),"sweep_list":OrderedDict()}
     
     def load_sequence(self,  sequence: Sequence,index: Optional[int] = None):
         if sequence.sequence_name in self.main_sequences:

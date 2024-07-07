@@ -4,7 +4,32 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 import sys 
 
-from sequencer.event import Event, Channel,Digital_Channel  ,Analog_Channel
+from sequencer.event import Event, Channel,Digital_Channel  ,Analog_Channel,Sequence,SequenceManager
+
+class ExistingChannelDialog(QDialog):
+    def __init__(self, sequence_manager:SequenceManager,sequence:Sequence, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle('Add Existing Channel')
+        self.layout = QFormLayout(self)
+
+        self.sequence_manager = sequence_manager
+
+        self.sequence = sequence
+        all_channels_names ,all_channels_references = self.sequence_manager.get_all_channels_names()
+        seq_channel_names = [channel.name for channel in self.sequence.channels]
+        all_channels_names = [channel for channel in all_channels_names if channel not in seq_channel_names]
+
+        self.channel_combo = QComboBox(self)
+        self.channel_combo.addItems(all_channels_names)
+
+        self.layout.addRow('Channel:', self.channel_combo)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        self.layout.addWidget(self.buttons)
+    def get_data(self):
+        return self.channel_combo.currentText()
 
 
 # Add this class to the Dialogs/channel_dialog.py file
