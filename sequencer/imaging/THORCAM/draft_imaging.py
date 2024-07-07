@@ -71,8 +71,9 @@ class ImageAcquisitionThread(threading.Thread):
         return Image.fromarray(color_image_data, mode='RGB')
 
     def _get_image(self, frame):
+        print("self._bit_depth",self._bit_depth)
         scaled_image = frame.image_buffer >> (self._bit_depth - 8)
-        return Image.fromarray(scaled_image)
+        return Image.fromarray(scaled_image),frame
 
     def run(self):
         while not self._stop_event.is_set():
@@ -82,8 +83,8 @@ class ImageAcquisitionThread(threading.Thread):
                     if self._is_color:
                         pil_image = self._get_color_image(frame)
                     else:
-                        pil_image = self._get_image(frame)
-                    self._image_queue.put_nowait(pil_image)
+                        pil_image,numpy_array = self._get_image(frame)
+                    self._image_queue.put_nowait((pil_image,numpy_array))
             except queue.Full:
                 pass
             except Exception as error:
@@ -213,9 +214,10 @@ class DataItem:
 
 
 class LiveViewWidget(QWidget):
-    def __init__(self, image_queue):
+    def __init__(self, image_queue,main_camera):
         super(LiveViewWidget, self).__init__()
         self.image_queue = image_queue
+        self.main_camera = main_camera
 
         self.image_label = QLabel(self)
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -229,7 +231,8 @@ class LiveViewWidget(QWidget):
 
     def update_image(self):
         try:
-            image = self.image_queue.get_nowait()
+            image,numpy_data = self.image_queue.get_nowait()
+            self.save_images(numpy_data)
             image = image.convert('RGB')
             data = image.tobytes("raw", "RGB")
             q_image = QImage(data, image.width, image.height, QImage.Format_RGB888)
@@ -237,6 +240,73 @@ class LiveViewWidget(QWidget):
             self.image_label.setPixmap(pixmap)
         except queue.Empty:
             pass
+
+
+    def save_images(self,numpy_data):
+        # check if the save checkbox is checked 
+        
+            # check if the experiment mode is ongoing
+        if self.main_camera.experiment_mode.currentText() == 'Ongoing Experiment':
+                # in the source folder the sequence should start with "current"
+            print(self.main_camera.default_source_path)
+            current_source_file = [file for file in os.listdir(self.main_camera.default_source_path) if file.startswith("current")]
+            if current_source_file:
+                current_source_file= current_source_file[0]
+            
+            print(current_source_file)
+            print(os.path.join(self.main_camera.default_source_path,current_source_file))
+            
+            temp_seq = Sequence.from_json(file_name=os.path.join(self.main_camera.default_source_path,current_source_file))
+            print(temp_seq.all_events)
+            paramters = temp_seq.get_parameter_dict()
+            self.main_camera.paramerter_list.update_parameters(paramters)
+            
+            if self.main_camera.save_checkbox.isChecked():
+                    # check if current file is also the current file 
+                    current_destination_file = [file for file in os.listdir(self.main_camera.default_destination_path) if file.startswith("current")]
+                    if current_destination_file:
+                        current_destination_file = current_destination_file[0]
+                        if current_destination_file == current_source_file:
+                            # save to the destination path
+                            # unpack the file and save it again to the destination path
+                            
+                            old_data =DataItem.load(os.path.join(self.main_camera.default_destination_path,current_destination_file))
+                            old_data.images.append(numpy_data)
+                            old_data.save(os.path.join(self.main_camera.default_destination_path,current_destination_file))
+                        else:
+                            # save to the default saving path
+                            # rename the current file in the destination path folder to be without current
+                            os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
+                            # save to the default saving path
+                            print('saving to the default saving path')
+                            new_data = DataItem(json_str=json.load(open(os.path.join(self.main_camera.default_source_path, current_source_file))), images=[numpy_data])
+                            new_data.save(os.path.join(self.main_camera.default_saving_path,current_source_file))
+                    else:
+                        # save to the default saving path
+                        # rename the current file in the destination path folder to be without current
+                        # os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
+                        # save to the default saving path
+                        print('saving to the default saving path')
+                        new_data = DataItem(json_str=json.load(open(os.path.join(self.main_camera.default_source_path, current_source_file))), images=[numpy_data])
+                        new_data.save(os.path.join(self.main_camera.default_saving_path,current_source_file))
+                            
+
+        else:
+            # save to the default saving path
+            if self.main_camera.save_checkbox.isChecked():
+                # get the default saving path
+                
+                now = datetime.datetime.now()
+                time_stamp = now.strftime("%Y-%m-%d_%H-%M-%S-%f")
+                file_name = f"{time_stamp}"
+                file_path = os.path.join(self.main_camera.default_saving_path, file_name)
+                print("Saving_images to " , file_path)
+                np.save(file_path,numpy_data)
+                
+                saved_image = Image.fromarray(numpy_data.astype('uint8'))
+                # Save the saved_image
+                saved_image.save(file_path+".png")
+
 
 
 
@@ -636,7 +706,7 @@ class ThorCamControlWidget(QWidget):
         self.save_layout = QHBoxLayout()
 
         # Live View
-        self.live_view = LiveViewWidget(image_queue=queue.Queue())
+        self.live_view = LiveViewWidget(image_queue=queue.Queue(),main_camera=self)
         
         # Camera List
         self.refresh_cameras_button = QPushButton("Refresh Cameras")
