@@ -298,15 +298,18 @@ class Runner(QWidget):
     def refreash_custom_sweep_queue(self):
         self.custom_sweep_queue =self.sequence_manager.get_sweep_sequences_custom(self.custom_sequence_widget.get_sequences_names())
     def refreash_queue(self,Working = False):
-        if not Working:
-            self.refreash_sweep_queue()
-            self.refreash_custom_sweep_queue()
+        try
+            if not Working:
+                self.refreash_sweep_queue()
+                self.refreash_custom_sweep_queue()
 
-        if self.combo_sweep.currentText() == "main":
-            self.sweep_viewer.populate_table(self.main_sweep_queue)
-        else:
-            self.sweep_viewer.populate_table(self.custom_sweep_queue)
-
+            if self.combo_sweep.currentText() == "main":
+                self.sweep_viewer.populate_table(self.main_sweep_queue)
+            else:
+                self.sweep_viewer.populate_table(self.custom_sweep_queue)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+            
         
     def check_sweep(self):
         try:
@@ -320,30 +323,32 @@ class Runner(QWidget):
             self.combo_sweep.setCurrentIndex(0)
 
     def randomize_queue(self):
-        #randomize the dictionary order 
-        items = list(self.main_sweep_queue.items())
-        random.shuffle(items)
-        # Create a new dictionary from the shuffled list
-        self.main_sweep_queue = dict(items)
-
-
         try:
-            items = list(self.custom_sweep_queue.items())
+            #randomize the dictionary order 
+            items = list(self.main_sweep_queue.items())
             random.shuffle(items)
             # Create a new dictionary from the shuffled list
-            self.custom_sweep_queue = dict(items)
+            self.main_sweep_queue = dict(items)
 
-        except:
-            pass
-        
-        try:
-            if self.combo_sweep.currentText() == "main":
+
+            try:
+                items = list(self.custom_sweep_queue.items())
+                random.shuffle(items)
+                # Create a new dictionary from the shuffled list
+                self.custom_sweep_queue = dict(items)
+
+            except:
+                pass
+            
+            try:
+                if self.combo_sweep.currentText() == "main":
+                    self.sweep_viewer.populate_table(self.main_sweep_queue)
+                else:
+                    self.sweep_viewer.populate_table(self.custom_sweep_queue)
+            except:
                 self.sweep_viewer.populate_table(self.main_sweep_queue)
-            else:
-                self.sweep_viewer.populate_table(self.custom_sweep_queue)
-        except:
-            self.sweep_viewer.populate_table(self.main_sweep_queue)
-
+        except Exception as e:  
+            QMessageBox.critical(self, "Error", str(e))
 
 
     def run_main(self):
@@ -389,21 +394,24 @@ class Runner(QWidget):
             QMessageBox.critical(self, "Error", str(e))
 
     def run_sequence(self, sequence:Sequence):
-        self.progress_bar.setValue(100)
-        if self.Save_Data_CheckBox.isChecked(): 
-            now = datetime.datetime.now()
+        try:
+            self.progress_bar.setValue(100)
+            if self.Save_Data_CheckBox.isChecked(): 
+                now = datetime.datetime.now()
+                
+                sequence.to_json(filename=os.path.join(self.save_path, f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
+                #remove current data from the folder 
+                for file in os.listdir(self.save_path):
+                    if file.startswith("current"):
+                        os.remove(os.path.join(self.save_path, file))
+                sequence.to_json(filename=os.path.join(self.save_path, f"current_{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
             
-            sequence.to_json(filename=os.path.join(self.save_path, f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
-            #remove current data from the folder 
-            for file in os.listdir(self.save_path):
-                if file.startswith("current"):
-                    os.remove(os.path.join(self.save_path, file))
-            sequence.to_json(filename=os.path.join(self.save_path, f"current_{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
-        
-        self.ADwin.add_to_queue(sequence)
-        print(f"Running sequence: {sequence.sequence_name}")
-        self.ADwin.initiate_all_experiments()
-        
+            self.ADwin.add_to_queue(sequence)
+            print(f"Running sequence: {sequence.sequence_name}")
+            self.ADwin.initiate_all_experiments()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+
         
 
     
