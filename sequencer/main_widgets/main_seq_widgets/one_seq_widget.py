@@ -1256,7 +1256,7 @@ class SequenceManagerWidget(QWidget):
             file_dialog = QFileDialog(self)
             file_name, _ = file_dialog.getSaveFileName(self, "Save Singel Sequence", "", "JSON Files (*.json)")
             if file_name:
-                self.sequence_manager.to_json(file_name=file_name)
+                self.sequence_manager.main_sequences[sequence_name]["seq"].to_json(file_name)
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
