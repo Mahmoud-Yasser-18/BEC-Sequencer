@@ -555,7 +555,6 @@ class EventsViewerWidget(QWidget):
             if range[0][0] ==range[0][1] and (self.sequence.all_events[-1].end_time!=range[0][1] ):
                 continue
             self.sequence_range_index[range[0][0]] = index
-        print   ("self.sequence_range_index",self.sequence_range_index)
 
         self.initUI()
 
@@ -1068,10 +1067,12 @@ from PyQt5.QtGui import QColor, QPalette,QDrag
 
 class DraggableButton(QPushButton):
     save_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+    save_sequence_signal_csv = pyqtSignal(str)  # Signal to emit a number
     delete_sequence_signal = pyqtSignal(str)  # Signal to emit a number
     edit_sequence_signal = pyqtSignal(str)  # Signal to emit a number
     plot_sequence_signal = pyqtSignal(str)  # Signal to emit a numbero
     print_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+
 
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
@@ -1102,6 +1103,12 @@ class DraggableButton(QPushButton):
         save_sequence_action = QAction('Save Sequence', self)
         save_sequence_action.triggered.connect(self.save_sequence)
         context_menu.addAction(save_sequence_action)
+
+        save_sequence_action_csv = QAction('Save Sequence as CSV', self)
+        save_sequence_action_csv.triggered.connect(self.save_sequence_csv)
+        context_menu.addAction(save_sequence_action_csv)
+
+
         delete_sequence_action = QAction('delete Sequence', self)
         delete_sequence_action.triggered.connect(self.delete_sequence)
         context_menu.addAction(delete_sequence_action)
@@ -1126,6 +1133,10 @@ class DraggableButton(QPushButton):
     def save_sequence(self):
 
         self.save_sequence_signal.emit(self.text_to_emit)
+
+    def save_sequence_csv(self):            
+            self.save_sequence_signal_csv.emit(self.text_to_emit)
+
     def edit_sequence(self):
 
         self.edit_sequence_signal.emit(self.text_to_emit)
@@ -1251,6 +1262,15 @@ class SequenceManagerWidget(QWidget):
             QMessageBox.critical(self, "Error", error_message)
             
         # self.sequence_manager.main_sequences[sequence_name]["seq"].to_json(file_name+".json")
+    def save_sequence_CSV(self, sequence_name): 
+        try:
+            file_dialog = QFileDialog(self)
+            file_name, _ = file_dialog.getSaveFileName(self, "Save Singel Sequence", "", "CSV Files (*.csv)")
+            if file_name:
+                self.sequence_manager.main_sequences[sequence_name]["seq"].to_csv(file_name+".csv")
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
 
     def delete_sequence(self, sequence_name):
         try:
@@ -1326,6 +1346,7 @@ class SequenceManagerWidget(QWidget):
             button = DraggableButton(sequence_name, self)
             button.clicked.connect(self.display_sequence)
             button.save_sequence_signal.connect(self.save_sequence)
+            button.save_sequence_signal_csv.connect(self.save_sequence_CSV)
             button.delete_sequence_signal.connect(self.delete_sequence)
             button.edit_sequence_signal.connect(self.edit_sequence)
             button.plot_sequence_signal.connect(self.plot_sequence)
