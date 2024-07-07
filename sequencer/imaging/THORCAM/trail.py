@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
             app = QApplication(sys.argv)
             print("Setting camera parameters...")
-            camera.frames_per_trigger_zero_for_unlimited = 1
+            camera.frames_per_trigger_zero_for_unlimited = 0
 
             acquisition_thread = ImageAcquisitionThread(camera)
             window = LiveViewWidget(image_queue=acquisition_thread.get_output_queue())
@@ -144,7 +144,7 @@ if __name__ == "__main__":
             window.show()
 
             camera.arm(2)
-            # camera.issue_software_trigger()
+            camera.issue_software_trigger()
 
             print("Starting image acquisition thread...")
             acquisition_thread.start()
