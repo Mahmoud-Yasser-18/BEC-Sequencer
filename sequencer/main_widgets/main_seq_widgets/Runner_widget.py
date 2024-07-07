@@ -298,7 +298,7 @@ class Runner(QWidget):
     def refreash_custom_sweep_queue(self):
         self.custom_sweep_queue =self.sequence_manager.get_sweep_sequences_custom(self.custom_sequence_widget.get_sequences_names())
     def refreash_queue(self,Working = False):
-        try
+        try:
             if not Working:
                 self.refreash_sweep_queue()
                 self.refreash_custom_sweep_queue()
