@@ -58,7 +58,7 @@ class EditEventDialog(QDialog):
 
             self.ramp_type_label = QLabel("Ramp Type (for Ramp):")
             self.ramp_type_combo = QComboBox()
-            self.ramp_type_combo.addItems(["LINEAR", "QUADRATIC", "EXPONENTIAL", "LOGARITHMIC"])
+            self.ramp_type_combo.addItems(["linear","quadratic","exponential","logarithmic","generic","minimum jerk"])
             self.layout.addWidget(self.ramp_type_label)
             self.layout.addWidget(self.ramp_type_combo)
 
@@ -109,7 +109,7 @@ class EditEventDialog(QDialog):
             self.ramp_duration_input.setText(str(event.behavior.duration))
             self.start_value_input.setText(str(event.behavior.start_value))
             self.end_value_input.setText(str(event.behavior.end_value))
-            self.ramp_type_combo.setCurrentText(str(event.behavior.ramp_type.value))
+            self.ramp_type_combo.setCurrentText(str(event.behavior.ramp_type))
 
         if event.parent is not None:
             self.relative_time_input.setText(str(event.relative_time))

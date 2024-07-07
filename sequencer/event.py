@@ -19,7 +19,9 @@ class Parameter:
         self.event = event
         self.parameter_origin = parameter_origin
     def get_value(self): 
-        self.event.get_event_attributes()[self.parameter_origin]
+        print(self.event.get_event_attributes())
+        print(self.parameter_origin)
+        return self.event.get_event_attributes()[self.parameter_origin]
 
         
 
@@ -103,6 +105,7 @@ class Ramp(EventBehavior):
         self.end_value = end_value
         self.resolution = resolution
         
+        print (self.ramp_type)
         if func:
             self.func = func
         else:
@@ -119,12 +122,14 @@ class Ramp(EventBehavior):
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (np.log10(t + 1) / np.log10(self.duration + 1))
         elif self.ramp_type == RampType.MINIMUM_JERK:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (10 * (t/self.duration)**3 - 15 * (t/self.duration)**4 + 6 * (t/self.duration)**5)
-
+        else : 
+            raise ValueError("Invalid ramp type")
+        
     def edit_ramp(self, duration: Optional[float] = None, ramp_type: Optional[RampType] = None, start_value: Optional[float] = None, end_value: Optional[float] = None, func: Optional[Callable[[float], float]] = None, resolution: Optional[float] = None):
         new_duration = duration if duration is not None else self.duration
         if ramp_type is not None:
             try:
-                new_ramp_type = RampType[ramp_type.upper().replace(' ', '_')]
+                new_ramp_type = ramp_type
             except KeyError:
                 # Handle the case where the ramp_type string is not valid
                 raise ValueError(f"Invalid ramp type: {ramp_type}")
@@ -423,9 +428,10 @@ class Sequence:
         # ff the event is not in the sequence
         if event not in self.all_events:
             raise ValueError("Event not found in the sequence")
-        event.associated_parameters.append(Parameter(parameter_name,event,parameter_origin))
+        p = Parameter(parameter_name,event,parameter_origin)
+        event.associated_parameters.append(p)
 
-        self.parameters_list.append(parameter_name)
+        self.parameters_list.append(p)
 
     def remove_parameter(self,parameter_name):
         for event in self.all_events:
@@ -2030,7 +2036,8 @@ def test_camera_trigger():
 
 if __name__ == '__main__':
 
-    
+    r = RampType ("linear")
+    print(r)
     pass     # print(seq_manager.main_sequences)
     # print(seq_manager.main_sequences["test"]["sweep_list"][('duration', 2)].all_events[0].reference_original_event.start_time)
     # print(seq_manager.main_sequences["test"]["sweep_list"].keys()) 

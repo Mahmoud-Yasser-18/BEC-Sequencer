@@ -98,9 +98,15 @@ class BaseEventDialog(QDialog):
         self.layout.addWidget(self.end_value_label)
         self.layout.addWidget(self.end_value_input)
 
+        self.resoltion_label = QLabel("Resolution (for Ramp):")
+        self.resoltion_input = QLineEdit()
+        self.resoltion_input.setValidator(QDoubleValidator())
+        self.layout.addWidget(self.resoltion_label)
+        self.layout.addWidget(self.resoltion_input)
+
         self.ramp_type_label = QLabel("Ramp Type (for Ramp):")
         self.ramp_type_combo = QComboBox()
-        self.ramp_type_combo.addItems(["LINEAR", "QUADRATIC", "EXPONENTIAL", "LOGARITHMIC"])
+        self.ramp_type_combo.addItems(["linear","quadratic","exponential","logarithmic","generic","minimum jerk"])
         self.layout.addWidget(self.ramp_type_label)
         self.layout.addWidget(self.ramp_type_combo)
 
@@ -133,6 +139,8 @@ class BaseEventDialog(QDialog):
         self.end_value_input.setVisible(not is_jump)
         self.ramp_type_label.setVisible(not is_jump)
         self.ramp_type_combo.setVisible(not is_jump)
+        self.resoltion_label.setVisible(not is_jump)
+        self.resoltion_input.setVisible(not is_jump)
         self.adjustSize()
 
     def get_behavior(self):
@@ -153,13 +161,15 @@ class BaseEventDialog(QDialog):
             ramp_type = self.ramp_type_combo.currentText().lower()
             start_value = self.start_value_input.text()
             end_value = self.end_value_input.text()
+            resolution = self.resoltion_input.text()
             behavior_params = {
                 'behavior_type': behavior_type,
                 'jump_target_value': None,
                 'ramp_duration': float(ramp_duration),
                 'ramp_type': ramp_type,
                 'start_value': float (start_value),
-                'end_value': float (end_value)
+                'end_value': float (end_value),
+                'resolution': float(resolution)
             }
         
         return behavior_params

@@ -17,7 +17,7 @@ from sequencer.Dialogs.edit_event_dialog import EditEventDialog,SweepEventDialog
 from sequencer.event import Ramp, Jump, Sequence,Event
 from sequencer.ADwin_Modules import calculate_time_ranges
 
-from sequencer.event import SequenceManager,Sequence,Event , Analog_Channel, Digital_Channel, Channel
+from sequencer.event import SequenceManager,Sequence,Event , Analog_Channel, Digital_Channel, Channel, RampType
 
 import sys
 from typing import List, Optional
@@ -167,10 +167,11 @@ class ChannelLabelWidget(QWidget):
 class GapButton(QPushButton):
     addEventSignal = pyqtSignal(object)
 
-    def __init__(self, channel, parent, previous_event):
+    def __init__(self, channel, parent, previous_event,event):
         super().__init__(parent)
         self.channel = channel  
         self.previous_event = previous_event
+        self.next_event = event 
         self.initUI()
 
     def initUI(self):
@@ -223,9 +224,16 @@ class GapButton(QPushButton):
     def enterEvent(self, event):
         if self.previous_event:
             if isinstance(self.previous_event.behavior, Ramp):
-                behavior = f"Holding on {self.previous_event.behavior.end_value} after {self.previous_event.behavior.ramp_type} ramp"
+                if self.next_event is not None: 
+                    behavior = f"starting from time {self.previous_event.end_time} to {self.next_event.start_time}\nHolding on {self.previous_event.behavior.end_value} after {self.previous_event.behavior.ramp_type} ramp"
+                else : 
+                    behavior = f"starting from time {self.previous_event.end_time}\nHolding on {self.previous_event.behavior.end_value} after {self.previous_event.behavior.ramp_type} ramp"
+
             elif isinstance(self.previous_event.behavior, Jump):
-                behavior = f"Holding on {self.previous_event.behavior.target_value} after jump"
+                if self.next_event is not None: 
+                    behavior = f"starting from time {self.previous_event.end_time} to {self.next_event.start_time}\nHolding on {self.previous_event.behavior.target_value} after jump"
+                else :
+                    behavior = f"starting from time {self.previous_event.end_time}\nHolding on {self.previous_event.behavior.target_value} after jump"
             else:
                 behavior = "Unknown behavior"
             QToolTip.showText(event.globalPos(), behavior, self)
@@ -366,7 +374,7 @@ class EventButton(QPushButton):
             behavior += "\n\nAssociated Parameters:"
             # associated_parameters is a list 
             for p in self.event.associated_parameters:
-                behavior += f"\n{p.name}: {p.value}"
+                behavior += f"\n{p.name}: {p.get_value()}"
         QToolTip.showText(event.globalPos(), behavior, self)
         super().enterEvent(event)
 
@@ -635,7 +643,7 @@ class EventsViewerWidget(QWidget):
                 start_time = event.start_time
                 if start_time > previous_end_time:
                     gap_duration = start_time - previous_end_time
-                    gap_button = GapButton(channel, buttons_container, previous_event)
+                    gap_button = GapButton(channel, buttons_container, previous_event,event)
                     gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
                     gap_button.addEventSignal.connect(self.add_event)
 
@@ -654,11 +662,11 @@ class EventsViewerWidget(QWidget):
             if previous_event:
                 gap_duration = self.max_time - previous_end_time
                 if gap_duration > 0:
-                    gap_button = GapButton(channel, buttons_container, previous_event)
+                    gap_button = GapButton(channel, buttons_container, previous_event,event)
                     gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int(gap_duration * self.scale_factor), 50)
                     gap_button.addEventSignal.connect(self.add_event)
             
-            gap_button = GapButton(channel, buttons_container, previous_event)
+            gap_button = GapButton(channel, buttons_container, previous_event,event= None)
             gap_button.setGeometry(int(previous_end_time * self.scale_factor), 0, int((self.max_time - previous_end_time+1) * self.scale_factor), 50)
             gap_button.addEventSignal.connect(self.add_event)
             
@@ -667,7 +675,7 @@ class EventsViewerWidget(QWidget):
             previous_end_time = 0
             time_ranges = calculate_time_ranges(channel.events)
             time_ranges2 =[time_range for time_range in time_ranges if time_range[1] != []]
-            print("time_ranges2",time_ranges2)
+
             time_ranges_start = [time_range[0][0] for time_range in time_ranges if time_range[1] != []]
             j=0
             i=0
@@ -711,6 +719,7 @@ class EventsViewerWidget(QWidget):
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
+            self.refreshUI()
     def add_parameter(self, event:Event):
         try:
             possible_parameters = event.get_event_attributes()
@@ -747,7 +756,7 @@ class EventsViewerWidget(QWidget):
                 else:
                     self.sequence.add_event(
                         channel_name=channel.name,
-                        behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
+                        behavior=Ramp(behavior['ramp_duration'], RampType(behavior['ramp_type']), behavior['start_value'], behavior['end_value'],resolution=behavior['resolution']),
                         start_time=float(data["start_time"])
                     )
                 self.refreshUI()
@@ -772,7 +781,7 @@ class EventsViewerWidget(QWidget):
                 else:
                     self.sequence.add_event(
                         channel_name=data['channel'],
-                        behavior=Ramp(behavior['ramp_duration'], behavior['ramp_type'], behavior['start_value'], behavior['end_value']),
+                        behavior=Ramp(behavior['ramp_duration'], RampType(behavior['ramp_type']), behavior['start_value'], behavior['end_value']),
                         relative_time=float(data["relative_time"]),
                         reference_time=data["reference_time"],
                         parent_event=parent_event
@@ -815,7 +824,7 @@ class EventsViewerWidget(QWidget):
                         duration= behavior['duration'],
                         start_value= behavior['start_value'],
                         end_value= behavior['end_value'],
-                        ramp_type= behavior['ramp_type'],
+                        ramp_type= RampType(behavior['ramp_type']),
                         new_relative_time= float(data.get ("relative_time",None)) if data.get ("relative_time",None) else None,
                         new_reference_time= data.get ('reference_time',None),
                         new_start_time=float(data.get ("start_time",None)) if data.get ("start_time",None) else None
