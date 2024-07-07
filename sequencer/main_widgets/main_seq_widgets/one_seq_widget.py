@@ -1070,6 +1070,7 @@ class DraggableButton(QPushButton):
     delete_sequence_signal = pyqtSignal(str)  # Signal to emit a number
     edit_sequence_signal = pyqtSignal(str)  # Signal to emit a number
     plot_sequence_signal = pyqtSignal(str)  # Signal to emit a numbero
+    print_sequence_signal = pyqtSignal(str)  # Signal to emit a number
 
     def __init__(self, text, parent=None):
         super().__init__(text, parent)
@@ -1111,6 +1112,11 @@ class DraggableButton(QPushButton):
         plot_sequence_action = QAction('plot Sequence', self)
         plot_sequence_action.triggered.connect(self.plot_sequence)
         context_menu.addAction(plot_sequence_action)
+
+        print_sequence_action = QAction('print Sequence', self)
+        print_sequence_action.triggered.connect(self.print_sequence)
+        context_menu.addAction(print_sequence_action)
+
         
         
         context_menu.exec_(self.mapToGlobal(position))
@@ -1128,6 +1134,10 @@ class DraggableButton(QPushButton):
     def plot_sequence(self):
 
         self.plot_sequence_signal.emit(self.text_to_emit)
+
+    def print_sequence(self):
+
+        self.print_sequence_signal.emit(self.text_to_emit)  
 
 
 class SequenceManagerWidget(QWidget):
@@ -1226,7 +1236,7 @@ class SequenceManagerWidget(QWidget):
         file_name, _ = file_dialog.getSaveFileName(self, "Save Singel Sequence", "", "JSON Files (*.json)")
         if file_name:
             self.sequence_manager.to_json(file_name=file_name)
-        self.sequence_manager.main_sequences[sequence_name]["seq"].to_json(file_name+".json")
+        # self.sequence_manager.main_sequences[sequence_name]["seq"].to_json(file_name+".json")
 
     def delete_sequence(self, sequence_name):
         self.sequence_manager.delete_sequence(sequence_name)
@@ -1241,6 +1251,21 @@ class SequenceManagerWidget(QWidget):
             self.sequence_manager.change_sequence_name(old_name=sequence_name, new_name=new_sequence_name)
             self.update_buttons()
             self.display_sequence(flag=True)
+
+    def print_sequence(self, sequence_name):
+        seq:Sequence = self.sequence_manager.main_sequences[sequence_name]["seq"]
+        text = seq.get_event_tree()
+
+        # make a message to print the text
+        msg = QMessageBox()
+        msg.setWindowTitle("Sequence Tree")
+        msg.setText(text)
+        msg.exec_()
+        
+        
+         
+        
+
     def plot_sequence(self, sequence_name):
         
         #make a dialog to ask for channel name with a combobox
@@ -1275,6 +1300,7 @@ class SequenceManagerWidget(QWidget):
             button.delete_sequence_signal.connect(self.delete_sequence)
             button.edit_sequence_signal.connect(self.edit_sequence)
             button.plot_sequence_signal.connect(self.plot_sequence)
+            button.print_sequence_signal.connect(self.print_sequence)
 
 
             button.setStyleSheet(self.get_button_style(False))

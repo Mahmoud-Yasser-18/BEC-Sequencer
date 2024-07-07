@@ -401,7 +401,14 @@ class Event:
         for child in self.children:
             child.print_event_hierarchy(level + 1, indent)
     
+    def get_text_event_hierarchy(self, level: int = 0, indent: str = "    "):
+        """Prints the event and its children recursively with indentation, avoiding duplicates."""
+        text = f"{indent*level}{self.behavior} on {self.channel.name} at {self.start_time}\n"
 
+        for child in self.children:
+            text += child.get_text_event_hierarchy(level + 1, indent)
+        
+        return text     
 
 
 
@@ -1122,6 +1129,13 @@ class Sequence:
         for root_event in root_events:
             root_event.print_event_hierarchy(level, indent)
         
+    def get_event_tree(self, level: int = 0, indent: str = "    "):
+        root_events = [event for event in self.all_events if event.parent is None]
+        event_tree_text = ""
+        for root_event in root_events:
+            event_tree_text+=root_event.get_text_event_hierarchy(level, indent)+"\n"
+        return event_tree_text
+    
     
     #string of the class 
     def __repr__(self) -> str:
