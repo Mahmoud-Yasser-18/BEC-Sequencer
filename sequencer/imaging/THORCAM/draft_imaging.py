@@ -73,7 +73,7 @@ class ImageAcquisitionThread(threading.Thread):
     def _get_image(self, frame):
         print("self._bit_depth",self._bit_depth)
         scaled_image = frame.image_buffer >> (self._bit_depth - 8)
-        return Image.fromarray(scaled_image),frame
+        return Image.fromarray(scaled_image),frame.image_buffer
 
     def run(self):
         while not self._stop_event.is_set():
