@@ -17,6 +17,7 @@ from sequencer.Dialogs.edit_event_dialog import EditEventDialog,SweepEventDialog
 from sequencer.event import Ramp, Jump, Sequence,Event
 from sequencer.ADwin_Modules import calculate_time_ranges
 
+from sequencer.event import SequenceManager,Sequence,Event , Analog_Channel, Digital_Channel, Channel
 
 import sys
 from typing import List, Optional
@@ -880,6 +881,8 @@ class SyncedTableWidget(QWidget):
         
         self.channel_list.add_channel_clicked.connect(self.show_channel_dialog)
         self.channel_list.buttonclicked.connect(self.show_channel_dialog)
+        self.channel_list.edit_channel_clicked.connect(self.edit_channel)
+        self.channel_list.delete_channel_clicked.connect(self.delete_channel)
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
         self.scroll_bar2 = self.data_table.scroll_area.verticalScrollBar()
@@ -936,9 +939,47 @@ class SyncedTableWidget(QWidget):
 
 
     def edit_channel(self, channel_name: str) -> None:
-        pass 
-        # use the edit channel dialog to edit the channel 
+        channel = self.sequence.find_channel_by_name(channel_name)
+        try:
+            if isinstance(channel, Analog_Channel):
+                dialog = Edit_Analog_Channel( channel)
+                if dialog.exec_() == QDialog.Accepted:
+                    data = dialog.get_data()
+                    self.sequence.edit_analog_channel(
+                        name=channel_name,
+                        new_name=data['name'],
+                        card_number=data['card_number'],
+                        channel_number=data['channel_number'],
+                        reset_value=data['reset_value'],
+                        max_voltage=data.get('max_voltage', 10),
+                        min_voltage=data.get('min_voltage', -10)
+                    )
+            elif isinstance(channel, Digital_Channel):
+                dialog = Edit_Digital_Channel( channel)
+                if dialog.exec_() == QDialog.Accepted:
+                    data = dialog.get_data()
+                    self.sequence.edit_digital_channel(
+                                            name=channel_name,
+                        new_name=data['name'],
+                        card_number=data['card_number'],
+                        channel_number=data['channel_number'],
+                        reset_value=data['reset_value']
+                    )
+            self.refresh_UI()
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+            
 
+    
+    def delete_channel(self, channel_name: str) -> None:
+        try:
+            self.sequence.delete_channel(channel_name)
+            self.refresh_UI()
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+            
 
     def show_channel_dialog(self):
         try :
@@ -973,7 +1014,6 @@ class SyncedTableWidget(QWidget):
 
 
 
-from sequencer.event import SequenceManager
 
 
 # self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence}

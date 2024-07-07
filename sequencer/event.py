@@ -478,18 +478,24 @@ class Sequence:
     def edit_digital_channel(self, name: str,new_name: Optional[str]=None, card_number: Optional[int]=None, channel_number: Optional[int]=None, card_id: Optional[str]=None, bitpos: Optional[int]=None, reset: Optional[bool]=None, reset_value: Optional[float]=None):
         channel = self.find_channel_by_name(name)
         # check if the new name is already taken by another channel
+    
         if new_name is not None:
-            for c in self.channels:
+            temp_list_channel = [ch for ch in self.channels if ch.name != channel.name]
+            for c in temp_list_channel:
                 if c.name == new_name:
                     raise ValueError(f"Channel name {new_name} is already taken by another channel")
+                
         # check if the new card_number and channel_number is already taken by another channel
+
+
         if card_number is not None or channel_number is not None:
             new_card_number = card_number if card_number is not None else channel.card_number
             new_channel_number = channel_number if channel_number is not None else channel.channel_number
-            for c in self.channels:
+
+            temp_list_channel = [ch for ch in self.channels if ch.name != channel.name]
+            for c in temp_list_channel:
                 if c.card_number == new_card_number and c.channel_number == new_channel_number:
                     raise ValueError(f"Card number {new_card_number} and channel number {new_channel_number} is already taken by another channel")
-                
         
         if channel is None:
             raise ValueError(f"Channel {name} not found")
@@ -516,15 +522,17 @@ class Sequence:
             raise ValueError(f"Channel {name} not found")
         # check if the new name is already taken by another channel
         if new_name is not None:
-            for c in self.channels:
+            temp_list_channel = [ch for ch in self.channels if ch.name != channel.name]
+            for c in temp_list_channel:
                 if c.name == new_name:
                     raise ValueError(f"Channel name {new_name} is already taken by another channel")
         # check if the new card_number and channel_number is already taken by another channel
         if card_number is not None or channel_number is not None:
             new_card_number = card_number if card_number is not None else channel.card_number
             new_channel_number = channel_number if channel_number is not None else channel.channel_number
-            
-            for c in self.channels:
+            temp_list_channel = [ch for ch in self.channels if ch.name != channel.name]
+
+            for c in temp_list_channel:
                 if c.card_number == new_card_number and c.channel_number == new_channel_number:
                     raise ValueError(f"Card number {new_card_number} and channel number {new_channel_number} is already taken by another channel")
                 

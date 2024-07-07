@@ -83,14 +83,6 @@ class ChannelDialog(QDialog):
         return data
 
 
-#edit Channel dialog 
-class Edit_Analog_Channel(QDialog):
-    def __init__(self,channel, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle('Edit Analog Channel')
-        self.layout = QFormLayout(self)
-
-
 
 # Edit Analog Channel dialog
 class Edit_Analog_Channel(QDialog):
