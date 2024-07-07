@@ -24,13 +24,12 @@ except ImportError:
 
 
 # --- Your provided code classes ---
-
 class ImageAcquisitionThread(threading.Thread):
     def __init__(self, camera):
         super(ImageAcquisitionThread, self).__init__()
         self._camera = camera
-        self._camera.exposure_time_us = 1000
-        self._camera.gain = 20
+        self._camera.exposure_time_us=1000
+        self._camera.gain = 0
         self._previous_timestamp = 0
 
         if self._camera.camera_sensor_type != SENSOR_TYPE.BAYER:
@@ -72,26 +71,20 @@ class ImageAcquisitionThread(threading.Thread):
         return Image.fromarray(color_image_data, mode='RGB')
 
     def _get_image(self, frame):
-
+        print("self._bit_depth",self._bit_depth)
         scaled_image = frame.image_buffer >> (self._bit_depth - 8)
-        # print(type(scaled_image))
-        # print(scaled_image.shape)
-        return Image.fromarray(scaled_image, mode='L'),scaled_image
+        return Image.fromarray(scaled_image),frame.image_buffer
 
     def run(self):
         while not self._stop_event.is_set():
             try:
                 frame = self._camera.get_pending_frame_or_null()
-                
                 if frame is not None:
-                    # print(type(frame))
                     if self._is_color:
                         pil_image = self._get_color_image(frame)
                     else:
-
-                        pil_image,numpy_data = self._get_image(frame)
-
-                    self._image_queue.put_nowait((pil_image, frame.time_stamp_relative_ns_or_null,numpy_data))
+                        pil_image,numpy_array = self._get_image(frame)
+                    self._image_queue.put_nowait((pil_image,numpy_array))
             except queue.Full:
                 pass
             except Exception as error:
@@ -102,9 +95,7 @@ class ImageAcquisitionThread(threading.Thread):
             self._mono_to_color_processor.dispose()
             self._mono_to_color_sdk.dispose()
 
-    def __del__(self):
-        self.stop() 
-        self.join()
+
 
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout
 from PyQt5.QtCore import QTimer, Qt, QPoint
@@ -142,9 +133,8 @@ class DataItem:
         return DataItem(json_str, images)
 
 
-
 class LiveViewWidget(QWidget):
-    def __init__(self, image_queue,main_camera:'ThorCamControlWidget'):
+    def __init__(self, image_queue,main_camera):
         super(LiveViewWidget, self).__init__()
         self.image_queue = image_queue
         self.main_camera = main_camera
@@ -158,7 +148,8 @@ class LiveViewWidget(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_image)
         self.timer.start(10)
-        self.save = False
+
+
 
     def save_images(self,numpy_data):
         # check if the save checkbox is checked 
@@ -213,78 +204,32 @@ class LiveViewWidget(QWidget):
             # save to the default saving path
             if self.main_camera.save_checkbox.isChecked():
                 # get the default saving path
+                
                 now = datetime.datetime.now()
-                time_stamp = now.strftime("%Y-%m-%d_%H-%M-%S")
-                file_name = f"{time_stamp}.png"
+                time_stamp = now.strftime("%Y-%m-%d_%H-%M-%S-%f")
+                file_name = f"{time_stamp}"
                 file_path = os.path.join(self.main_camera.default_saving_path, file_name)
+                print("Saving_images to " , file_path)
                 np.save(file_path,numpy_data)
-
-
-
-
+                
+                saved_image = Image.fromarray(numpy_data.astype('uint8'))
+                # Save the saved_image
+                saved_image.save(file_path+".png")
 
     def update_image(self):
         try:
-            # Get the image and timestamp from the queue
-            image, timestamp,numpy_data = self.image_queue.get_nowait()
-            
-            
+            image,numpy_data = self.image_queue.get_nowait()
             self.save_images(numpy_data)
-            # Convert the timestamp from microseconds to seconds
-            time_seconds = timestamp / 1e6  # Convert microseconds to seconds
-
-            # Convert the PIL image to a QImage
-            if image.mode == 'RGB':
-                data = image.tobytes("raw", "RGB")
-                q_image = QImage(data, image.width, image.height, QImage.Format_RGB888)
-            else:  # Grayscale image
-                data = image.tobytes("raw", "L")
-                q_image = QImage(data, image.width, image.height, QImage.Format_Grayscale8)
-
-            # Create a QPixmap from the QImage
+            image = image.convert('RGB')
+            data = image.tobytes("raw", "RGB")
+            q_image = QImage(data, image.width, image.height, QImage.Format_RGB888)
             pixmap = QPixmap.fromImage(q_image)
-
-            # Resize the QPixmap according to the QLabel size, keeping aspect ratio
-            scaled_pixmap = pixmap.scaled(self.image_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-
-            # Create a QPainter object to draw on the scaled QPixmap
-            painter = QPainter(scaled_pixmap)
-
-            # Set the font and color for the timestamp
-            font = painter.font()
-            font.setPointSize(12)  # Set the font size to 12 points for better visibility
-            painter.setFont(font)
-            painter.setPen(Qt.red)  # Set the text color to red
-
-            # Define the text to draw, formatting the time to 2 decimal places
-            text = f"Time: {time_seconds:.2f}s"
-
-            # Define the text position to be in the upper-left corner
-            margin_x = 10  # Margin from the left edge
-            margin_y = 10  # Margin from the top edge
-            text_position = QPoint(margin_x, margin_y + painter.fontMetrics().height())
-
-            # Draw the timestamp text on the pixmap
-            painter.drawText(text_position, text)
-
-            # Finish painting
-            painter.end()
-
-            # Set the pixmap with the timestamp to the label
-            self.image_label.setPixmap(scaled_pixmap)
-
+            self.image_label.setPixmap(pixmap)
         except queue.Empty:
             pass
 
-    def resizeEvent(self, event):
-        # Call the base class implementation first
-        super(LiveViewWidget, self).resizeEvent(event)
 
-        # Update the image to rescale it when the window is resized
-        temp_save = copy.deepcopy(self.save)
-        self.save = False
-        self.update_image()
-        self.save = temp_save
+
 
 class THORCAM_HANDLER():
     def __init__(self):
