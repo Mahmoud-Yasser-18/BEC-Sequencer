@@ -589,11 +589,24 @@ class Sequence:
             raise ValueError("Provide either start_time or relative_time, not both.")
 
         channel = self.find_channel_by_name(channel_name)
+        
         if channel is None:
             raise ValueError(f"Channel {channel_name} not found")
 
         if isinstance(channel, Digital_Channel) and isinstance(behavior, Ramp):
             raise ValueError("Ramp behavior cannot be added to a digital channel.")
+
+        # check if the  behavior is a jump and is not within the max min range of the channel 
+        if isinstance(channel, Analog_Channel) and isinstance(behavior, Jump):
+            if behavior.target_value > channel.max_voltage or behavior.target_value < channel.min_voltage:
+                raise ValueError(f"Jump value {behavior.target_value} is out of range for channel {channel.name} with min voltage {channel.min_voltage} and max voltage {channel.max_voltage}")
+        
+        if isinstance(channel, Analog_Channel) and isinstance(behavior, Ramp):
+            if behavior.start_value > channel.max_voltage or behavior.start_value < channel.min_voltage:
+                raise ValueError(f"Ramp start value {behavior.start_value} is out of range for channel {channel.name} with min voltage {channel.min_voltage} and max voltage {channel.max_voltage}")
+            if behavior.end_value > channel.max_voltage or behavior.end_value < channel.min_voltage:
+                raise ValueError(f"Ramp end value {behavior.end_value} is out of range for channel {channel.name} with min voltage {channel.min_voltage} and max voltage {channel.max_voltage}")
+        
 
         if parent_event is None:
             if start_time is None:
@@ -836,6 +849,7 @@ class Sequence:
                           new_reference_time: Optional[str] = None):
         temp_sequence = copy.deepcopy(self)
         self.copy_original_events_to_new_sequence(self, temp_sequence)
+        
 
         
         if (edited_event is not None) and (start_time is not  None) and (channel_name is not None):
@@ -850,6 +864,17 @@ class Sequence:
         else:
             event = temp_sequence.find_event_by_original_reference(edited_event)
 
+        # check if the new values are within the range of the channel 
+        if jump_target_value is not None and isinstance(event.behavior, Jump):
+            if jump_target_value > event.channel.max_voltage or jump_target_value < event.channel.min_voltage:
+                raise ValueError(f"Jump value {jump_target_value} is out of range for channel {event.channel.name} with min voltage {event.channel.min_voltage} and max voltage {event.channel.max_voltage}")
+        if start_value is not None and isinstance(event.behavior, Ramp):
+            if start_value > event.channel.max_voltage or start_value < event.channel.min_voltage:
+                raise ValueError(f"Ramp start value {start_value} is out of range for channel {event.channel.name} with min voltage {event.channel.min_voltage} and max voltage {event.channel.max_voltage}")
+        if end_value is not None and isinstance(event.behavior, Ramp):
+            if end_value > event.channel.max_voltage or end_value < event.channel.min_voltage:
+                raise ValueError(f"Ramp end value {end_value} is out of range for channel {event.channel.name} with min voltage {event.channel.min_voltage} and max voltage {event.channel.max_voltage}")
+            
 
 
         if event is None:
