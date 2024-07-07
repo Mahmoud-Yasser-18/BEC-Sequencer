@@ -26,17 +26,52 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QPoint
 
-from sequencer.Dialogs.channel_dialog import ChannelDialog
+from sequencer.Dialogs.channel_dialog import ChannelDialog,Edit_Analog_Channel,Edit_Digital_Channel
+
 from sequencer.Dialogs.event_dialog import ChildEventDialog, RootEventDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog
 from sequencer.event import Ramp, Jump, Sequence, SequenceManager
 
 from sequencer.imaging.THORCAM.imaging_software import ThorCamControlWidget
 from sequencer.main_widgets.main_seq_widgets.Runner_widget import Runner
+class ChannelLabel(QWidget):
+    def __init__(self, channel_name, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.channel_name = channel_name
+        self.initUI()
+
+    def initUI(self):
+        self.label = QLabel(self.channel_name, self)
+        self.label.setFixedHeight(50)
+        self.label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.label.customContextMenuRequested.connect(self.show_context_menu)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.label)
+        self.setLayout(layout)
+
+    def show_context_menu(self, pos):
+        context_menu = QMenu(self)
+        add_channel_action = context_menu.addAction("Add Channel")
+        edit_channel_action = context_menu.addAction("Edit Channel")
+        delete_channel_action = context_menu.addAction("Delete Channel")
+
+        action = context_menu.exec_(self.mapToGlobal(pos))
+        if action == edit_channel_action:
+            self.parent.on_edit_channel(self.channel_name)
+        elif action == delete_channel_action:
+            self.parent.on_delete_channel(self.channel_name)
+        elif action == add_channel_action:
+            self.parent.on_add_channel()
 
 
 class ChannelLabelWidget(QWidget):
-    channel_right_clicked = pyqtSignal()
+    add_channel_clicked = pyqtSignal()
+    edit_channel_clicked = pyqtSignal(str)
+    delete_channel_clicked = pyqtSignal(str)
     buttonclicked = pyqtSignal()
 
     def __init__(self, sequence, parent=None):
@@ -97,41 +132,36 @@ class ChannelLabelWidget(QWidget):
             self.layout.addWidget(add_channel_button, alignment=Qt.AlignCenter)
         else:
             for channel in self.channels:
-                label = QLabel(channel, self)
-                label.setFixedHeight(50)
-                label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)  # Adjust size policy for width to fit content
-                label.setAlignment(Qt.AlignCenter)
-                label.setContextMenuPolicy(Qt.CustomContextMenu)
-                label.customContextMenuRequested.connect(self.show_context_menu)
-
-                self.layout.addWidget(label)
+                channel_label = ChannelLabel(channel, self)
+                self.layout.addWidget(channel_label)
 
         self.container_widget.setLayout(self.layout)
         self.container_widget.setFixedHeight(len(self.channels) * 100 if self.channels else 100)
-        self.container_widget.adjustSize()  # Adjust size to fit contents
+        self.container_widget.adjustSize()
 
         scroll_area.setWidget(self.container_widget)
         scroll_area.verticalScrollBar().setStyleSheet("""
             QScrollBar:vertical {
                 width: 10px;  /* Adjust the width as needed */
             }
-                                    }
         """)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-
-
         scroll_area.setFixedWidth(200)
         return scroll_area
 
-    def show_context_menu(self, pos):
-        context_menu = QMenu(self)
-        add_event_action = context_menu.addAction("Add Channel")
-        action = context_menu.exec_(self.mapToGlobal(pos))
-        if action == add_event_action:
-            self.channel_right_clicked.emit()
+    def on_edit_channel(self, channel_name):
+        self.edit_channel_clicked.emit(channel_name)
+
+    def on_delete_channel(self, channel_name):
+        self.delete_channel_clicked.emit(channel_name)
+
+    def on_add_channel(self): 
+        self.add_channel_clicked.emit()
+
 
     def add_channel(self):
         self.buttonclicked.emit()
+
 
 class GapButton(QPushButton):
     addEventSignal = pyqtSignal(object)
@@ -386,7 +416,7 @@ class TimeAxisContent(QWidget):
                     continue
                 i+=1
             
-            self.setFixedSize(int((i+1) * self.scale_factor*2) , 50)
+            self.setFixedSize(int((i) * self.scale_factor*2) + 50, 50)
 
 
             
@@ -409,7 +439,7 @@ class TimeAxisContent(QWidget):
             for time in range(int(self.max_time) + 1):
                 x = int(time * self.scale_factor)
                 painter.drawLine(x, 20, x, 30)
-                painter.drawText(QRect(x - 10, 30, 20, 20), Qt.AlignCenter, str(time))
+                painter.drawText(QRect(x - 30, 30, 60, 20), Qt.AlignCenter, str(time))
         elif self.view_type == "Linear Event":
             time_ranges=calculate_time_ranges(self.sequence.all_events) 
 
@@ -417,7 +447,7 @@ class TimeAxisContent(QWidget):
                 start_time, end_time = time_range[0]
                 x_start = int(start_time * self.scale_factor)
                 painter.drawLine(x_start, 20, x_start, 30)
-                painter.drawText(QRect(x_start-10, 30, 20, 20), Qt.AlignCenter, f"{start_time}")
+                painter.drawText(QRect(x_start- 30, 30, 60, 20), Qt.AlignCenter, f"{start_time}")
         elif self.view_type == "Event":
             time_ranges=calculate_time_ranges(self.sequence.all_events)
             i=0
@@ -428,7 +458,7 @@ class TimeAxisContent(QWidget):
                 # x_start = int(start_time * self.scale_factor)
                 x_start_i = int(i * self.scale_factor*2)
                 painter.drawLine(x_start_i, 20, x_start_i, 30)
-                painter.drawText(QRect(x_start_i-10, 30, 20, 20), Qt.AlignCenter, f"{start_time}")
+                painter.drawText(QRect(x_start_i- 30, 30, 60, 20), Qt.AlignCenter, f"{start_time}")
                 i+=1
 
 
@@ -539,7 +569,7 @@ class EventsViewerWidget(QWidget):
 
             self.container_widget.setFixedSize(int(self.max_time * self.scale_factor) + 50, self.num_channels * 100)
         elif self.sequence_manager.view_type == "Event":
-            self.container_widget.setFixedSize(int((len(self.sequence_range_index.items())+1) * self.scale_factor*2) + 50, self.num_channels * 100)
+            self.container_widget.setFixedSize(int((len(self.sequence_range_index.items())) * self.scale_factor*2) + 50, self.num_channels * 100)
         scroll_area.setWidget(self.container_widget)
         scroll_area.verticalScrollBar().setStyleSheet("""
             QScrollBar:vertical {
@@ -848,7 +878,7 @@ class SyncedTableWidget(QWidget):
         self.data_table.changes_in_event.connect(self.refresh_UI)
         self.time_axis = TimeAxisWidget(sequence=self.sequence,parent=self.data_table,view_type=self.sequence_manager.view_type)
         
-        self.channel_list.channel_right_clicked.connect(self.show_channel_dialog)
+        self.channel_list.add_channel_clicked.connect(self.show_channel_dialog)
         self.channel_list.buttonclicked.connect(self.show_channel_dialog)
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
@@ -904,12 +934,11 @@ class SyncedTableWidget(QWidget):
         proportion = value / scroll_bar_from.maximum() if scroll_bar_from.maximum() != 0 else 0
         return int(proportion * scroll_bar_to.maximum())
 
-    # def show_context_menu(self, position):
-    #     context_menu = QMenu(self)
-    #     add_channel_action = context_menu.addAction("Add Channel")
-    #     action = context_menu.exec_(position)
-    #     if action == add_channel_action:
-    #         self.show_channel_dialog()
+
+    def edit_channel(self, channel_name: str) -> None:
+        pass 
+        # use the edit channel dialog to edit the channel 
+
 
     def show_channel_dialog(self):
         try :
