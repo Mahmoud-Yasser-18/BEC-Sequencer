@@ -326,9 +326,9 @@ class EventButton(QPushButton):
 
     def enterEvent(self, event:Event):
         if isinstance(self.event.behavior, Ramp):
-            behavior = f"Start time: {self.event.start_time}\n{self.event.behavior.ramp_type} Ramp of duration {self.event.behavior.duration} from {self.event.behavior.start_value} to {self.event.behavior.end_value}"
+            behavior = f"Start time: {self.event.start_time}\nEnd time: {self.event.end_time}\n{self.event.behavior.ramp_type} Ramp of duration {self.event.behavior.duration} from value {self.event.behavior.start_value} to {self.event.behavior.end_value}"
         elif isinstance(self.event.behavior, Jump):
-            behavior = f"Start time: {self.event.start_time}\nJump to {self.event.behavior.target_value}"
+            behavior = f"Start time: {self.event.start_time}\nEnd time: {self.event.end_time}\nJump to {self.event.behavior.target_value}"
         else:
             behavior = "Unknown behavior"
         if self.event.associated_parameters:
