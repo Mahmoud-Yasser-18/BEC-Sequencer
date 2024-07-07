@@ -281,12 +281,14 @@ class EventButton(QPushButton):
     addParameterSignal = pyqtSignal(object)
     removeParameterSignal = pyqtSignal(object)
 
-    def __init__(self, event: Event , scale_factor, sequence, parent=None, view_type= "Linear"):
+    def __init__(self, event: Event , scale_factor, sequence, parent=None, view_type= "Linear",flag=0,next_event=None):
         super().__init__(parent)
         self.event = event
         self.scale_factor = scale_factor
         self.sequence = sequence
         self.view_type = view_type
+        self.flag = flag 
+        self.next_event = next_event
         self.initUI()
 
     def initUI(self):
@@ -386,19 +388,35 @@ class EventButton(QPushButton):
 
 
     def enterEvent(self, event:Event):
-        if isinstance(self.event.behavior, Ramp):
-            behavior = f"Start time: {self.event.start_time}\nEnd time: {self.event.end_time}\n{self.event.behavior.ramp_type} Ramp of duration {self.event.behavior.duration} from value {self.event.behavior.start_value} to {self.event.behavior.end_value}"
-        elif isinstance(self.event.behavior, Jump):
-            behavior = f"Start time: {self.event.start_time}\nEnd time: {self.event.end_time}\nJump to {self.event.behavior.target_value}"
-        else:
-            behavior = "Unknown behavior"
-        if self.event.associated_parameters:
-            behavior += "\n\nAssociated Parameters:"
-            # associated_parameters is a list 
-            for p in self.event.associated_parameters:
-                behavior += f"\n{p.name}: {p.get_value()}"
-        QToolTip.showText(event.globalPos(), behavior, self)
-        super().enterEvent(event)
+        if self.flag :
+            if isinstance(self.event.behavior, Ramp):
+                behavior = f"Start time: {self.event.start_time}\nEnd time: {self.event.end_time}\n{self.event.behavior.ramp_type} Ramp of duration {self.event.behavior.duration} from value {self.event.behavior.start_value} to {self.event.behavior.end_value}"
+            elif isinstance(self.event.behavior, Jump):
+                behavior = f"Start time: {self.event.start_time}\nEnd time: {self.next_event.start_time}\nJump to {self.event.behavior.target_value}"
+            else:
+                behavior = "Unknown behavior"
+            if self.event.associated_parameters:
+                behavior += "\n\nAssociated Parameters:"
+                # associated_parameters is a list 
+                for p in self.event.associated_parameters:
+                    behavior += f"\n{p.name}: {p.get_value()}"
+            QToolTip.showText(event.globalPos(), behavior, self)
+            super().enterEvent(event)
+ 
+        else : 
+            if isinstance(self.event.behavior, Ramp):
+                behavior = f"Start time: {self.event.start_time}\nEnd time: {self.event.end_time}\n{self.event.behavior.ramp_type} Ramp of duration {self.event.behavior.duration} from value {self.event.behavior.start_value} to {self.event.behavior.end_value}"
+            elif isinstance(self.event.behavior, Jump):
+                behavior = f"Start time: {self.event.start_time}\nEnd time: {self.event.end_time}\nJump to {self.event.behavior.target_value}"
+            else:
+                behavior = "Unknown behavior"
+            if self.event.associated_parameters:
+                behavior += "\n\nAssociated Parameters:"
+                # associated_parameters is a list 
+                for p in self.event.associated_parameters:
+                    behavior += f"\n{p.name}: {p.get_value()}"
+            QToolTip.showText(event.globalPos(), behavior, self)
+            super().enterEvent(event)
 
     def show_context_menu(self, pos):
         context_menu = QMenu(self)
@@ -717,7 +735,10 @@ class EventsViewerWidget(QWidget):
                     event = time_ranges2[i][1][0]
                     previous_event = event
                     i+=1
-                    button = EventButton(event, self.scale_factor, self.sequence, buttons_container,view_type=self.sequence_manager.view_type)
+                    try :
+                        button = EventButton(event, self.scale_factor, self.sequence, buttons_container,view_type=self.sequence_manager.view_type,flag=1,next_event=time_ranges2[i][1][0])
+                    except:
+                        button = EventButton(event, self.scale_factor, self.sequence, buttons_container,view_type=self.sequence_manager.view_type)
                     button.setGeometry(int(j * self.scale_factor*2), 0, int( 2* self.scale_factor), 50)
                     button.addChildEventSignal.connect(self.add_child_event)
                     button.deleteEventSignal.connect(self.delete_event)

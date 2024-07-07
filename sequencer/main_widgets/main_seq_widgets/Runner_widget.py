@@ -280,47 +280,6 @@ class Runner(QWidget):
         self.setLayout(main_layout)
         self.setWindowTitle('Runner Widget')
         self.setWindowIcon(QIcon('path_to_icon.png'))  # Add path to your icon
-        # self.setStyleSheet("""
-        #     QWidget {
-        #         background-color: #1e1e1e;
-        #         color: #f0f0f0;
-        #         font-family: Arial, sans-serif;
-        #         font-size: 14px;
-        #     }
-        #     QMenuBar {
-        #         background-color: #3e3e3e;
-        #         color: #f0f0f0;
-        #     }
-        #     QMenuBar::item {
-        #         background-color: #3e3e3e;
-        #         color: #f0f0f0;
-        #     }
-        #     QMenuBar::item:selected {
-        #         background-color: #505050;
-        #     }
-        #     QPushButton {
-        #         background-color: #3e3e3e;
-        #         border: 1px solid #f0f0f0;
-        #         border-radius: 5px;
-        #         padding: 10px;
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #505050;
-        #     }
-        #     QPushButton:pressed {
-        #         background-color: #606060;
-        #     }
-        #     QProgressBar {
-        #         background-color: #3e3e3e;
-        #         border: 1px solid #f0f0f0;
-        #         border-radius: 5px;
-        #         text-align: center;
-        #         padding: 5px;
-        #     }
-        #     QProgressBar::chunk {
-        #         background-color: #00bfff;
-        #     }
-        # """)
         try: 
             self.refreash_custom_sweep_queue()
         except:
