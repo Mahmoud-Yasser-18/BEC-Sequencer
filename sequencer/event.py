@@ -1658,7 +1658,7 @@ class Sequence:
         try: 
             temp_original_sequence.check_for_overlapping_events()
         except: 
-            print("There is an overlapping events in the end")
+            print("There is an overlapping events in the end of the original sequence and the start of the new sequence. Please adjust the time difference.")
 
         return temp_original_sequence
 

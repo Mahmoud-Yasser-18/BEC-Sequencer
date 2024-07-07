@@ -422,7 +422,9 @@ class EventButton(QPushButton):
             self.addParameterSignal.emit(self.event)
         elif action == remove_parameter_action:
             self.removeParameterSignal.emit(self.event)
-
+        else:
+            raise Exception("Unknown action")
+        
 
         
     
@@ -822,7 +824,7 @@ class EventsViewerWidget(QWidget):
             QMessageBox.critical(self, "Error", error_message)
 
     def edit_event(self, event_to_edit):
-        # try:
+        try:
             dialog = EditEventDialog( event_to_edit)
             if dialog.exec_() == QDialog.Accepted:
                 data = dialog.get_data()
@@ -852,10 +854,9 @@ class EventsViewerWidget(QWidget):
                         new_start_time=float(data.get ("start_time",None)) if data.get ("start_time",None) else None
                                                                 )
                 self.refreshUI()
-        # except Exception as e:
-        #     error_message = f"An error occurred: {str(e)}"
-        #     QMessageBox.critical(self,
-        # "Error", error_message)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self,"Error", error_message)
     
     def sweep_event(self, event_to_sweep):
         try:
@@ -1218,75 +1219,103 @@ class SequenceManagerWidget(QWidget):
             
 
     def save_sequence_manager(self):
-        file_dialog = QFileDialog(self)
-        file_name, _ = file_dialog.getSaveFileName(self, "Save Sequence Manager", "", "JSON Files (*.json)")
-        if file_name:
-            self.sequence_manager.to_json(file_name=file_name)
+        try:
+            file_dialog = QFileDialog(self)
+            file_name, _ = file_dialog.getSaveFileName(self, "Save Sequence Manager", "", "JSON Files (*.json)")
+            if file_name:
+                self.sequence_manager.to_json(file_name=file_name)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
 
     def load_sequence_manager(self):
-        file_dialog = QFileDialog(self)
-        file_name, _ = file_dialog.getOpenFileName(self, "Open Sequence Manager", "", "JSON Files (*.json)")
-        if file_name:
-            self.sequence_manager = SequenceManager.from_json(file_name=file_name)
-            self.update_buttons()
-            self.display_sequence(flag=True)
-    
+        try:
+            file_dialog = QFileDialog(self)
+            file_name, _ = file_dialog.getOpenFileName(self, "Open Sequence Manager", "", "JSON Files (*.json)")
+            if file_name:
+                self.sequence_manager = SequenceManager.from_json(file_name=file_name)
+                self.update_buttons()
+                self.display_sequence(flag=True)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
     def save_sequence(self, sequence_name):
-        file_dialog = QFileDialog(self)
-        file_name, _ = file_dialog.getSaveFileName(self, "Save Singel Sequence", "", "JSON Files (*.json)")
-        if file_name:
-            self.sequence_manager.to_json(file_name=file_name)
+        try:
+            file_dialog = QFileDialog(self)
+            file_name, _ = file_dialog.getSaveFileName(self, "Save Singel Sequence", "", "JSON Files (*.json)")
+            if file_name:
+                self.sequence_manager.to_json(file_name=file_name)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+            
         # self.sequence_manager.main_sequences[sequence_name]["seq"].to_json(file_name+".json")
 
     def delete_sequence(self, sequence_name):
-        self.sequence_manager.delete_sequence(sequence_name)
-        self.update_buttons()
-        self.display_sequence(flag=True)
+        try:
+            self.sequence_manager.delete_sequence(sequence_name)
+            self.update_buttons()
+            self.display_sequence(flag=True)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
 
     def edit_sequence(self, sequence_name):
         # ask user for new name
-        new_sequence_name, ok = QInputDialog.getText(self, "Edit Sequence Name", "Enter new sequence name:")
-        if ok and new_sequence_name:
-                
-            self.sequence_manager.change_sequence_name(old_name=sequence_name, new_name=new_sequence_name)
-            self.update_buttons()
-            self.display_sequence(flag=True)
+        try:
+            new_sequence_name, ok = QInputDialog.getText(self, "Edit Sequence Name", "Enter new sequence name:")
+            if ok and new_sequence_name:
+                    
+                self.sequence_manager.change_sequence_name(old_name=sequence_name, new_name=new_sequence_name)
+                self.update_buttons()
+                self.display_sequence(flag=True)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
 
     def print_sequence(self, sequence_name):
-        seq:Sequence = self.sequence_manager.main_sequences[sequence_name]["seq"]
-        text = seq.get_event_tree()
+        try:
+            seq = self.sequence_manager.main_sequences[sequence_name]["seq"]
+            text = seq.get_event_tree()
 
-        # make a message to print the text
-        msg = QMessageBox()
-        msg.setWindowTitle("Sequence Tree")
-        msg.setText(text)
-        msg.exec_()
-        
+            # make a message to print the text
+            msg = QMessageBox()
+            msg.setWindowTitle("Sequence Tree")
+            msg.setText(text)
+            msg.exec_()
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
         
          
         
 
     def plot_sequence(self, sequence_name):
-        
-        #make a dialog to ask for channel name with a combobox
-        channels =["All Channels"]+ [ch.name for ch in self.sequence_manager.main_sequences[sequence_name]["seq"].channels] 
-        types = ["Normal","With Relations"]
-        dialog = CustomDialog(channels, types)
-        if dialog.exec_() == QDialog.Accepted:
-            channel_name, channel_type,resolution = dialog.get_values()
-            print(f"Selected Channel: {channel_name}, Type: {channel_type}")
+        try:
+            #makZe a dialog to ask for channel name with a combobox
+            channels =["All Channels"]+ [ch.name for ch in self.sequence_manager.main_sequences[sequence_name]["seq"].channels] 
+            types = ["Normal","With Relations"]
+            dialog = CustomDialog(channels, types)
+            if dialog.exec_() == QDialog.Accepted:
+                channel_name, channel_type,resolution = dialog.get_values()
+                print(f"Selected Channel: {channel_name}, Type: {channel_type}")
 
-            if channel_name != "All Channels":
-                if channel_type == "Normal":
-                    self.sequence_manager.main_sequences[sequence_name]["seq"].plot([channel_name],resolution=resolution)
-                else :
-                    self.sequence_manager.main_sequences[sequence_name]["seq"].plot_all([channel_name],resolution=resolution)
+                if channel_name != "All Channels":
+                    if channel_type == "Normal":
+                        self.sequence_manager.main_sequences[sequence_name]["seq"].plot([channel_name],resolution=resolution)
+                    else :
+                        self.sequence_manager.main_sequences[sequence_name]["seq"].plot_all([channel_name],resolution=resolution)
 
-            else:  
-                if channel_type == "Normal":
-                    self.sequence_manager.main_sequences[sequence_name]["seq"].plot(resolution=resolution)
-                else :
-                    self.sequence_manager.main_sequences[sequence_name]["seq"].plot_all(resolution=resolution)
+                else:  
+                    if channel_type == "Normal":
+                        self.sequence_manager.main_sequences[sequence_name]["seq"].plot(resolution=resolution)
+                    else :
+                        self.sequence_manager.main_sequences[sequence_name]["seq"].plot_all(resolution=resolution)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
 
 
     def update_buttons(self):
