@@ -109,11 +109,6 @@ class DataItem:
         self.images = images if images is not None else []
 
     def save(self, filename):
-        # Convert the JSON string to a dictionary
-        # json_dict = json.loads(self.json_str)
-        
-        # Create a dictionary to save
-        # save_dict = {'json': json_dict}
         save_dict = {'json': self.json_str}
         for i, img in enumerate(self.images):
             save_dict[f'image_{i}'] = img

@@ -262,10 +262,6 @@ class ADwin_Driver:
         processdelay_value_list= self.queue[index]["processdelay_value_list"]
 
 
-        #channel_number= self.queue[index]["channel_number"] 
-        # channel_number=channel_number*0 + 33
-        # channel_number=list(channel_number.astype('int'))
-        
         start_time2 = time.time()
         self.adw.Set_Par(Index=1, Value=len(update_list))
         self.adw.Set_Par(Index=2, Value=int(self.processdelay))

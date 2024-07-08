@@ -34,6 +34,8 @@ from sequencer.Dialogs.edit_event_dialog import EditEventDialog
 from sequencer.event import Ramp, Jump, Sequence, SequenceManager
 
 from sequencer.imaging.THORCAM.imaging_software import ThorCamControlWidget
+from sequencer.imaging.THORCAM.data_viewer import DataItemViewer
+
 from sequencer.main_widgets.main_seq_widgets.Runner_widget import Runner
 class ChannelLabel(QWidget):
     def __init__(self, channel_name, parent=None):
@@ -1228,12 +1230,26 @@ class SequenceManagerWidget(QWidget):
         tools_menu.addAction(open_camera_action)
 
 
+        
+        open_data_view_action = QAction("Open Data Viewer", self)
+        open_data_view_action.triggered.connect(self.open_data_view)
+        tools_menu.addAction(open_data_view_action)
+
+
 
 
         menu_bar.addMenu(file_menu)
         menu_bar.addMenu(tools_menu)
         
         return menu_bar
+    def open_data_view(self):
+        try:
+            self.data_view_widget = DataItemViewer()
+            self.data_view_widget.show()
+        except Exception as e:
+            error_message = f"Can not Open Data View, An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
     def open_runner(self):
         try:
             self.runner_widget = Runner(self.sequence_manager)
@@ -1525,3 +1541,4 @@ if __name__ == '__main__':
     window = SequenceManagerWidget()
     window.show()
     sys.exit(app.exec_())
+# experiment description : 
