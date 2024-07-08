@@ -71,7 +71,6 @@ class ImageAcquisitionThread(threading.Thread):
         return Image.fromarray(color_image_data, mode='RGB')
 
     def _get_image(self, frame):
-        print("self._bit_depth",self._bit_depth)
         scaled_image = frame.image_buffer >> (self._bit_depth - 8)
         return Image.fromarray(scaled_image),frame.image_buffer
 
