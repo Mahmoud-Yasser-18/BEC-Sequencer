@@ -1612,7 +1612,7 @@ class Sequence:
 
 
     # returns a new sequence with the events of the new sequence added to the original sequence with a time difference if specified
-    def add_sequence(self, new_sequence: 'Sequence', time_difference: float = 0.0):
+    def add_sequence(self, new_sequence: 'Sequence', time_difference: float = 0.000001):
         temp_original_sequence = copy.deepcopy(self)
         temp_new_sequence = copy.deepcopy(new_sequence)
         self.copy_original_events_to_new_sequence(self, temp_original_sequence)
