@@ -28,7 +28,7 @@ class ImageAcquisitionThread(threading.Thread):
     def __init__(self, camera):
         super(ImageAcquisitionThread, self).__init__()
         self._camera = camera
-        self._camera.exposure_time_us=1000
+        self._camera.exposure_time_us=113
         self._camera.gain = 0
         self._previous_timestamp = 0
 
@@ -160,12 +160,16 @@ class LiveViewWidget(QWidget):
             current_source_file = [file for file in os.listdir(self.main_camera.default_source_path) if file.startswith("current")]
             if current_source_file:
                 current_source_file= current_source_file[0]
+            else:
+                # make a message box to tell the user to select the source folder 
+                QMessageBox.warning(self, "Warning", "Please select a valid source file. The current source folder is empty")
+                return
+            
             
             print(current_source_file)
             print(os.path.join(self.main_camera.default_source_path,current_source_file))
             
             temp_seq = Sequence.from_json(file_name=os.path.join(self.main_camera.default_source_path,current_source_file))
-            print(temp_seq.all_events)
             paramters = temp_seq.get_parameter_dict()
             self.main_camera.paramerter_list.update_parameters(paramters)
             
@@ -180,24 +184,26 @@ class LiveViewWidget(QWidget):
                             
                             old_data =DataItem.load(os.path.join(self.main_camera.default_destination_path,current_destination_file))
                             old_data.images.append(numpy_data)
+                            print('saving to the default saving path1')
+                            
                             old_data.save(os.path.join(self.main_camera.default_destination_path,current_destination_file))
                         else:
                             # save to the default saving path
                             # rename the current file in the destination path folder to be without current
-                            os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
+                            os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current_","")))
                             # save to the default saving path
-                            print('saving to the default saving path')
+                            print('saving to the default saving path2')
                             new_data = DataItem(json_str=json.load(open(os.path.join(self.main_camera.default_source_path, current_source_file))), images=[numpy_data])
-                            new_data.save(os.path.join(self.main_camera.default_saving_path,current_source_file))
+                            new_data.save(os.path.join(self.main_camera.default_destination_path,current_source_file))
                     else:
                         # save to the default saving path
                         # rename the current file in the destination path folder to be without current
                         # os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
                         # save to the default saving path
-                        print('saving to the default saving path')
+                        print('saving to the default saving path3')
                         new_data = DataItem(json_str=json.load(open(os.path.join(self.main_camera.default_source_path, current_source_file))), images=[numpy_data])
-                        new_data.save(os.path.join(self.main_camera.default_saving_path,current_source_file))
-                            
+                        new_data.save(os.path.join(self.main_camera.default_destination_path,current_source_file))
+          
 
         else:
             # save to the default saving path
