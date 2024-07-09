@@ -373,16 +373,16 @@ class Runner(QWidget):
                 for key in self.main_sweep_queue.keys():
                     sequence = self.main_sweep_queue[key]
                     self.run_sequence(sequence)
-                    self.main_sweep_queue.pop(key)
+                    # self.main_sweep_queue.pop(key)
                     self.refreash_queue(Working=True)
 
 
 
             else:
-                for key in self.main_sweep_queue.keys():
+                for key in self.custom_sequence_widget.keys():
                     sequence = self.custom_sweep_queue[key]
                     self.run_sequence(sequence)
-                    self.main_sweep_queue.pop(key)
+                    # self.main_sweep_queue.pop(key)
                     self.refreash_queue(Working=True)
 
 
