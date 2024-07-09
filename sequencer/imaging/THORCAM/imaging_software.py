@@ -22,6 +22,7 @@ except ImportError:
     configure_path = None
 
 
+import matplotlib.pyplot as plt
 
 # --- Your provided code classes ---
 class ImageAcquisitionThread(threading.Thread):
@@ -78,15 +79,19 @@ class ImageAcquisitionThread(threading.Thread):
         while not self._stop_event.is_set():
             try:
                 frame = self._camera.get_pending_frame_or_null()
+                
                 if frame is not None:
+                    print("frame is not None")
                     if self._is_color:
                         pil_image = self._get_color_image(frame)
                     else:
                         pil_image,numpy_array = self._get_image(frame)
                     self._image_queue.put_nowait((pil_image,numpy_array))
             except queue.Full:
+                print("queue.Full")
                 pass
             except Exception as error:
+                print("Here error")
                 print(f"Encountered error: {error}, image acquisition will stop.")
                 break
         print("Image acquisition has stopped")
@@ -182,7 +187,11 @@ class LiveViewWidget(QWidget):
                         current_destination_file = current_destination_file[0]
                         current_destination_file_temp = current_destination_file.replace("current_","")
                         current_destination_file_temp = current_destination_file_temp.replace(".npz","")
-                        if current_source_file == current_destination_file_temp:
+                        print("comparing folders")
+                        print(current_destination_file_temp)
+                        print(current_source_file)
+                        
+                        if current_source_file.replace("current_","") == current_destination_file_temp:
                             # save to the destination path
                             # unpack the file and save it again to the destination path
                             
@@ -195,7 +204,7 @@ class LiveViewWidget(QWidget):
                         else:
                             # save to the default saving path
                             # rename the current file in the destination path folder to be without current
-                            os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current_","")))
+                            os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
                             # save to the default saving path
                             print('saving to the default saving path2')
                             with open(os.path.join(self.main_camera.default_source_path, current_source_file+".json")) as json_file:
@@ -226,15 +235,21 @@ class LiveViewWidget(QWidget):
                 file_path = os.path.join(self.main_camera.default_saving_path, file_name)
                 print("Saving_images to " , file_path)
                 np.save(file_path,numpy_data)
-                
-                saved_image = Image.fromarray(numpy_data.astype('uint8'))
-                # Save the saved_image
-                saved_image.save(file_path+".png")
+
+
+                # plt.imshow(numpy_data, cmap='gray')
+                # plt.axis('off')  # Turn off axis numbers and ticks
+                # plt.savefig(file_path+".png", bbox_inches='tight', pad_inches=0.0)  # Save as PNG file
+
+                # saved_image = Image.fromarray(numpy_data.astype('uint8'))
+                # # Save the saved_image
+                # saved_image.save()
 
     def update_image(self):
         try:
             image,numpy_data = self.image_queue.get_nowait()
-            self.save_images(numpy_data)
+            save_thread = threading.Thread(target=self.save_images, args=(numpy_data,))
+            save_thread.start()
             image = image.convert('RGB')
             data = image.tobytes("raw", "RGB")
             q_image = QImage(data, image.width, image.height, QImage.Format_RGB888)
@@ -311,16 +326,16 @@ class THORCAM_HANDLER():
             gain = 0
             print('Minimum gain is 0')
 
-        if gain > 100:
-            gain = 100
-            print('Maximum gain is 100')
+        if gain > 40:
+            gain = 40
+            print('Maximum gain is 40')
 
         try:
             self.camera.exposure_time_us = exposure_time_us
         except:
             print('No camera to set exposure')
         try:    
-            self.camera.gain = gain
+            self.camera.gain = 10*gain
         except:
             print('No camera to set gain')
 

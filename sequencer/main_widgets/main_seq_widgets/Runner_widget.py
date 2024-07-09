@@ -294,6 +294,7 @@ class Runner(QWidget):
 
     def refreash_sweep_queue(self):
         self.main_sweep_queue =self.sequence_manager.get_sweep_sequences_main()
+        # print(self.main_sweep_queue[0])
     
     def refreash_custom_sweep_queue(self):
         self.custom_sweep_queue =self.sequence_manager.get_sweep_sequences_custom(self.custom_sequence_widget.get_sequences_names())
@@ -366,7 +367,7 @@ class Runner(QWidget):
             QMessageBox.critical(self, "Error", str(e))
 
     def run_sweep(self):
-        # try:
+        try:
             if self.combo_sweep.currentText() == "main":
                 self.main_sweep_queue 
                 # run the first sequence in the queue and pop it out untill there is not element and refreash UI 
@@ -390,8 +391,8 @@ class Runner(QWidget):
 
 
 
-        # except Exception as e:
-        #     QMessageBox.critical(self, "Error", str(e))
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
 
     def run_sequence(self, sequence:Sequence):
         try:

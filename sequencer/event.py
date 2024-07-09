@@ -1902,7 +1902,6 @@ class SequenceManager:
         
         
         
-        
         seq_list = list(self.main_sequences.values())
         seq_list.sort(key=lambda seq: seq["index"])
 
@@ -1962,7 +1961,7 @@ class SequenceManager:
             if len(sweep_sequences_keys[0]) <2:
                 new_sweep_sequences_key = [tuple(s) for s in sweep_sequences_keys]
                 sweep_sequences_keys= new_sweep_sequences_key
-                
+ 
         final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
 
         # clear the  seq["sweep_list"] from the main sequences 

@@ -66,6 +66,8 @@ class DataItemViewer(QWidget):
         filename, _ = QFileDialog.getOpenFileName(self, "Load Data Item", "", "NPZ Files (*.npz);;All Files (*)", options=options)
         if filename:
             self.data_item = DataItem.load(filename)
+            print("self.data_item.images")
+            print(len(self.data_item.images))
             self.json_text.setText(self.data_item.json_str)
             self.current_image_index = 0
             self.show_image(self.current_image_index)
