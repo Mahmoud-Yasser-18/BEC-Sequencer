@@ -173,19 +173,24 @@ class LiveViewWidget(QWidget):
             paramters = temp_seq.get_parameter_dict()
             self.main_camera.paramerter_list.update_parameters(paramters)
             
+            current_source_file= current_source_file.replace(".json","")
+            
             if self.main_camera.save_checkbox.isChecked():
                     # check if current file is also the current file 
                     current_destination_file = [file for file in os.listdir(self.main_camera.default_destination_path) if file.startswith("current")]
                     if current_destination_file:
                         current_destination_file = current_destination_file[0]
-                        if current_destination_file == current_source_file:
+                        current_destination_file_temp = current_destination_file.replace("current_","")
+                        current_destination_file_temp = current_destination_file_temp.replace(".npz","")
+                        if current_source_file == current_destination_file_temp:
                             # save to the destination path
                             # unpack the file and save it again to the destination path
                             
                             old_data =DataItem.load(os.path.join(self.main_camera.default_destination_path,current_destination_file))
                             old_data.images.append(numpy_data)
                             print('saving to the default saving path1')
-                            
+                            # remove the old npz file 
+                            os.remove(os.path.join(self.main_camera.default_destination_path,current_destination_file))
                             old_data.save(os.path.join(self.main_camera.default_destination_path,current_destination_file))
                         else:
                             # save to the default saving path
@@ -193,7 +198,7 @@ class LiveViewWidget(QWidget):
                             os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current_","")))
                             # save to the default saving path
                             print('saving to the default saving path2')
-                            with open(os.path.join(self.main_camera.default_source_path, current_source_file)) as json_file:
+                            with open(os.path.join(self.main_camera.default_source_path, current_source_file+".json")) as json_file:
                                 json_str_data = json.load(json_file)
 
                             new_data = DataItem(json_str=json_str_data, images=[numpy_data])
@@ -204,7 +209,7 @@ class LiveViewWidget(QWidget):
                         # os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
                         # save to the default saving path
                         print('saving to the default saving path3')
-                        with open(os.path.join(self.main_camera.default_source_path, current_source_file)) as json_file:
+                        with open(os.path.join(self.main_camera.default_source_path, current_source_file+".json")) as json_file:
                             json_str_data = json.load(json_file)
                         new_data = DataItem(json_str=json_str_data, images=[numpy_data])
                         new_data.save(os.path.join(self.main_camera.default_destination_path,current_source_file))
