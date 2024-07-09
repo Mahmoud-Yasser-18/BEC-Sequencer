@@ -1672,6 +1672,7 @@ class SequenceManager:
         self.main_sequences = OrderedDict()
         self.custom_sequence= None
         self.view_type = "Linear"
+        self.to_be_swept = []
         
         
     def get_all_channels_names(self): 
@@ -1838,7 +1839,26 @@ class SequenceManager:
         self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence}
     
     
-     
+    def sweep_sequence_temp(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None):
+        # make a dictionary to store the sweeping information 
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        self.to_be_swept.append({"sequence_name":sequence_name,
+                                 "parameter":parameter,
+                                 "values":values,
+                                 "start_time":start_time,
+                                 "channel_name":channel_name,
+                                 "event_to_sweep":event_to_sweep})
+        event_to_sweep.is_sweept = True 
+    
+    def remove_sweep_sequence(self,sequence_name: str, event_to_sweep: Optional[Event] = None):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        
+        self.to_be_swept = [sweep for sweep in self.to_be_swept if event_to_sweep!=sweep["event_to_sweep"]]
+        event_to_sweep.is_sweept = False
+        
+        
      
 
     def sweep_sequence(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None):
@@ -1874,6 +1894,15 @@ class SequenceManager:
 
     def get_sweep_sequences_main(self):
         # put all sequences in a list and sort them by the index
+        #  use self.to_be_swept
+        if not self.to_be_swept:
+            return [] 
+        for sweep in self.to_be_swept:
+            self.sweep_sequence(sequence_name=sweep["sequence_name"],parameter=sweep["parameter"], values=sweep["values"],start_time=sweep["start_time"], channel_name=sweep["channel_name"], event_to_sweep=sweep["event_to_sweep"])
+        
+        
+        
+        
         seq_list = list(self.main_sequences.values())
         seq_list.sort(key=lambda seq: seq["index"])
 
@@ -1935,12 +1964,23 @@ class SequenceManager:
                 sweep_sequences_keys= new_sweep_sequences_key
                 
         final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
+
+        # clear the  seq["sweep_list"] from the main sequences 
+        for seq in self.main_sequences.values():
+            seq["sweep_list"] = OrderedDict()
+        
         return final_dictionary
 
     def get_custom_sequence(self, sequence_name: List[str]) -> Sequence:
+        if not self.to_be_swept:
+            return [] 
+        for sweep in self.to_be_swept:
+            self.sweep_sequence(sequence_name=sweep["sequence_name"],parameter=sweep["parameter"], values=sweep["values"],start_time=sweep["start_time"], channel_name=sweep["channel_name"], event_to_sweep=sweep["event_to_sweep"])
+        
         # put all sequences in a list and sort them by the index
         seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
-
+        if not seq_list: 
+            return []
         # Run the sequences in order
         self.custom_sequence = seq_list[0]["seq"]
         for seq in seq_list[1:]:
@@ -2011,7 +2051,15 @@ class SequenceManager:
                 sweep_sequences_keys= new_sweep_sequences_key
                 
             final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
+                    # clear the  seq["sweep_list"] from the main sequences 
+            for seq in self.main_sequences.values():
+                seq["sweep_list"] = OrderedDict()
+
             return final_dictionary
+                # clear the  seq["sweep_list"] from the main sequences 
+        for seq in self.main_sequences.values():
+            seq["sweep_list"] = OrderedDict()
+
         return None
         # make a list of all the sweep sequences and compine them according to the index
 

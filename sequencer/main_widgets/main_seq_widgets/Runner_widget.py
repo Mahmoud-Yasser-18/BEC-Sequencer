@@ -366,7 +366,7 @@ class Runner(QWidget):
             QMessageBox.critical(self, "Error", str(e))
 
     def run_sweep(self):
-        try:
+        # try:
             if self.combo_sweep.currentText() == "main":
                 self.main_sweep_queue 
                 # run the first sequence in the queue and pop it out untill there is not element and refreash UI 
@@ -390,8 +390,8 @@ class Runner(QWidget):
 
 
 
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+        # except Exception as e:
+        #     QMessageBox.critical(self, "Error", str(e))
 
     def run_sequence(self, sequence:Sequence):
         try:
@@ -399,12 +399,14 @@ class Runner(QWidget):
             if self.Save_Data_CheckBox.isChecked(): 
                 now = datetime.datetime.now()
                 
-                sequence.to_json(filename=os.path.join(self.save_path, f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
+                time_format = now.strftime("%Y-%m-%d_%H-%M-%S-%f")
+                sequence.to_json(filename=os.path.join(self.save_path, f"{time_format}.json"))
                 #remove current data from the folder 
                 for file in os.listdir(self.save_path):
                     if file.startswith("current"):
                         os.remove(os.path.join(self.save_path, file))
-                sequence.to_json(filename=os.path.join(self.save_path, f"current_{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"))
+                time_format = now.strftime("%Y-%m-%d_%H-%M-%S-%f")
+                sequence.to_json(filename=os.path.join(self.save_path, f"current_{time_format}.json"))
             
             self.ADwin.add_to_queue(sequence)
             print(f"Running sequence: {sequence.sequence_name}")

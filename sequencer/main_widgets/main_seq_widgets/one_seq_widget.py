@@ -280,6 +280,7 @@ class EventButton(QPushButton):
     deleteEventSignal = pyqtSignal(object)
     editEventSignal = pyqtSignal(object)
     sweepEventSignal = pyqtSignal(object)
+    unsweepEventSignal = pyqtSignal(object)
     addParameterSignal = pyqtSignal(object)
     removeParameterSignal = pyqtSignal(object)
 
@@ -379,6 +380,10 @@ class EventButton(QPushButton):
             stylesheet_data["border_color"] = "#9E9E9E"  # Purple border
             stylesheet_data["border_radius"] = "0px"
             stylesheet_data["border_size"] = "5px"
+        
+        if self.event.is_sweept:
+            stylesheet_data["border_color"] = "#FFFFFF"  # Purple border
+            stylesheet_data["border_size"] = "5px"
             
 
         # Apply the stylesheet
@@ -426,6 +431,7 @@ class EventButton(QPushButton):
         delete_action = context_menu.addAction("Delete Event")
         edit_action = context_menu.addAction("Edit Event")
         sweep_action = context_menu.addAction("Sweep Event")
+        unsweep_action = context_menu.addAction("Unweep Event")
         add_parameter_action = context_menu.addAction("Add Parameter")
         remove_parameter_action = context_menu.addAction("Remove Parameter")
 
@@ -438,6 +444,9 @@ class EventButton(QPushButton):
             self.editEventSignal.emit(self.event)
         elif action == sweep_action:
             self.sweepEventSignal.emit(self.event)
+        elif action == unsweep_action:
+            self.unsweepEventSignal.emit(self.event)
+
         elif action == add_parameter_action:
             self.addParameterSignal.emit(self.event)
         elif action == remove_parameter_action:
@@ -697,6 +706,7 @@ class EventsViewerWidget(QWidget):
                 button.deleteEventSignal.connect(self.delete_event)
                 button.editEventSignal.connect(self.edit_event)
                 button.sweepEventSignal.connect(self.sweep_event)
+                button.unsweepEventSignal.connect(self.unsweep_event)
                 button.addParameterSignal.connect(self.add_parameter)
                 button.removeParameterSignal.connect(self.remove_parameter)
 
@@ -746,6 +756,7 @@ class EventsViewerWidget(QWidget):
                     button.deleteEventSignal.connect(self.delete_event)
                     button.editEventSignal.connect(self.edit_event)
                     button.sweepEventSignal.connect(self.sweep_event)
+                    button.unsweepEventSignal.connect(self.unsweep_event)
                     button.addParameterSignal.connect(self.add_parameter)
                     button.removeParameterSignal.connect(self.remove_parameter)
 
@@ -890,12 +901,20 @@ class EventsViewerWidget(QWidget):
                 if result:
                     
                     parameter_name, values = result
-                    self.sequence_manager.sweep_sequence(self.sequence.sequence_name, parameter_name, values,event_to_sweep=event_to_sweep)
+                    self.sequence_manager.sweep_sequence_temp(self.sequence.sequence_name, parameter_name, values,event_to_sweep=event_to_sweep)
+                    self.refreshUI()
 
                 else:
                     pass
             else:
                 pass
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+    
+    def unsweep_event(self, event_to_unsweep):
+        try:
+            self.sequence_manager.remove_sweep_sequence(self.sequence.sequence_name,event_to_sweep=event_to_unsweep)
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
