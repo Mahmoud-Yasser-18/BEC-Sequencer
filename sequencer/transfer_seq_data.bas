@@ -11,20 +11,19 @@
 ' Stacksize                      = 1000
 ' Info_Last_Save                 = DESKTOP-IAC6L9U  DESKTOP-IAC6L9U\Mahmoud Yasser
 '<Header End>
+'
+'
+' Documentation of the enteir code :
 
-'June 28th 2021
-'This file takes the results of the sequences coded in Matlab and transfers them to the ADwin channels at the set times.
+
+'This file takes the results of the sequences coded in Python and transfers them to the ADwin channels at the set times.
 'Once compiled, the ADwin reads the binary file, which is essentially a list of channels, times and voltages/states.
 
 #include adwinpro_all.inc
 
 #define SIZE 50000000 'size of the data arrays
 
-#define d_io 1 'the digital I/O card is set to module number 1
-#define a_out1 2'one of the analog outs is module 2
-#define a_out2 3 'one of the analog outs is module 3
-#define a_out3 4
-#define a_out4 5
+
 
 #define MAX_EVENT_COUNT Par_1 'controls when the looping stops; assigned to Par_1 in E3_load_seq.m
 #define MAX_UPDATES Par_3 'max number of updates per EVENT run
@@ -211,7 +210,6 @@ sub generic_write(type_card_channel , avalue)
   ' Extract z by masking the last 7 bits
     
 endsub
-
 
 
 
