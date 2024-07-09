@@ -2066,8 +2066,21 @@ class SequenceManager:
         
     def to_json(self,file_name: Optional[str] = None) -> str:
         data = {
-            "sequences": []
+            "sequences": [],
+            "sweep_list": []
         }
+        
+        # doing the sweep sequences first
+        for sweep in self.to_be_swept:
+            data["sweep_list"].append({
+                "sequence_name": sweep["sequence_name"],
+                "parameter": sweep["parameter"],
+                "values": sweep["values"],
+                "start_time": sweep["event_to_sweep"].start_time if sweep["event_to_sweep"] else sweep["start_time"],
+                "channel_name": sweep["event_to_sweep"].channel.name if sweep["event_to_sweep"] else sweep["channel_name"],
+            })
+
+
         #sort sequences by index before saving 
         self.sort_sequences()
         
@@ -2109,7 +2122,16 @@ class SequenceManager:
             seq_manager.main_sequences[seq_data["name"]] = {"index":seq_data["index"], "seq":sequence}
             #sweep_list
             seq_manager.main_sequences[seq_data["name"]]["sweep_list"] = {key: Sequence.from_json(json_input=seq) for key, seq in seq_data["sweep_list"].items()}
-
+        # doing the sweep sequences 
+        for sweep in data["sweep_list"]:
+            seq_manager.main_sequences[sweep["sequence_name"]]["seq"].find_event_by_time_and_channel(sweep["start_time"],sweep["channel_name"]).is_sweept = True
+            seq_manager.to_be_swept.append({"sequence_name":sweep["sequence_name"]
+                                    ,"parameter":sweep["parameter"]
+                                    ,"values":sweep["values"]
+                                    ,"start_time":None
+                                    ,"channel_name":None
+                                    ,"event_to_sweep":seq_manager.main_sequences[sweep["sequence_name"]]["seq"].find_event_by_time_and_channel(sweep["start_time"],sweep["channel_name"])})
+        print (seq_manager.to_be_swept)
         return seq_manager 
             
 
