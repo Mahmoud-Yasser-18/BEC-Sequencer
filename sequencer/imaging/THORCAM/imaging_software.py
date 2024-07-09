@@ -193,7 +193,10 @@ class LiveViewWidget(QWidget):
                             os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current_","")))
                             # save to the default saving path
                             print('saving to the default saving path2')
-                            new_data = DataItem(json_str=json.load(open(os.path.join(self.main_camera.default_source_path, current_source_file))), images=[numpy_data])
+                            with open(os.path.join(self.main_camera.default_source_path, current_source_file)) as json_file:
+                                json_str_data = json.load(json_file)
+
+                            new_data = DataItem(json_str=json_str_data, images=[numpy_data])
                             new_data.save(os.path.join(self.main_camera.default_destination_path,current_source_file))
                     else:
                         # save to the default saving path
@@ -201,7 +204,9 @@ class LiveViewWidget(QWidget):
                         # os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
                         # save to the default saving path
                         print('saving to the default saving path3')
-                        new_data = DataItem(json_str=json.load(open(os.path.join(self.main_camera.default_source_path, current_source_file))), images=[numpy_data])
+                        with open(os.path.join(self.main_camera.default_source_path, current_source_file)) as json_file:
+                            json_str_data = json.load(json_file)
+                        new_data = DataItem(json_str=json_str_data, images=[numpy_data])
                         new_data.save(os.path.join(self.main_camera.default_destination_path,current_source_file))
           
 
