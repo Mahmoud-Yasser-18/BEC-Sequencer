@@ -19,8 +19,6 @@ class Parameter:
         self.event = event
         self.parameter_origin = parameter_origin
     def get_value(self): 
-        # print(self.event.get_event_attributes())
-        # print(self.parameter_origin)
         return self.event.get_event_attributes()[self.parameter_origin]
 
         
@@ -951,14 +949,13 @@ class Sequence:
             event.reference_time = new_reference_time
             event.update_times(delta)
 
-        if isinstance(event.behavior, Ramp): 
+        if isinstance(event.behavior, Ramp) and (duration is not None or ramp_type is not None or start_value is not None or end_value is not None or func is not None or resolution is not None): 
             event.behavior.edit_ramp(duration, ramp_type, start_value, end_value, func, resolution)
             delta_duration = event.behavior.duration-  event.end_time+  event.start_time 
             if delta_duration:
-                # print("delta_duration",delta_duration)
                 event.update_times_end(delta_duration)
 
-        elif isinstance(event.behavior, Jump):
+        elif isinstance(event.behavior, Jump) and jump_target_value is not None:
             event.behavior.edit_jump(jump_target_value)
         
         
@@ -985,9 +982,7 @@ class Sequence:
     @staticmethod
     def copy_original_events_to_new_sequence(original_sequence: 'Sequence', new_sequence: 'Sequence'):
         for event in original_sequence.all_events:
-            # print("event",event)
             new_event = new_sequence.find_event_by_time_and_channel(event.start_time, event.channel.name)
-            # print("new_event",new_event)
             new_event.reference_original_event = event.reference_original_event
             new_event.is_sweept = True
     
@@ -1378,7 +1373,6 @@ class Sequence:
             json_str = json_input
 
         data = json.loads(json_str)
-        print(data["name"])
         sequence = Sequence(data["name"])
 
         channel_map = {}
@@ -1715,8 +1709,6 @@ class SequenceManager:
             )
         return new_channel
     def add_existing_channel_to_sequence(self, sequence_name, channel_name): 
-        print(self.main_sequences.keys())  
-        print(sequence_name)
         sequence = self.main_sequences[sequence_name]["seq"]
         new_channel = self.create_new_existing_channel(channel_name)
         # chen
@@ -1923,7 +1915,6 @@ class SequenceManager:
                     for sweep_seq_key in seq["sweep_list"].keys():
                         for sweep in sweep_sequences_keys:
                             temp_key = list(copy.copy(sweep))
-                            print("temp_key",temp_key)
                             temp_key.append(sweep_seq_key)
                             new_sweep_sequences_key.append(tuple((temp_key)))
                     
@@ -1965,7 +1956,6 @@ class SequenceManager:
                 sweep_sequences_keys= new_sweep_sequences_key
  
         final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
-
         # clear the  seq["sweep_list"] from the main sequences 
         for seq in self.main_sequences.values():
             seq["sweep_list"] = OrderedDict()
@@ -1990,9 +1980,7 @@ class SequenceManager:
         return self.custom_sequence
 
     def get_sweep_sequences_custom(self, sequence_name: List[str]):
-        print(sequence_name)
         seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
-        # print(seq_list)
 
         # make a list of all the sweep sequences and compine them according to the index
         sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [[seq_list[0]["seq"]]]
@@ -2032,15 +2020,11 @@ class SequenceManager:
             else:
                 for sweep in sweep_sequences:
                     sweep.append(seq["seq"])
-        print(sweep_sequences)
-        print(sweep_sequences_keys)
-
         final_sweep_sequences = []
 
         
 
         if sweep_sequences_keys:
-            print("sweep_sequences_keys",sweep_sequences_keys)
             for sweep in sweep_sequences:
                 main_sweep = sweep[0]
                 for seq in sweep[1:]:
@@ -2095,7 +2079,6 @@ class SequenceManager:
 
         if file_name:
             with open(file_name, 'w') as file:
-                print(data)
                 json.dump(data, file, indent=4)
             
         return json.dumps(data, indent=4)
@@ -2175,14 +2158,9 @@ def create_test_seq_manager():
     seq_manager.main_sequences["test2"]["seq"] = create_test_sequence("test2")
 
 
-    # seq_manager.sweep_sequence("test","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
-    # # print(seq_manager.main_sequences)
-    seq_manager.sweep_sequence("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
-    # print(seq_manager.main_sequences)
+    .sweep_sequence("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
     seq_manager.sweep_sequence("test2","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
-    # print(seq_manager.main_sequences)
     seq_manager.sweep_sequence("test2","duration", [1,2,3],start_time=2,channel_name= "Analog1")
-    # print([str(k ) for k in seq_manager.get_sweep_sequences_main().keys()])
     return seq_manager
 
     
@@ -2201,31 +2179,43 @@ def test_camera_trigger():
 
 
 if __name__ == '__main__':
-    main_seq = Sequence("Camera Trigger")
+    main_seq = Sequence("Camera Trigger2")
     main_seq.add_analog_channel("Camera Trigger", 2, 2)
     t = 0
     main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
     t = 1
-    main_seq.add_event("Camera Trigger", Jump(3.3), start_time=t)
+    parent = main_seq.add_event("Camera Trigger", Jump(3.3), start_time=t)
     t = 2
-    event_2 =main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    event_2 =main_seq.add_event("Camera Trigger", Jump(0), parent_event=parent,relative_time=1)
     
-    sweeps =main_seq.sweep_event_parameters("jump_target_value", [1,2,3], event_to_sweep=event_2)
+    # sweeps =main_seq.sweep_event_parameters("relative_time", [1,2,3], event_to_sweep=event_2)
     seq_manager = SequenceManager()
     seq_manager.load_sequence(main_seq)
-    seq_manager.sweep_sequence_temp("Camera Trigger","jump_target_value", [1,2,3], event_to_sweep=event_2)
+    seq_manager.sweep_sequence_temp("Camera Trigger2","relative_time", [1,2,3], event_to_sweep=event_2)
+    print(seq_manager.to_be_swept) 
+    print()
     print(event_2)
-    print(seq_manager.get_sweep_sequences_main())
+    # print()
+    # find event by reference
+    temper = seq_manager.get_sweep_sequences_main() 
+    print(list(temper.values())[1])    
+    print()
     print(event_2)
 
 
 
 
-    # print(seq_manager.main_sequences)
-    # print(seq_manager.main_sequences["test"]["sweep_list"][('duration', 2)].all_events[0].reference_original_event.start_time)
-    # print(seq_manager.main_sequences["test"]["sweep_list"].keys()) 
+    # print()
+    # # print(seq_manager.main_sequences)
+    # print()
+    # # print(seq_manager.main_sequences["test"]["sweep_list"][('duration', 2)].all_events[0].reference_original_event.start_time)
+    # print()
+    # # print(seq_manager.main_sequences["test"]["sweep_list"].keys()) 
     
-        # print(len(main_seq))
-    # print(len(pram_list[0]))
-    # print(pram_list[0])
+        # print()
+        # # print(len(main_seq))
+    # print()
+    # # print(len(pram_list[0]))
+    # print()
+    # # print(pram_list[0])
     

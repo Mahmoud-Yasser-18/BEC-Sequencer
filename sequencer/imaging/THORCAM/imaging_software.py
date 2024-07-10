@@ -202,7 +202,7 @@ class LiveViewWidget(QWidget):
                         else:
                             # save to the default saving path
                             # rename the current file in the destination path folder to be without current
-                            os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current","")))
+                            os.rename(os.path.join(self.main_camera.default_destination_path,current_destination_file),os.path.join(self.main_camera.default_destination_path,current_destination_file.replace("current_","")))
                             # save to the default saving path
                             print('saving to the default saving path2')
                             with open(os.path.join(self.main_camera.default_source_path, current_source_file+".json")) as json_file:
@@ -251,8 +251,7 @@ class LiveViewWidget(QWidget):
     def update_image(self):
         try:
             image,numpy_data = self.image_queue.get_nowait()
-            save_thread = threading.Thread(target=self.save_images, args=(numpy_data,))
-            save_thread.start()
+            self.save_images(numpy_data)
             image = image.convert('RGB')
             data = image.tobytes("raw", "RGB")
             q_image = QImage(data, image.width, image.height, QImage.Format_RGB888)
