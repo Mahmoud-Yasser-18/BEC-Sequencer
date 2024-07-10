@@ -915,6 +915,7 @@ class EventsViewerWidget(QWidget):
     def unsweep_event(self, event_to_unsweep):
         try:
             self.sequence_manager.remove_sweep_sequence(self.sequence.sequence_name,event_to_sweep=event_to_unsweep)
+            self.refreshUI()
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
             QMessageBox.critical(self, "Error", error_message)
