@@ -44,11 +44,15 @@ class ParameterListWidget(QWidget):
 
     def populate_table(self, parameters):
         """Populates the QTableWidget with parameter names and values."""
-        self.table_widget.setRowCount(len(parameters.items()))
-        for row, (name, value) in enumerate(parameters.items()):
-            self.table_widget.setItem(row, 0, QTableWidgetItem(str(name)))
-            self.table_widget.setItem(row, 1, QTableWidgetItem(str(0)))
-
+        try:
+            
+            self.table_widget.setRowCount(len(parameters.items()))
+            for row, (name, value) in enumerate(parameters.items()):
+                self.table_widget.setItem(row, 0, QTableWidgetItem(str(name)))
+                self.table_widget.setItem(row, 1, QTableWidgetItem(str(0)))
+        except Exception as e:
+            print(e)
+            print("No sweeps there")
     def update_parameters(self, new_parameters):
         """Updates the QTableWidget with new parameters."""
         self.populate_table(new_parameters)
@@ -293,11 +297,20 @@ class Runner(QWidget):
         pass 
 
     def refreash_sweep_queue(self):
-        self.main_sweep_queue =self.sequence_manager.get_sweep_sequences_main()
+        try:
+            self.main_sweep_queue =self.sequence_manager.get_sweep_sequences_main()
+        except Exception as e:
+            print("No sweeps there")
+            print   (e)
         # print(self.main_sweep_queue[0])
     
     def refreash_custom_sweep_queue(self):
-        self.custom_sweep_queue =self.sequence_manager.get_sweep_sequences_custom(self.custom_sequence_widget.get_sequences_names())
+        try:
+            self.custom_sweep_queue =self.sequence_manager.get_sweep_sequences_custom(self.custom_sequence_widget.get_sequences_names())
+        except Exception as e:
+            print("No sweeps there")
+            print   (e)
+
     def refreash_queue(self,Working = False):
         try:
             if not Working:
