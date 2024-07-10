@@ -447,7 +447,7 @@ class ParameterListWidget(QWidget):
         try:
             for row, (name, value) in enumerate(parameters.items()):
                 self.table_widget.setItem(row, 0, QTableWidgetItem(name))
-                self.table_widget.setItem(row, 1, QTableWidgetItem(str(value)))
+                self.table_widget.setItem(row, 1, QTableWidgetItem(str(value)[:5]))
         except:
             print('Error in populating the table')
     def update_parameters(self, new_parameters):
