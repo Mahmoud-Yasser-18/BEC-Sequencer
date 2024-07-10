@@ -592,7 +592,7 @@ class Sequence:
 
 
     # add a new event to the sequence
-    def add_event(self, channel_name: str, behavior: EventBehavior, start_time: Optional[float] = None, relative_time: Optional[float] = None, reference_time: str = "start", parent_event: Optional[Event] = None) -> Event:
+    def add_event(self, channel_name: str, behavior: EventBehavior, start_time: Optional[float] = None, relative_time: Optional[float] = None, reference_time: str = "start", parent_event: Optional[Event] = None,comment:str="" ) -> Event:
         if start_time is not None and relative_time is not None:
             raise ValueError("Provide either start_time or relative_time, not both.")
 
@@ -621,14 +621,14 @@ class Sequence:
                 raise ValueError("Root event must have start_time specified.")
             if start_time < 0:
                 raise ValueError("start_time must be non-negative.")
-            event = Event(channel, behavior, start_time=start_time)
+            event = Event(channel, behavior, start_time=start_time,comment=comment)
         else:
             if relative_time is None:
                 raise ValueError("Child event must have relative_time specified.")
             if relative_time+parent_event.start_time < 0:
                 raise ValueError("Negative time is not allowed.")
             
-            event = Event(channel, behavior, relative_time=relative_time, reference_time=reference_time, parent=parent_event)
+            event = Event(channel, behavior, relative_time=relative_time, reference_time=reference_time, parent=parent_event,comment=comment)
             parent_event.children.append(event)
 
         bisect.insort(self.all_events, event)  # Sort by start_time

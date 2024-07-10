@@ -81,7 +81,6 @@ class ImageAcquisitionThread(threading.Thread):
                 frame = self._camera.get_pending_frame_or_null()
                 
                 if frame is not None:
-                    print("frame is not None")
                     if self._is_color:
                         pil_image = self._get_color_image(frame)
                     else:
