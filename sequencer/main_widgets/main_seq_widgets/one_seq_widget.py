@@ -408,7 +408,7 @@ class EventButton(QPushButton):
                 for p in self.event.associated_parameters:
                     behavior += f"\n{p.name}: {p.get_value()}"
             
-            behavior += f"\ncomment: {self.event.comment}"
+            behavior += f"\nComment:\n{self.event.comment}"
 
             QToolTip.showText(event.globalPos(), behavior, self)
             super().enterEvent(event)
@@ -425,7 +425,7 @@ class EventButton(QPushButton):
                 # associated_parameters is a list 
                 for p in self.event.associated_parameters:
                     behavior += f"\n{p.name}: {p.get_value()}"
-            behavior += f"\ncomment: {self.event.comment}"
+            behavior += f"\nComment:\n{self.event.comment}"
 
             QToolTip.showText(event.globalPos(), behavior, self)
             super().enterEvent(event)
