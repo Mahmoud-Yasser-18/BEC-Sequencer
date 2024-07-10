@@ -2158,7 +2158,7 @@ def create_test_seq_manager():
     seq_manager.main_sequences["test2"]["seq"] = create_test_sequence("test2")
 
 
-    .sweep_sequence("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
+    seq_manager.sweep_sequence("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
     seq_manager.sweep_sequence("test2","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
     seq_manager.sweep_sequence("test2","duration", [1,2,3],start_time=2,channel_name= "Analog1")
     return seq_manager
