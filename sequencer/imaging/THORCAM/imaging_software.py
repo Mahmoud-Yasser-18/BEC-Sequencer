@@ -107,35 +107,33 @@ from PyQt5.QtGui import QImage, QPixmap, QPainter
 import queue
 import datetime
 
+
 class DataItem:
-    def __init__(self, json_str=None, images=None):
-        self.json_str = json_str
+    def __init__(self, dictionary_temp=None, images=None):
+        self.dictionary_temp = dictionary_temp
         self.images = images if images is not None else []
-
-    def save(self, filename):
-        # Convert the JSON string to a dictionary
-        # json_dict = json.loads(self.json_str)
+    
+    
+    def save(self, file_name):
+        # Convert dictionary_temp to a numpy array using np.array with dtype=object
+        dictionary_temp_np = np.array([self.dictionary_temp], dtype=object)
         
-        # Create a dictionary to save
-        # save_dict = {'json': json_dict}
-        save_dict = {'json': self.json_str}
-        for i, img in enumerate(self.images):
-            save_dict[f'image_{i}'] = img
+        # Save images as a numpy array
+        images_np = np.array(self.images, dtype=object)
         
-        # Save the dictionary as a .npz file
-        np.savez(filename, **save_dict)
-
-    @staticmethod
-    def load(filename):
-        # Load the .npz file
-        data = np.load(filename, allow_pickle=True)
+        # Save both arrays in an npz file
+        np.savez(file_name, dictionary_temp=dictionary_temp_np, images=images_np)
+    
+    @classmethod
+    def load(cls, file_name):
+        # Load data from npz file
+        data = np.load(file_name, allow_pickle=True)
         
-        # Extract the JSON string and images
-        json_str = json.dumps(data['json'].item())
-        images = [data[f'image_{i}'] for i in range(len(data.files) - 1)]
+        # Extract dictionary_temp and images
+        dictionary_temp = data['dictionary_temp'][0]
+        images = data['images'].tolist()
         
-        return DataItem(json_str, images)
-
+        return cls(dictionary_temp=dictionary_temp, images=images)
 
 class LiveViewWidget(QWidget):
     def __init__(self, image_queue,main_camera):
@@ -208,9 +206,12 @@ class LiveViewWidget(QWidget):
                             # save to the default saving path
                             print('saving to the default saving path2')
                             with open(os.path.join(self.main_camera.default_source_path, current_source_file+".json")) as json_file:
-                                json_str_data = json.load(json_file)
+                                json_str_data = json_file.read()
+                                json_data = json.loads(json_str_data)
 
-                            new_data = DataItem(json_str=json_str_data, images=[numpy_data])
+                                
+
+                            new_data = DataItem(dictionary_temp=json_data, images=[numpy_data])
                             new_data.save(os.path.join(self.main_camera.default_destination_path,current_source_file))
                     else:
                         # save to the default saving path
@@ -219,8 +220,10 @@ class LiveViewWidget(QWidget):
                         # save to the default saving path
                         print('saving to the default saving path3')
                         with open(os.path.join(self.main_camera.default_source_path, current_source_file+".json")) as json_file:
-                            json_str_data = json.load(json_file)
-                        new_data = DataItem(json_str=json_str_data, images=[numpy_data])
+                            json_str_data = json_file.read()
+                            json_data = json.loads(json_str_data)
+
+                        new_data = DataItem(dictionary_temp=json_data, images=[numpy_data])
                         new_data.save(os.path.join(self.main_camera.default_destination_path,current_source_file))
           
 

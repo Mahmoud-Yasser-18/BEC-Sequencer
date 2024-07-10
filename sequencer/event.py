@@ -416,7 +416,7 @@ class Sequence:
     def __init__(self,name:str):
         
         self.sequence_name=name
-        self.parameters_list = []
+
         
         # list of all channels in the sequence 
         self.channels: List[Channel] = []
@@ -438,22 +438,23 @@ class Sequence:
         p = Parameter(parameter_name,event,parameter_origin)
         event.associated_parameters.append(p)
 
-        self.parameters_list.append(p)
+
 
     def remove_parameter(self,parameter_name):
         for event in self.all_events:
             for p in event.associated_parameters:
                 if p.name == parameter_name:
                     event.associated_parameters.remove(p)
-                    self.parameters_list.remove(p)
+
                     return
         raise ValueError("Parameter not found in the sequence")
     
     
     def get_parameter_dict(self):
         parameter_dict = {}
-        for parameter  in self.parameters_list:
-            parameter_dict[parameter.name] = parameter.get_value()
+        for event in self.all_events:
+            for p in event.associated_parameters:
+                parameter_dict[p.name] = p.get_value() 
         return parameter_dict
         
         
@@ -929,7 +930,7 @@ class Sequence:
         if edited_event is None:
             event = self.find_event_by_time_and_channel(start_time, channel_name)
         else:
-            event = edited_event    
+            event = self.find_event_by_original_reference(edited_event)    
 
 
         if new_start_time is not None:
@@ -1377,6 +1378,7 @@ class Sequence:
             json_str = json_input
 
         data = json.loads(json_str)
+        print(data["name"])
         sequence = Sequence(data["name"])
 
         channel_map = {}
@@ -2199,10 +2201,27 @@ def test_camera_trigger():
 
 
 if __name__ == '__main__':
+    main_seq = Sequence("Camera Trigger")
+    main_seq.add_analog_channel("Camera Trigger", 2, 2)
+    t = 0
+    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    t = 1
+    main_seq.add_event("Camera Trigger", Jump(3.3), start_time=t)
+    t = 2
+    event_2 =main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
+    
+    sweeps =main_seq.sweep_event_parameters("jump_target_value", [1,2,3], event_to_sweep=event_2)
+    seq_manager = SequenceManager()
+    seq_manager.load_sequence(main_seq)
+    seq_manager.sweep_sequence_temp("Camera Trigger","jump_target_value", [1,2,3], event_to_sweep=event_2)
+    print(event_2)
+    print(seq_manager.get_sweep_sequences_main())
+    print(event_2)
 
-    r = RampType ("linear")
-    print(r)
-    pass     # print(seq_manager.main_sequences)
+
+
+
+    # print(seq_manager.main_sequences)
     # print(seq_manager.main_sequences["test"]["sweep_list"][('duration', 2)].all_events[0].reference_original_event.start_time)
     # print(seq_manager.main_sequences["test"]["sweep_list"].keys()) 
     
