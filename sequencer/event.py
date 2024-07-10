@@ -19,8 +19,8 @@ class Parameter:
         self.event = event
         self.parameter_origin = parameter_origin
     def get_value(self): 
-        print(self.event.get_event_attributes())
-        print(self.parameter_origin)
+        # print(self.event.get_event_attributes())
+        # print(self.parameter_origin)
         return self.event.get_event_attributes()[self.parameter_origin]
 
         
@@ -1430,7 +1430,7 @@ class Sequence:
             for param_data in event_data["associated_parameters"]:
                 param = Parameter(name=param_data["name"], event=event,parameter_origin=param_data["origin"])
                 event.associated_parameters.append(param)
-                sequence.parameters_list.append(param)
+
 
 
             for child_data in event_data["children"]:

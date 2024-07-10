@@ -441,10 +441,15 @@ class ParameterListWidget(QWidget):
     def populate_table(self, parameters):
         """Populates the QTableWidget with parameter names and values."""
         self.table_widget.setRowCount(len(parameters))
-        for row, (name, value) in enumerate(parameters):
-            self.table_widget.setItem(row, 0, QTableWidgetItem(name))
-            self.table_widget.setItem(row, 1, QTableWidgetItem(value))
-
+        print("parameters in table widget")
+        print(parameters)
+        
+        try:
+            for row, (name, value) in enumerate(parameters.items()):
+                self.table_widget.setItem(row, 0, QTableWidgetItem(name))
+                self.table_widget.setItem(row, 1, QTableWidgetItem(str(value)))
+        except:
+            print('Error in populating the table')
     def update_parameters(self, new_parameters):
         """Updates the QTableWidget with new parameters."""
         self.populate_table(new_parameters)
