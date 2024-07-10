@@ -263,13 +263,14 @@ class Digital_Channel(Channel):
         )
 
 class Event:
-    def __init__(self, channel: Channel, behavior: EventBehavior, start_time: Optional[float] = None, relative_time: Optional[float] = None, reference_time: str = "start", parent: Optional['Event'] = None):
+    def __init__(self, channel: Channel, behavior: EventBehavior, start_time: Optional[float] = None, relative_time: Optional[float] = None, reference_time: str = "start", parent: Optional['Event'] = None,comment:str =""):
         if start_time is not None and relative_time is not None:
             raise ValueError("Provide either start_time or relative_time, not both.")
 
         self.channel = channel
         self.behavior = behavior
         self.parent = parent
+        self.comment= comment
         self.reference_time = reference_time if parent else None
 
         self.is_sweept = False
@@ -386,7 +387,8 @@ class Event:
             f"    channel={self.channel.name},\n"
             f"    behavior={self.behavior},\n"
             f"    start_time={self.start_time},\n"
-            f"    end_time={self.end_time},\n"
+            f"    end_time={self.end_time},\n",
+            f"    comment={self.comment },\n" ,
             f"    parent={self.parent.channel.name if self.parent else None}\n"
             f")"
         )
@@ -1287,6 +1289,7 @@ class Sequence:
                 "channel_name": event.channel.name,
                 "start_time": event.start_time,
                 "end_time": event.end_time,
+                "comment": event.comment,
                 "behavior": {
                     "type": "Jump" if isinstance(event.behavior, Jump) else "Ramp",
                     "details": {}
@@ -1419,7 +1422,8 @@ class Sequence:
                 start_time=event_data["start_time"] if parent is None else None,
                 relative_time=None if parent is None else event_data["start_time"] - (parent.end_time if event_data["reference_time"] == "end" else parent.start_time),
                 reference_time=event_data["reference_time"],
-                parent_event=parent
+                parent_event=parent,
+                comment=event_data["comment"]
             )
             for param_data in event_data["associated_parameters"]:
                 param = Parameter(name=param_data["name"], event=event,parameter_origin=param_data["origin"])
