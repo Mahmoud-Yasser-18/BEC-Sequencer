@@ -445,7 +445,7 @@ class ParameterListWidget(QWidget):
         try:
             for row, (name, value) in enumerate(parameters.items()):
                 self.table_widget.setItem(row, 0, QTableWidgetItem(name))
-                self.table_widget.setItem(row, 1, QTableWidgetItem(str(value)[:5]))
+                self.table_widget.setItem(row, 1, QTableWidgetItem(str(value)[:8]))
         except:
             print('Error in populating the table')
     def update_parameters(self, new_parameters):
@@ -679,6 +679,8 @@ class ThorCamControlWidget(QWidget):
     def change_camera_live_mode(self):
         mode = self.camera_mode_compo.currentText()
         try:
+            if mode.lower().strip() =="live":
+                self.save_checkbox.setChecked(False)
             self.thor_cam.change_camera_live_mode(mode)
         except Exception as e:
             print(f'Error changing camera mode: {e}')
