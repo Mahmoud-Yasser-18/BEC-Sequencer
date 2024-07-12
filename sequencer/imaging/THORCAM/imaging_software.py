@@ -429,9 +429,6 @@ class ParameterListWidget(QWidget):
         self.layout.addWidget(self.table_widget)
 
         # Add a button to demonstrate updating parameters
-        self.update_button = QPushButton("Update Parameters")
-        self.update_button.clicked.connect(self.update_parameters_demo)
-        self.layout.addWidget(self.update_button)
 
         # Set the layout for the widget
         self.setLayout(self.layout)
@@ -451,16 +448,6 @@ class ParameterListWidget(QWidget):
     def update_parameters(self, new_parameters):
         """Updates the QTableWidget with new parameters."""
         self.populate_table(new_parameters)
-
-    def update_parameters_demo(self):
-        """Demonstration method to update parameters."""
-        new_parameters = {
-            "New Parameter 1": "New Value 1",
-            "New Parameter 2": "New Value 2",
-            "New Parameter 3": "New Value 3",
-            "New Parameter 4": "New Value 4"
-        }
-        self.update_parameters(new_parameters)
 
 import os
 import json
