@@ -814,13 +814,15 @@ class EventsViewerWidget(QWidget):
                     self.sequence.add_event(
                         channel_name=channel.name,
                         behavior=Jump(behavior['jump_target_value']),
-                        start_time=float(data["start_time"])
+                        start_time=float(data["start_time"]),
+                        comment=behavior['comment']
                     )
                 else:
                     self.sequence.add_event(
                         channel_name=channel.name,
                         behavior=Ramp(behavior['ramp_duration'], RampType(behavior['ramp_type']), behavior['start_value'], behavior['end_value'],resolution=behavior['resolution']),
-                        start_time=float(data["start_time"])
+                        start_time=float(data["start_time"]),
+                        comment=behavior['comment']
                     )
                 self.refreshUI()
         except Exception as e:
@@ -839,7 +841,8 @@ class EventsViewerWidget(QWidget):
                         behavior=Jump(behavior['jump_target_value']),
                         relative_time=float(data["relative_time"]),
                         reference_time=data["reference_time"],
-                        parent_event=parent_event
+                        parent_event=parent_event,
+                        comment=behavior['comment']
                     )
                 else:
                     self.sequence.add_event(
@@ -847,7 +850,8 @@ class EventsViewerWidget(QWidget):
                         behavior=Ramp(behavior['ramp_duration'], RampType(behavior['ramp_type']), behavior['start_value'], behavior['end_value']),
                         relative_time=float(data["relative_time"]),
                         reference_time=data["reference_time"],
-                        parent_event=parent_event
+                        parent_event=parent_event,
+                        comment=behavior['comment']
                     )
                 self.refreshUI()
         except Exception as e:

@@ -65,6 +65,11 @@ class BaseEventDialog(QDialog):
         self.layout.addWidget(self.channel_label)
         self.layout.addWidget(self.channel_combo)
 
+        self.comment_label = QLabel("Description of the event:")
+        self.comment_text = QLineEdit()
+        self.layout.addWidget(self.comment_label)
+        self.layout.addWidget(self.comment_text)
+
         # Behavior type
         self.behavior_label = QLabel("Behavior Type:")
         self.behavior_combo = QComboBox()
@@ -154,7 +159,8 @@ class BaseEventDialog(QDialog):
                 'ramp_duration': None,
                 'ramp_type': None,
                 'start_value': None,
-                'end_value': None
+                'end_value': None,
+                'comment': self.comment_text.text()
             }
         else:
             ramp_duration = self.ramp_duration_input.text()
@@ -169,7 +175,9 @@ class BaseEventDialog(QDialog):
                 'ramp_type': ramp_type,
                 'start_value': float (start_value),
                 'end_value': float (end_value),
-                'resolution': float(resolution)
+                'resolution': float(resolution),
+                'comment': self.comment_text.text()
+
             }
         
         return behavior_params
