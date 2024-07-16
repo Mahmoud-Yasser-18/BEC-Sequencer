@@ -239,6 +239,7 @@ class Analog_Channel(Channel):
     def __eq__(self, other: object) -> bool:
         return super().__eq__(other) and self.default_voltage_func == other.default_voltage_func and self.max_voltage == other.max_voltage and self.min_voltage == other.min_voltage
 
+
 class Digital_Channel(Channel):
     def __init__(self, name: str, card_number: int, channel_number: int, card_id: str, bitpos: int, reset: bool = False, reset_value: float = 0):
         super().__init__(name, card_number, channel_number, reset, reset_value)
@@ -261,6 +262,8 @@ class Digital_Channel(Channel):
             f"   events={self.events}\n"
             f")"
         )
+    
+
 
 class Event:
     def __init__(self, channel: Channel, behavior: EventBehavior, start_time: Optional[float] = None, relative_time: Optional[float] = None, reference_time: str = "start", parent: Optional['Event'] = None,comment:str =""):
@@ -396,20 +399,19 @@ class Event:
 
     def print_event_hierarchy(self, level: int = 0, indent: str = "    "):
         """Prints the event and its children recursively with indentation, avoiding duplicates."""
-        print(f"{indent*level}{self.behavior} on {self.channel.name} at {self.start_time}")
+        print(f"{indent*level}{self.behavior} on {self.channel.name} at {self.start_time}, {self.comment}")
 
         for child in self.children:
             child.print_event_hierarchy(level + 1, indent)
     
     def get_text_event_hierarchy(self, level: int = 0, indent: str = "    "):
         """Prints the event and its children recursively with indentation, avoiding duplicates."""
-        text = f"{indent*level}{self.behavior} on {self.channel.name} at {self.start_time}\n"
+        text = f"{indent*level}{self.behavior} on {self.channel.name} at {self.start_time}, {self.comment}\n"
 
         for child in self.children:
             text += child.get_text_event_hierarchy(level + 1, indent)
         
         return text     
-
 
 
 class Sequence:
@@ -1515,6 +1517,7 @@ class Sequence:
         y_offset = 0
         channel_positions = {channel.name: y_offset + i * 10 for i, channel in enumerate(self.channels)}
 
+        ploted_events = []
         # Plot channels
         for channel_name in channels_to_plot:
             channel = next(channel for channel in self.channels if channel.name == channel_name)
@@ -1529,7 +1532,7 @@ class Sequence:
                     break
                 if event.end_time < start_time:
                     continue
-                
+                ploted_events.append(event)
                 if event.start_time > start_time and (not time_points or time_points[-1] < start_time):
                     time_points.append(start_time)
                     values.append(last_value + channel_positions[channel.name])
@@ -1557,27 +1560,38 @@ class Sequence:
             ax.plot(time_points, values, label=channel.name)
 
         # Plot event tree
-        all_times = sorted(set(event.start_time for event in self.all_events) | set(event.end_time for event in self.all_events))
+        all_times = sorted(set(event.start_time for event in ploted_events) | set(event.end_time for event in ploted_events))
 
-        def draw_event(event, level=0, parent_pos=None):
+        def draw_event(event, level=0, parent_pos_start=None,parent_pos_end=None):
             # Plot the event
             channel_pos = channel_positions[event.channel.name]
-            event_value = event.behavior.get_value_at_time(0) + channel_pos
-            event_pos = (event.start_time, event_value)
-            ax.plot(event_pos[0], event_pos[1], 'o', color=color_map(level))
+            event_value_start = event.behavior.get_value_at_time(0) + channel_pos
+            event_pos_start = (event.start_time, event_value_start)
+            if isinstance(event.behavior, Ramp):
+                event_value_end = event.behavior.end_value + channel_pos
+                event_pos_end = (event.end_time, event_value_end)
+            else:
+                event_pos_end = event_pos_start
+
+            ax.plot(event_pos_start[0], event_pos_start[1], 'o', color=color_map(level))
             
             # Annotate the event with its level
-            ax.text(event_pos[0], event_pos[1], f'Level {level}', ha='right', va='bottom', fontsize=8, color='black')
+            ax.text(event_pos_start[0], event_pos_start[1], f'Level {level}', ha='right', va='bottom', fontsize=8, color='black')
 
             # Draw dotted arrow from parent to current event
-            if parent_pos is not None:
+            if parent_pos_start is not None:
+                if event.reference_time == "start":
+                    parent_pos = parent_pos_start
+                else:
+                    parent_pos = parent_pos_end
+
                 arrow_width = max(20.0 / (5*level + 1), 0.1)  # Decrease arrow width with level, ensuring minimum width
-                ax.annotate("", xy=event_pos, xytext=parent_pos, 
+                ax.annotate("", xy=event_pos_start, xytext=parent_pos, 
                             arrowprops=dict(arrowstyle="->", lw=arrow_width, linestyle='dotted', color=color_map(level)))
 
             # Draw event's children
             for child in event.children:
-                draw_event(child, level + 1, event_pos)
+                draw_event(child, level + 1, event_pos_start,event_pos_end)
 
         # Draw all root events
         root_events = [event for event in self.all_events if event.parent is None]
@@ -1588,7 +1602,7 @@ class Sequence:
             draw_event(root_event)
 
         # Set axis limits
-        ax.set_xlim(min(all_times) - 1, max(all_times) + 1)
+        ax.set_xlim(min(all_times) - 0.000001, max(all_times) + 0.000001)
         ax.set_ylim(-10, len(self.channels) * 10)
 
         # Set axis labels and title
@@ -1601,9 +1615,10 @@ class Sequence:
         # Add grid
         ax.grid(True)
         plt.tight_layout()
+        plt.xlim(start_time, end_time)
         if plot_now:
+            plt.savefig("event_tree_with_channel_plots.png")
             plt.show()
-    
     def find_sequence_dauation(self):
         return max(
             (event.start_time + (event.behavior.duration if isinstance(event.behavior, Ramp) else 0))
@@ -2222,4 +2237,3 @@ if __name__ == '__main__':
     # # print(len(pram_list[0]))
     # print()
     # # print(pram_list[0])
-    
