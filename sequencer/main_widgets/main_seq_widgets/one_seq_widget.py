@@ -1,5 +1,3 @@
-# Filename: synced_table_widget.py
-
 import sys
 from typing import List, Optional
 from PyQt5.QtWidgets import (
@@ -73,7 +71,7 @@ class ChannelLabel(QWidget):
         elif action == add_existing_channel_action:
             self.parent.on_add_existing_channel()
 
-class ChannelLabelWidget(QWidget):
+class ChannelLabelListWidget(QWidget):
     add_channel_clicked = pyqtSignal()
     add_existing_channel_clicked = pyqtSignal()
     edit_channel_clicked = pyqtSignal(str)
@@ -930,7 +928,7 @@ class EventsViewerWidget(QWidget):
             QMessageBox.critical(self, "Error", error_message)
 
 import copy
-class SyncedTableWidget(QWidget):
+class SequenceViewerWdiget(QWidget):
     def __init__(self, sequence_manager:SequenceManager, sequence:Sequence, scale_factor: float = 100.0,view_type="Linear"):
         super().__init__()
         self.sequence_manager = sequence_manager
@@ -958,7 +956,7 @@ class SyncedTableWidget(QWidget):
         
         
         # Create and configure widgets
-        self.channel_list = ChannelLabelWidget(self.sequence)
+        self.channel_list = ChannelLabelListWidget(self.sequence)
         self.data_table = EventsViewerWidget(self.sequence_manager,self.sequence, self.scale_factor, parent=self)
         self.data_table.changes_in_event.connect(self.refresh_UI)
         self.time_axis = TimeAxisWidget(sequence=self.sequence,parent=self.data_table,view_type=self.sequence_manager.view_type)
@@ -1549,7 +1547,7 @@ class SequenceManagerWidget(QWidget):
             self.sequence_view_layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
         
-        synced_table_widget = SyncedTableWidget(self.sequence_manager, sequence,view_type=self.view_type)
+        synced_table_widget = SequenceViewerWdiget(self.sequence_manager, sequence,view_type=self.view_type)
         self.sequence_view_layout.addWidget(synced_table_widget)
 
         if self.selected_sequence_button:
