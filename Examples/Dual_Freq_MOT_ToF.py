@@ -95,5 +95,5 @@ DFM_ToF.add_event("Repump TTL", Jump(3.3), relative_time=0,parent_event=Trig_Hig
 DFM_ToF.add_event("Camera Trigger", Jump(0), relative_time=t_exp,parent_event=Trig_High_IWA, comment= "[Picture Taken], Cam Trigger Low")
 
 
-DFM_ToF.plot_with_event_tree(start_time=6.006, end_time=6.1,resolution=0.00000001)
-# DFM_ToF.to_json('Dual_Freq_MOT_ToF.json')
+# DFM_ToF.plot_with_event_tree(start_time=6.006, end_time=6.1,resolution=0.00000001)
+DFM_ToF.to_json('Dual_Freq_MOT_ToF.json')
