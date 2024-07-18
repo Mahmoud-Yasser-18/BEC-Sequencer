@@ -383,17 +383,17 @@ class Event:
 
     def __le__(self, other: 'Event') -> bool:
         return self.__lt__(other) or self.start_time == self.start_time
-
-    def __repr__(self) -> str:
+    
+    def __repr__(self):
         return (
-            f"Event(\n"
+            "Event(\n"
             f"    channel={self.channel.name},\n"
             f"    behavior={self.behavior},\n"
             f"    start_time={self.start_time},\n"
-            f"    end_time={self.end_time},\n",
-            f"    comment={self.comment },\n" ,
+            f"    end_time={self.end_time},\n"
+            f"    comment={self.comment },\n" 
             f"    parent={self.parent.channel.name if self.parent else None}\n"
-            f")"
+            ")"
         )
     
 
