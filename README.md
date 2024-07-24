@@ -1,6 +1,5 @@
 # BEC-Sequencer
-Provide a brief introduction to your project here. Describe what it does, its main features, and any other relevant information.
-
+A Software to Automate Cold Atoms Experiments
 ## Installation
 
 ### Step 1: Create a Python 3.9 Virtual Environment
