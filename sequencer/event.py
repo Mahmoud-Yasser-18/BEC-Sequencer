@@ -2143,8 +2143,8 @@ class SequenceManager:
             seq_manager.to_be_swept.append({"sequence_name":sweep["sequence_name"]
                                     ,"parameter":sweep["parameter"]
                                     ,"values":sweep["values"]
-                                    ,"start_time": sweep["start_time"]
-                                    ,"channel_name": sweep["channel_name"]
+                                    ,"start_time": None
+                                    ,"channel_name": None
                                     ,"event_to_sweep":seq_manager.main_sequences[sweep["sequence_name"]]["seq"].find_event_by_time_and_channel(sweep["start_time"],sweep["channel_name"])
                                     , "sweep_type":sweep["sweep_type"]
                                     , "settings":sweep["settings"]
@@ -2152,7 +2152,7 @@ class SequenceManager:
                                     )
             seq_manager.to_be_swept[-1]["event_to_sweep"].sweep_type = sweep["sweep_type"]
             seq_manager.to_be_swept[-1]["event_to_sweep"].sweep_settings = sweep["settings"]
-            
+
             
 
         return seq_manager 

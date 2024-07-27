@@ -358,6 +358,7 @@ class Runner(QWidget):
         try:
             #randomize the dictionary order 
             items = list(self.main_sweep_queue.items())
+            print(items[0])
             random.shuffle(items)
             # Create a new dictionary from the shuffled list
             self.main_sweep_queue = dict(items)

@@ -405,7 +405,9 @@ class EventButton(QPushButton):
                 # associated_parameters is a list 
                 for p in self.event.associated_parameters:
                     behavior += f"\n{p.name} ({p.parameter_origin}) : {p.get_value()}"
-            
+            if self.event.is_sweept:
+                behavior += f"\nSweept: {self.event.sweep_type}: {list(self.event.sweep_settings.items())} "
+
             behavior += f"\nComment:\n{self.event.comment}"
 
             QToolTip.showText(event.globalPos(), behavior, self)
@@ -424,6 +426,9 @@ class EventButton(QPushButton):
                 for p in self.event.associated_parameters:
                     print(p.name)
                     behavior += f"\n{p.name} ({p.parameter_origin}) : {p.get_value()}"
+            if self.event.is_sweept:
+                behavior += f"\nSweept: {self.event.sweep_type}: {list(self.event.sweep_settings.items())}"
+
             behavior += f"\nComment:\n{self.event.comment}"
 
             QToolTip.showText(event.globalPos(), behavior, self)
@@ -435,7 +440,7 @@ class EventButton(QPushButton):
         delete_action = context_menu.addAction("Delete Event")
         edit_action = context_menu.addAction("Edit Event")
         sweep_action = context_menu.addAction("Sweep Event")
-        unsweep_action = context_menu.addAction("Unweep Event")
+        unsweep_action = context_menu.addAction("Unsweep Event")
         add_parameter_action = context_menu.addAction("Add Parameter")
         remove_parameter_action = context_menu.addAction("Remove Parameter")
 
@@ -909,8 +914,8 @@ class EventsViewerWidget(QWidget):
                 result = dialog.get_result()
                 if result:
                     
-                    parameter_name, values = result
-                    self.sequence_manager.sweep_sequence_temp(self.sequence.sequence_name, parameter_name, values,event_to_sweep=event_to_sweep)
+                    parameter_name, values,sweep_type, settings = result
+                    self.sequence_manager.sweep_sequence_temp(self.sequence.sequence_name, parameter_name, values,event_to_sweep=event_to_sweep,sweep_type=sweep_type, settings= settings)
                     self.refreshUI()
 
                 else:
