@@ -1209,6 +1209,8 @@ class SequenceManagerWidget(QWidget):
         self.sequence_manager = SequenceManager()
         self.selected_sequence_button = None
         self.view_type ="Linear"
+        self.setWindowTitle("Sequence Manager")
+
         self.initUI()
 
     def initUI(self):
@@ -1222,7 +1224,7 @@ class SequenceManagerWidget(QWidget):
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.button_container = QWidget()
-        self.button_layout = QHBoxLayout(self.button_container)
+        self.seq_buttons_layout = QHBoxLayout(self.button_container)
         self.scroll_area.setWidget(self.button_container)
 
         self.layout.addWidget(self.scroll_area)
@@ -1404,8 +1406,8 @@ class SequenceManagerWidget(QWidget):
 
 
     def update_buttons(self):
-        for i in reversed(range(self.button_layout.count())):
-            self.button_layout.itemAt(i).widget().setParent(None)
+        for i in reversed(range(self.seq_buttons_layout.count())):
+            self.seq_buttons_layout.itemAt(i).widget().setParent(None)
 
         for sequence_name in self.sequence_manager.main_sequences:
             button = DraggableButton(sequence_name, self)
@@ -1419,7 +1421,7 @@ class SequenceManagerWidget(QWidget):
 
 
             button.setStyleSheet(self.get_button_style(False))
-            self.button_layout.addWidget(button)
+            self.seq_buttons_layout.addWidget(button)
 
         add_button = DraggableButton("+", self)
         add_button.clicked.connect(self.add_new_sequence)
@@ -1438,11 +1440,11 @@ class SequenceManagerWidget(QWidget):
                 background-color: #3e8e41;
             }
         """)
-        self.button_layout.addWidget(add_button, alignment=Qt.AlignLeft)
+        self.seq_buttons_layout.addWidget(add_button, alignment=Qt.AlignLeft)
 
     def move_button(self, target, source):
-        source_index = self.button_layout.indexOf(source)
-        target_index = self.button_layout.indexOf(target)
+        source_index = self.seq_buttons_layout.indexOf(source)
+        target_index = self.seq_buttons_layout.indexOf(target)
 
         #rearrange the sequences in the sequence manager
         # target_index_manager = self.sequence_manager.main_sequences[target.text()]["index"]
@@ -1451,7 +1453,7 @@ class SequenceManagerWidget(QWidget):
         self.sequence_manager.move_sequence_to_index(source.text(),target_index )
 
 
-        self.button_layout.insertWidget(target_index, source)
+        self.seq_buttons_layout.insertWidget(target_index, source)
 
 
 
@@ -1460,7 +1462,8 @@ class SequenceManagerWidget(QWidget):
             return """
                 QPushButton {
                     background-color: #FFC300; /* Bright Yellow */
-                    color: white;
+                    color: black; 
+                    font-weight: bold;
                     border: 2px solid #C70039;
                     border-radius: 10px;
                     padding: 10px;
@@ -1476,7 +1479,9 @@ class SequenceManagerWidget(QWidget):
             return """
                 QPushButton {
                     background-color: #2196F3;
-                    color: white;
+                    color: black; 
+                    font-weight: bold;
+
                     border: 2px solid #1976D2;
                     border-radius: 10px;
                     padding: 10px;
@@ -1556,7 +1561,7 @@ class SequenceManagerWidget(QWidget):
             self.selected_sequence_button = button
             self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
         else:
-            button = self.button_layout.itemAt(self.button_layout.count()-2).widget()
+            button = self.seq_buttons_layout.itemAt(self.seq_buttons_layout.count()-2).widget()
             self.selected_sequence_button = button
             self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
 
