@@ -277,6 +277,8 @@ class Event:
         self.reference_time = reference_time if parent else None
 
         self.is_sweept = False
+        self.sweep_type = None
+        self.sweep_settings = dict()
         self.reference_original_event = self
         self.associated_parameters = []
 
@@ -1852,7 +1854,7 @@ class SequenceManager:
         self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence}
     
     
-    def sweep_sequence_temp(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None):
+    def sweep_sequence_temp(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None,sweep_type: Optional[str] = None, settings: Optional[Dict[str, Any]] = None):
         # make a dictionary to store the sweeping information 
         if sequence_name not in self.main_sequences:
             raise ValueError(f"Sequence with name {sequence_name} not found.")
@@ -1863,6 +1865,11 @@ class SequenceManager:
                                  "channel_name":channel_name,
                                  "event_to_sweep":event_to_sweep})
         event_to_sweep.is_sweept = True 
+        event_to_sweep.sweep_type = sweep_type
+        event_to_sweep.sweep_settings = settings
+
+
+
     
     def remove_sweep_sequence(self,sequence_name: str, event_to_sweep: Optional[Event] = None):
         if sequence_name not in self.main_sequences:
@@ -1870,6 +1877,8 @@ class SequenceManager:
         
         self.to_be_swept = [sweep for sweep in self.to_be_swept if event_to_sweep!=sweep["event_to_sweep"]]
         event_to_sweep.is_sweept = False
+        event_to_sweep.sweep_type = None
+        event_to_sweep.sweep_settings = dict()
         
         
      
@@ -2082,6 +2091,8 @@ class SequenceManager:
                 "values": sweep["values"],
                 "start_time": sweep["event_to_sweep"].start_time if sweep["event_to_sweep"] else sweep["start_time"],
                 "channel_name": sweep["event_to_sweep"].channel.name if sweep["event_to_sweep"] else sweep["channel_name"],
+                "sweep_type": sweep["event_to_sweep"].sweep_type if sweep["event_to_sweep"] else None,
+                "settings": sweep["event_to_sweep"].sweep_settings if sweep["event_to_sweep"] else dict()
             })
 
 
@@ -2128,13 +2139,22 @@ class SequenceManager:
         # doing the sweep sequences 
         for sweep in data["sweep_list"]:
             seq_manager.main_sequences[sweep["sequence_name"]]["seq"].find_event_by_time_and_channel(sweep["start_time"],sweep["channel_name"]).is_sweept = True
+
             seq_manager.to_be_swept.append({"sequence_name":sweep["sequence_name"]
                                     ,"parameter":sweep["parameter"]
                                     ,"values":sweep["values"]
-                                    ,"start_time":None
-                                    ,"channel_name":None
-                                    ,"event_to_sweep":seq_manager.main_sequences[sweep["sequence_name"]]["seq"].find_event_by_time_and_channel(sweep["start_time"],sweep["channel_name"])})
-        print (seq_manager.to_be_swept)
+                                    ,"start_time": sweep["start_time"]
+                                    ,"channel_name": sweep["channel_name"]
+                                    ,"event_to_sweep":seq_manager.main_sequences[sweep["sequence_name"]]["seq"].find_event_by_time_and_channel(sweep["start_time"],sweep["channel_name"])
+                                    , "sweep_type":sweep["sweep_type"]
+                                    , "settings":sweep["settings"]
+                                    }
+                                    )
+            seq_manager.to_be_swept[-1]["event_to_sweep"].sweep_type = sweep["sweep_type"]
+            seq_manager.to_be_swept[-1]["event_to_sweep"].sweep_settings = sweep["settings"]
+            
+            
+
         return seq_manager 
             
 

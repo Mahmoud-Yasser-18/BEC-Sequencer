@@ -256,7 +256,7 @@ class SweepEventDialog(QDialog):
 
         try:
             values = self.generate_sweep_values(sweep_type, settings)
-            self.result = (parameter_name, values)
+            self.result = (parameter_name, values,sweep_type, settings)
             super().accept()
         except ValueError as e:
             QMessageBox.warning(self, "Invalid Input", str(e))
