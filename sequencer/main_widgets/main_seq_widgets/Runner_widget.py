@@ -159,7 +159,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 import os 
 
-
+import json
 import random 
 import datetime
 
@@ -169,10 +169,18 @@ class Runner(QWidget):
         super().__init__()
         self.sequence_manager = sequence_manager
 
+        self.paramerters_path = os.path.join(os.path.dirname(__file__), 'runner_default_settings.json')
+
+        with open(self.paramerters_path, 'r') as json_file:
+            loaded_settings = json.load(json_file)
+            self.save_path = loaded_settings["default_save_path"]
+        # Create these folders if they don't exist 
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
+
         
         
         
-        self.save_path = "../data/source_folder"
         self.refreash_sweep_queue()
         self.boot_ADwin()
         # print("Here")
@@ -183,6 +191,15 @@ class Runner(QWidget):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
         self.initUI()
+    def save_as_default_settings(self):
+        # Define the default settings
+        camera_default_settings = {
+            "default_save_path": self.save_path,
+        }
+
+        # Write the settings to a JSON file
+        with open(self.paramerters_path, 'w') as json_file:
+            json.dump(camera_default_settings, json_file, indent=4)
         
         
         
@@ -292,7 +309,8 @@ class Runner(QWidget):
         self.show()
     def change_save_location(self):
         self.save_path = QFileDialog.getExistingDirectory(self, "Select Save Folder", self.save_path)
-
+        self.save_as_default_settings()
+        
     def saver_handler_checkBox(self):
         pass 
 

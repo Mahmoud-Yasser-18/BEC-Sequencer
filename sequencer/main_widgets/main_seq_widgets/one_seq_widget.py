@@ -10,7 +10,7 @@ from PyQt5.QtCore import Qt, QRect, pyqtSignal, QPoint
 
 
 
-from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog,ParameterDialog
+from sequencer.Dialogs.event_dialog import ChildEventDialog,RootEventDialog,ParameterDialog,RemoveParameterDialog
 from sequencer.Dialogs.edit_event_dialog import EditEventDialog,SweepEventDialog
 from sequencer.event import Ramp, Jump, Sequence,Event
 from sequencer.ADwin_Modules import calculate_time_ranges
@@ -404,7 +404,7 @@ class EventButton(QPushButton):
                 behavior += "\n\nAssociated Parameters:"
                 # associated_parameters is a list 
                 for p in self.event.associated_parameters:
-                    behavior += f"\n{p.name}: {p.get_value()}"
+                    behavior += f"\n{p.name} ({p.parameter_origin}) : {p.get_value()}"
             
             behavior += f"\nComment:\n{self.event.comment}"
 
@@ -422,7 +422,8 @@ class EventButton(QPushButton):
                 behavior += "\n\nAssociated Parameters:"
                 # associated_parameters is a list 
                 for p in self.event.associated_parameters:
-                    behavior += f"\n{p.name}: {p.get_value()}"
+                    print(p.name)
+                    behavior += f"\n{p.name} ({p.parameter_origin}) : {p.get_value()}"
             behavior += f"\nComment:\n{self.event.comment}"
 
             QToolTip.showText(event.globalPos(), behavior, self)
@@ -771,16 +772,17 @@ class EventsViewerWidget(QWidget):
 
     
     def remove_parameter(self, event:Event):
-        try:
-
-            parameter_name=QInputDialog.getItem(self, 'Remove Parameter', 'Enter the parameter name to remove',[p.name for p in event.associated_parameters], 0, False)
-
-            self.sequence.remove_parameter(parameter_name=parameter_name[0])
+        parameters = event.associated_parameters
+        dialog = RemoveParameterDialog(self, parameters)
+        if dialog.exec_() == QDialog.Accepted:
+            print("Parameter removed successfully.")
             self.refreshUI()
-        except Exception as e:
-            error_message = f"An error occurred: {str(e)}"
-            QMessageBox.critical(self, "Error", error_message)
-            self.refreshUI()
+
+        else:
+            print("Parameter removal cancelled.")
+
+
+
     def add_parameter(self, event:Event):
         try:
             possible_parameters = event.get_event_attributes()

@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox,QDialogButtonBox
+    QApplication, QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QComboBox,QDialogButtonBox,QMessageBox,QHBoxLayout
 )
 from PyQt5.QtGui import QDoubleValidator
 
@@ -204,6 +204,49 @@ class RootEventDialog(BaseEventDialog):
             'reference_time': None
         }
         return data
+
+class RemoveParameterDialog(QDialog):
+    def __init__(self, parent=None, parameters=None):
+        super(RemoveParameterDialog, self).__init__(parent)
+        self.parent_widget = parent
+        self.parameters = parameters
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle('Remove Parameter')
+
+        layout = QVBoxLayout()
+
+        self.label = QLabel('Select the parameter name to remove:')
+        layout.addWidget(self.label)
+
+        self.combo_box = QComboBox()
+        self.combo_box.addItems([p.name for p in self.parameters])
+        layout.addWidget(self.combo_box)
+
+        button_layout = QHBoxLayout()
+
+        self.ok_button = QPushButton('OK')
+        self.ok_button.clicked.connect(self.remove_parameter)
+        button_layout.addWidget(self.ok_button)
+
+        self.cancel_button = QPushButton('Cancel')
+        self.cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(self.cancel_button)
+
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+
+    def remove_parameter(self):
+        parameter_name = self.combo_box.currentText()
+        try:
+            self.parent_widget.sequence.remove_parameter(parameter_name=parameter_name)
+            self.accept()  # Close the dialog
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+            self.parent_widget.refreshUI()
+
 
 class ChildEventDialog(BaseEventDialog):
     def __init__(self, channels):
