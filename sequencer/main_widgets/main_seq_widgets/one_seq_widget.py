@@ -781,6 +781,11 @@ class EventsViewerWidget(QWidget):
         dialog = RemoveParameterDialog(self, parameters)
         if dialog.exec_() == QDialog.Accepted:
             print("Parameter removed successfully.")
+            #also do unsweep 
+            try:
+                self.sequence_manager.remove_sweep_sequence(self.sequence.sequence_name,event_to_sweep=event)
+            except:
+                pass
             self.refreshUI()
 
         else:
@@ -802,7 +807,7 @@ class EventsViewerWidget(QWidget):
                 if parameter_name_new is None or parameter_name_new.strip == "":
                     raise Exception("Parameter name cannot be empty")
 
-                self.sequence.add_parameter_to_event(event, parameter_name=parameter_name_new.strip(),parameter_value=possible_parameters[parameter_name],parameter_origin=parameter_name )
+                self.sequence.add_parameter_to_event(event, parameter_name=parameter_name_new,parameter_origin=parameter_name )
                 self.refreshUI()
 
         except Exception as e:
@@ -929,6 +934,9 @@ class EventsViewerWidget(QWidget):
     def unsweep_event(self, event_to_unsweep):
         try:
             self.sequence_manager.remove_sweep_sequence(self.sequence.sequence_name,event_to_sweep=event_to_unsweep)
+            # also remove the associated parameters 
+            self.sequence.remove_parameter(parameter_name=event_to_unsweep.asociated_parameters[0].name)
+            
             self.refreshUI()
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"

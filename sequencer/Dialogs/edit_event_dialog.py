@@ -172,6 +172,10 @@ class SweepEventDialog(QDialog):
         self.form_layout = QFormLayout()
         self.layout.addLayout(self.form_layout)
 
+        self.parameter_label_label = QLabel("Parameter label:")
+        self.parameter_label_text = QLineEdit()
+        self.form_layout.addRow(self.parameter_label_label, self.parameter_label_text)
+
         # Parameter name combo box
         self.parameter_name_label = QLabel("Parameter Name:")
         self.parameter_name_combo = QComboBox()
@@ -250,13 +254,19 @@ class SweepEventDialog(QDialog):
         self.sweep_settings_widgets[setting_key] = line_edit
 
     def accept(self):
+        parameter_label = self.parameter_label_text.text()
+        #chec if parameter label is empty
+        if parameter_label.strip() == "":
+            QMessageBox.warning(self, "Invalid Input", "Parameter label cannot be empty.")
+            return
+        
         parameter_name = self.parameter_name_combo.currentText()
         sweep_type = self.sweep_type_combo.currentText()
         settings = {key: widget.text() for key, widget in self.sweep_settings_widgets.items()}
 
         try:
             values = self.generate_sweep_values(sweep_type, settings)
-            self.result = (parameter_name, values,sweep_type, settings)
+            self.result = ((parameter_name,parameter_label), values,sweep_type, settings)
             super().accept()
         except ValueError as e:
             QMessageBox.warning(self, "Invalid Input", str(e))

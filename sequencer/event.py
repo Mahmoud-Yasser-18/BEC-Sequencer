@@ -22,7 +22,7 @@ class Parameter:
         return self.event.get_event_attributes()[self.parameter_origin]
 
         
-
+        
 
 
 
@@ -435,10 +435,19 @@ class Sequence:
             channel.check_for_overlapping_events()
     
 
-    def add_parameter_to_event(self,event: Event,parameter_name,parameter_value,parameter_origin):
+    def add_parameter_to_event(self,event: Event,parameter_name,parameter_origin):
         # ff the event is not in the sequence
         if event not in self.all_events:
             raise ValueError("Event not found in the sequence")
+        # check if the parameter already exist in the sequence 
+        for p in self.get_parameter_dict().keys():
+            if p == parameter_name:
+                raise ValueError("Parameter already exists in the sequence")
+        
+        # check if the parameter origin is already swept on 
+        for p in event.associated_parameters:
+            if p.parameter_origin == parameter_origin:
+                raise ValueError(f"Parameter origin {parameter_origin} is already defined for the event")
         p = Parameter(parameter_name,event,parameter_origin)
         event.associated_parameters.append(p)
 
@@ -1856,24 +1865,30 @@ class SequenceManager:
     
     def sweep_sequence_temp(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None,sweep_type: Optional[str] = None, settings: Optional[Dict[str, Any]] = None):
         # get event to sweep from start time and channel name
+        parameter_name, parameter_label = parameter
         if event_to_sweep is None:
             if start_time is None or channel_name is None:
                 raise ValueError("Either event_to_sweep or start_time and channel_name must be provided.")
             
             sequence = self.main_sequences[sequence_name]["seq"]
             event_to_sweep = sequence.find_event_by_time_and_channel(start_time, channel_name)
-        
+        sequence:Sequence = self.main_sequences[sequence_name]["seq"]
+
         # make a dictionary to store the sweeping information 
         
         
         if sequence_name not in self.main_sequences:
             raise ValueError(f"Sequence with name {sequence_name} not found.")
         self.to_be_swept.append({"sequence_name":sequence_name,
-                                 "parameter":parameter,
+                                 "parameter":parameter_name,
+                                 "parameter_label":parameter_label,
                                  "values":values,
                                  "start_time":start_time,
                                  "channel_name":channel_name,
                                  "event_to_sweep":event_to_sweep})
+        # create a Paramter and then associate it to the event 
+        sequence.add_parameter_to_event(event_to_sweep, parameter_name=parameter_label,parameter_origin=parameter_name )
+
         event_to_sweep.is_sweept = True 
         event_to_sweep.sweep_type = sweep_type
         event_to_sweep.sweep_settings = settings
