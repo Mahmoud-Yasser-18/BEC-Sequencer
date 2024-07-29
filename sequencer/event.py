@@ -1688,7 +1688,7 @@ class SequenceManager:
     def __init__(self) -> None:
         self.main_sequences = OrderedDict()
         self.custom_sequence= None
-        self.view_type = "Linear"
+        self.view_type = "Event"
         self.to_be_swept = []
         
         
@@ -1855,7 +1855,17 @@ class SequenceManager:
     
     
     def sweep_sequence_temp(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None,sweep_type: Optional[str] = None, settings: Optional[Dict[str, Any]] = None):
+        # get event to sweep from start time and channel name
+        if event_to_sweep is None:
+            if start_time is None or channel_name is None:
+                raise ValueError("Either event_to_sweep or start_time and channel_name must be provided.")
+            
+            sequence = self.main_sequences[sequence_name]["seq"]
+            event_to_sweep = sequence.find_event_by_time_and_channel(start_time, channel_name)
+        
         # make a dictionary to store the sweeping information 
+        
+        
         if sequence_name not in self.main_sequences:
             raise ValueError(f"Sequence with name {sequence_name} not found.")
         self.to_be_swept.append({"sequence_name":sequence_name,
@@ -2200,9 +2210,9 @@ def create_test_seq_manager():
     seq_manager.main_sequences["test2"]["seq"] = create_test_sequence("test2")
 
 
-    seq_manager.sweep_sequence("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
-    seq_manager.sweep_sequence("test2","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
-    seq_manager.sweep_sequence("test2","duration", [1,2,3],start_time=2,channel_name= "Analog1")
+    seq_manager.sweep_sequence_temp("test","duration", [1,2,3],start_time=2,channel_name= "Analog1")
+    seq_manager.sweep_sequence_temp("test2","end_value", [2,3,4],start_time=2,channel_name= "Analog1")
+    seq_manager.sweep_sequence_temp("test2","duration", [1,2,3],start_time=2,channel_name= "Analog1")
     return seq_manager
 
     

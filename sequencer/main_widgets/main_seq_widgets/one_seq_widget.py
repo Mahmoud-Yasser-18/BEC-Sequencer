@@ -709,7 +709,7 @@ class EventsViewerWidget(QWidget):
                     gap_button.addEventSignal.connect(self.add_event)
 
                 previous_event = event
-                button = EventButton(event, self.scale_factor, self.sequence, buttons_container)
+                button = EventButton(event, self.scale_factor, self.sequence, buttons_container,view_type=self.sequence_manager.view_type)
 
                 button.addChildEventSignal.connect(self.add_child_event)
                 button.deleteEventSignal.connect(self.delete_event)
@@ -936,7 +936,7 @@ class EventsViewerWidget(QWidget):
 
 import copy
 class SequenceViewerWdiget(QWidget):
-    def __init__(self, sequence_manager:SequenceManager, sequence:Sequence, scale_factor: float = 100.0,view_type="Linear"):
+    def __init__(self, sequence_manager:SequenceManager, sequence:Sequence, scale_factor: float = 100.0):
         super().__init__()
         self.sequence_manager = sequence_manager
         self.scale_factor = scale_factor
@@ -946,9 +946,8 @@ class SequenceViewerWdiget(QWidget):
         
         self.setLayout(self.layout_main)
         self.combo_box_type = QComboBox()
-        option_list = ["Linear","Linear Event","Event"]
+        option_list = ["Event","Linear","Linear Event"]
         option_list.remove(copy.deepcopy(self.sequence_manager.view_type))
-
         self.combo_box_type.addItems([copy.deepcopy(self.sequence_manager.view_type)]+option_list)
         self.combo_box_type.currentTextChanged.connect(self.change_view_type)
 
@@ -1215,7 +1214,7 @@ class SequenceManagerWidget(QWidget):
         super().__init__()
         self.sequence_manager = SequenceManager()
         self.selected_sequence_button = None
-        self.view_type ="Linear"
+        self.view_type ="Event"
         self.setWindowTitle("Sequence Manager")
 
         self.initUI()
@@ -1559,7 +1558,7 @@ class SequenceManagerWidget(QWidget):
             self.sequence_view_layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
         
-        synced_table_widget = SequenceViewerWdiget(self.sequence_manager, sequence,view_type=self.view_type)
+        synced_table_widget = SequenceViewerWdiget(self.sequence_manager, sequence)
         self.sequence_view_layout.addWidget(synced_table_widget)
 
         if self.selected_sequence_button:
