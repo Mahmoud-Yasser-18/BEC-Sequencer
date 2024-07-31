@@ -479,6 +479,12 @@ class TimeInstance:
             children.append(child)
             children += child.get_all_children()
         return children
+    def get_all_time_instances(self) -> List['TimeInstance']:
+        time_instances: List['TimeInstance'] = []
+        time_instances.append(self)
+        time_instances += self.get_all_children()
+        return time_instances
+    
     
     def get_time_instance_by_name(self, name: str) -> Optional['TimeInstance']:
         if self.name == name:
@@ -530,6 +536,8 @@ class Sequence:
     def add_time_instance(self, name: str, parent: TimeInstance, relative_time: int) -> TimeInstance:
         return parent.add_child_time_instance(name, relative_time)
     
+    def get_all_time_instances(self) -> List[TimeInstance]:
+        return self.root_time_instance.get_all_time_instances()
     
 
     # adding an event to the sequence by providing the channel, behavior, start_time_instance and end_time_instance (in case of ramp)
@@ -1004,6 +1012,7 @@ class Sequence:
         plt.tight_layout()
         if plot_now:
             plt.show()  
+    
 
 
 
@@ -1055,46 +1064,157 @@ class SequenceSweeper:
             
 
 from sequencer.ADwin_Modules import ADwin_Driver
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QPushButton, QLabel, QMessageBox
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+   QComboBox, QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
+)
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QGridLayout, QPushButton, QLabel, QMessageBox,
+    QScrollArea, QVBoxLayout, QHBoxLayout, QFrame
+)
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QGridLayout, QPushButton, QLabel, QMessageBox,
+    QScrollArea, QVBoxLayout, QHBoxLayout, QFrame, QMainWindow, QInputDialog,
+    QSizePolicy
+)
+from PyQt5.QtCore import Qt
 
-if __name__ == "__main__":
+class SequenceGrid(QWidget):
+    def __init__(self, sequence:Sequence, parent=None):
+        super().__init__(parent)
+        self.sequence = sequence
+        self.initUI()
+    
+    def initUI(self):
+        self.layout = QGridLayout()
+        self.setLayout(self.layout)
+        self.refresh_grid()
+    
+    def refresh_grid(self):
+        for i in reversed(range(self.layout.count())): 
+            self.layout.itemAt(i).widget().setParent(None)
+        
+        # Create headers for time instances
+        for col, time_instance in enumerate(self.sequence.get_all_time_instances(), start=1):
+            self.layout.addWidget(QLabel(time_instance.name), 0, col)
+        
+        # Create rows for channels
+        for row, channel in enumerate(self.sequence.channels, start=1):
+            self.layout.addWidget(QLabel(channel.name), row, 0)
+            for col, time_instance in enumerate(self.sequence.get_all_time_instances(), start=1):
+                event = self.sequence.find_event_by_time_and_channel(time_instance.name, channel.name)
+                if event:
+                    if isinstance(event.behavior, Jump):
+                        value = event.behavior.target_value
+                    elif isinstance(event.behavior, Ramp):
+                        value = event.behavior.start_value
+                    self.layout.addWidget(QLabel(str(value)), row, col)
+                else:
+                    btn = QPushButton('+')
+                    btn.clicked.connect(lambda _, r=row, c=col: self.add_event(r, c))
+                    self.layout.addWidget(btn, row, col)
+    
+    def add_event(self, row, col):
+        # Get the channel and time instance names from row and col
+        channel_name = self.layout.itemAtPosition(row, 0).widget().text()
+        time_instance_name = self.layout.itemAtPosition(0, col).widget().text()
+        
+        # Find the corresponding objects in the sequence
+        channel = self.sequence.find_channel_by_name(channel_name)
+        time_instance = self.sequence.root_time_instance.get_time_instance_by_name(time_instance_name)
+        
+        if channel and time_instance:
+            value, ok = QInputDialog.getDouble(self, "Add Event", "Enter the event value:", 0.0, -1000, 1000, 2)
+            if ok:
+                behavior = Jump(value)
+                self.sequence.add_event(channel, behavior, time_instance)
+                self.refresh_grid()
+        else:
+            QMessageBox.warning(self, "Error", "Channel or Time Instance not found")
+
+class SequenceGUI(QMainWindow):
+    def __init__(self, sequence:Sequence):
+        super().__init__()
+        self.sequence = sequence
+        self.initUI()
+    
+    def initUI(self):
+        self.setWindowTitle("Sequence GUI")
+        self.setGeometry(100, 100, 800, 600)
+        
+        # Main widget and layout
+        main_widget = QWidget()
+        main_layout = QVBoxLayout(main_widget)
+        
+        # Header layout for fixed headers
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel("Channels/Time Instances"), alignment=Qt.AlignTop)
+
+        for time_instance in self.sequence.get_all_time_instances():
+            header_layout.addWidget(QLabel(time_instance.name), alignment=Qt.AlignTop)
+
+        main_layout.addLayout(header_layout)
+
+        # Scroll area for the grid
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        # Sequence grid
+        self.sequence_grid = SequenceGrid(self.sequence)
+        scroll_area.setWidget(self.sequence_grid)
+
+        main_layout.addWidget(scroll_area)
+        self.setCentralWidget(main_widget)
+        
+    def refresh_grid(self):
+        self.sequence_grid.refresh_grid()
+
+class SequenceApp:
+    def __init__(self, sequence:Sequence):
+        self.app = QApplication(sys.argv)
+        self.gui = SequenceGUI(sequence)
+    
+    def run(self):
+        self.gui.show()
+        sys.exit(self.app.exec_())
+
+
+if __name__ == '__main__':
     seq = Sequence("test")
     ch1 = seq.add_analog_channel("ch1", 1, 1)
     ch2 = seq.add_analog_channel("ch2", 1, 2)
     ch3 = seq.add_analog_channel("ch3", 1, 3)
     ch4 = seq.add_analog_channel("ch4", 1, 4)
+    for i in range(6, 100):
+        seq.add_analog_channel(f"ch{i}", 1, i)
 
     root = seq.root_time_instance
-    t1 = seq.add_time_instance("t1", root, 0)
-    t2 = seq.add_time_instance("t2", root, 1)
-    t3 = seq.add_time_instance("t3", t2, 1)
-    t4 = seq.add_time_instance("t4", t3, 1)
-    t5 = seq.add_time_instance("t5", t4, 1)
-    t6 = seq.add_time_instance("t6", t5, 1)
+    t_list = [root]
+    for i in range(1, 100):
+        t_list.append( seq.add_time_instance(f"t{i}", t_list[-1], 1))
 
 
-    e1 = seq.add_event(ch1, Jump(5), t1)
-    e2 = seq.add_event(ch2, Ramp(t1,t2, RampType.LINEAR, 0, 5,resolution= 0.1), t1,t2)
-    e3 = seq.add_event(ch3, Jump(5), t1)
-    e4 = seq.add_event(ch4, Jump(3), t1)
-    e5 = seq.add_event(ch1, Jump(-3), t2)
-    e6 = seq.add_event(ch2, Jump(1.5), t2)
-    e7 = seq.add_event(ch3, Jump(5), t3)
+    e1 = seq.add_event(ch1, Jump(5), t_list[0])
+    e2 = seq.add_event(ch2, Ramp(t_list[0],t_list[1], RampType.LINEAR, 0, 5,resolution= 0.1), t_list[0],t_list[1])
+    e3 = seq.add_event(ch3, Jump(5), t_list[3])
+    e4 = seq.add_event(ch4, Jump(3), t_list[3])
+    e5 = seq.add_event(ch1, Jump(-3), t_list[1])
+    e6 = seq.add_event(ch2, Jump(1.5), t_list[1])
+    e7 = seq.add_event(ch3, Jump(5), t_list[4])
+     
+    # Run the application
+    app = SequenceApp(seq)
+    app.run()
 
 
+    exit()
 
-    
+
     seq_sweep =SequenceSweeper(seq)
     seq_sweep.stack_sweep_paramter(e2,"start_value", [1, 2, 3])
-    seq_sweep.stack_sweep_paramter(t2,"end_value", [1, 2, 3])
+    seq_sweep.stack_sweep_paramter(t_list[1],"end_value", [1, 2, 3])
     generated_sequences = seq_sweep.sweep()
     for s in generated_sequences:
         s.plot()
-        
-    # sweept = seq.sweep_time_instance_relative_time(t2, [3, 4, 5])
-    # general_sweept =[]
-    # for s in sweept:
-    #     general_sweept+=s.sweep_event_behavior(e2, [1, 2, 3],"end_value")
-    # for s in general_sweept:
-    #     s.plot()
-    
-
