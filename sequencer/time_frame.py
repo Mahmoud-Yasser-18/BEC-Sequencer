@@ -10,6 +10,7 @@ import sys
 import time
 import copy
 import matplotlib.pyplot as plt
+import itertools
 
 class Parameter:
     def __init__(self, name: str,event: 'Event',parameter_origin):
@@ -678,6 +679,9 @@ class Sequence:
         channel = Digital_Channel(name, card_number, channel_number, reset, reset_value)
         self.channels.append(channel)
         return channel
+    def find_TimeInstance_by_name(self, name: str) -> Optional[TimeInstance]:
+        return self.root_time_instance.get_time_instance_by_name(name)
+    
     def find_channel_by_name(self, name: str) -> Optional[Channel]:
         for channel in self.channels:
             if channel.name == name:
@@ -1001,7 +1005,57 @@ class Sequence:
         if plot_now:
             plt.show()  
 
+
+
+class SequenceSweeper:
+    def __init__(self, sequence: Sequence):
+        self.sequence = sequence
+        self.sweep_dict = {}
+
+
+    def stack_sweep_paramter(self,target,parameter: str, values: List[float]):
+        # get event to sweep from start time and channel name
+        if isinstance(target,Event):
+            key = (target.start_time_instance.name, target.channel.name,parameter)
+            if key not in self.sweep_dict:
+                self.sweep_dict[key] = values
+            else:
+                return ValueError(f"Parameter {parameter} already swept on {target.start_time_instance.name} at {target.channel.name}")
+        elif isinstance(target,TimeInstance):
+            key = target.name
+            if key not in self.sweep_dict:
+                self.sweep_dict[key] = values
+            else:
+                return ValueError(f"Parameter relative time already swept on {target.name}")
+    def sweep(self):
+        # check if the sweep dict is empty
+        if not self.sweep_dict:
+            return ValueError("No sweep parameters found")
         
+        # get all the keys from the sweep dict
+        first_key = list(self.sweep_dict.keys())[0]
+        if isinstance(first_key,tuple):
+            generated_sequences = self.sequence.sweep_event_behavior(self.sequence.find_event_by_time_and_channel(first_key[0], first_key[1]), self.sweep_dict[first_key],first_key[2])
+        elif isinstance(first_key,str): 
+            generated_sequences = self.sequence.sweep_time_instance_relative_time(self.sequence.find_TimeInstance_by_name(first_key), self.sweep_dict[first_key])
+        
+        for key in list(self.sweep_dict.keys())[1:]:
+            if isinstance(key,tuple):
+                temp_list = []
+                for s in generated_sequences:
+                    temp_list+=s.sweep_event_behavior(s.find_event_by_time_and_channel(key[0], key[1]), self.sweep_dict[key],key[2])
+                generated_sequences = temp_list
+            elif isinstance(key,str):
+                temp_list = []
+                for s in generated_sequences:
+                    temp_list+=s.sweep_time_instance_relative_time(s.find_TimeInstance_by_name(key), self.sweep_dict[key])
+                generated_sequences = temp_list        
+                    
+        return generated_sequences
+            
+
+from sequencer.ADwin_Modules import ADwin_Driver
+
 if __name__ == "__main__":
     seq = Sequence("test")
     ch1 = seq.add_analog_channel("ch1", 1, 1)
@@ -1025,12 +1079,22 @@ if __name__ == "__main__":
     e5 = seq.add_event(ch1, Jump(-3), t2)
     e6 = seq.add_event(ch2, Jump(1.5), t2)
     e7 = seq.add_event(ch3, Jump(5), t3)
-    sweept = seq.sweep_time_instance_relative_time(t2, [3, 4, 5])
-    for s in sweept:
+
+
+
+    
+    seq_sweep =SequenceSweeper(seq)
+    seq_sweep.stack_sweep_paramter(e2,"start_value", [1, 2, 3])
+    seq_sweep.stack_sweep_paramter(t2,"end_value", [1, 2, 3])
+    generated_sequences = seq_sweep.sweep()
+    for s in generated_sequences:
         s.plot()
-    seq.plot()
-    # print(seq.to_json())
-    # seq.to_json (filename="test1.json")
-    # seq2= Sequence.from_json(file_name="test1.json")
-    # seq2.to_json(filename="test2.json")
-     
+        
+    # sweept = seq.sweep_time_instance_relative_time(t2, [3, 4, 5])
+    # general_sweept =[]
+    # for s in sweept:
+    #     general_sweept+=s.sweep_event_behavior(e2, [1, 2, 3],"end_value")
+    # for s in general_sweept:
+    #     s.plot()
+    
+
