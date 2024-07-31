@@ -92,16 +92,17 @@ class Ramp(EventBehavior):
         return self.end_time_instance.get_absolute_time() - self.start_time_instance.get_absolute_time()
 
     def _set_func(self):
+        duration = self.get_duration()
         if self.ramp_type == RampType.LINEAR:
-            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (t / self.get_duration())
+            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (t / duration)
         elif self.ramp_type == RampType.QUADRATIC:
-            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (t / self.get_duration())**2
+            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (t / duration)**2
         elif self.ramp_type == RampType.EXPONENTIAL:
-            self.func = lambda t: self.start_value * (self.end_value / self.start_value) ** (t / self.get_duration())
+            self.func = lambda t: self.start_value * (self.end_value / self.start_value) ** (t / duration)
         elif self.ramp_type == RampType.LOGARITHMIC:
-            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (np.log10(t + 1) / np.log10(self.get_duration() + 1))
+            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (np.log10(t + 1) / np.log10(duration + 1))
         elif self.ramp_type == RampType.MINIMUM_JERK:
-            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (10 * (t/self.get_duration())**3 - 15 * (t/self.get_duration())**4 + 6 * (t/self.get_duration())**5)
+            self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (10 * (t/duration)**3 - 15 * (t/duration)**4 + 6 * (t/duration)**5)
         else : 
             raise ValueError("Invalid ramp type")
         
@@ -308,7 +309,7 @@ class Event:
                 if end_time_instance is None:
                     raise ValueError("end_time_instance is required for Ramp events")
                 else :
-                    self.end_time_instance = self.end_time_instance
+                    self.end_time_instance = end_time_instance
         else:
             self.end_time_instance = self.start_time_instance
 
@@ -381,7 +382,7 @@ class Event:
                     if start_time != event.get_end_time():
                         raise ValueError(f"Jump events can only be added at the end of a ramp on channel {channel.name}.")
                 else:
-                    raise ValueError(f"Events on channel {channel.name} overlap with existing event {event.behavior} from {event.start_time} to {event.end_time}.")
+                    raise ValueError(f"Events on channel {channel.name} overlap with existing event {event.behavior} from {event.get_start_time()} to {event.get_end_time()}.")
 
 class TimeInstance:
     def __init__(self, name: str, parent: Optional['TimeInstance'] = None, relative_time: int = 0):
@@ -928,6 +929,78 @@ class Sequence:
 
     
 
+    def plot(self, channels_to_plot: Optional[List[str]] = None, resolution: float = 0.1, start_time: Optional[float] = None, end_time: Optional[float] = None, plot_now: bool =True):
+        all_events = self.get_all_events()
+
+
+        if channels_to_plot is None:
+            channels_to_plot = [channel.name for channel in self.channels]
+        else:
+            invalid_channels = [name for name in channels_to_plot if not any(channel.name == name for channel in self.channels)]
+            if invalid_channels:
+                raise ValueError(f"Invalid channel names: {', '.join(invalid_channels)}")
+        
+        if start_time is None or end_time is None:
+            all_time_points = sorted(set(event.get_start_time() for event in all_events) | set(event.get_end_time() for event in all_events))
+            if start_time is None:
+                start_time = all_time_points[0]
+            if end_time is None:
+                end_time = all_time_points[-1]
+        
+        num_channels = len(channels_to_plot)
+        fig, axes = plt.subplots(num_channels, 1, figsize=(12, 6 * num_channels), sharex=True)
+        
+        if num_channels == 1:
+            axes = [axes]
+        
+        for ax, channel_name in zip(axes, channels_to_plot):
+            channel = next(channel for channel in self.channels if channel.name == channel_name)
+            events = sorted(channel.events, key=lambda event: event.get_start_time())
+            
+            time_points: List[float] = []
+            values: List[float] = []
+            last_value = channel.reset_value
+            
+            for event in events:
+                if event.get_start_time() > end_time:
+                    break
+                if event.get_end_time() < start_time:
+                    continue
+                
+                if event.get_start_time() > start_time and (not time_points or time_points[-1] < start_time):
+                    time_points.append(start_time)
+                    values.append(last_value)
+                
+                if time_points and event.get_start_time() > time_points[-1]:
+                    time_points.append(event.get_start_time())
+                    values.append(last_value)
+                
+                current_time = max(start_time, event.get_start_time())
+                while current_time <= min(end_time, event.get_end_time()):                    
+                    time_points.append(current_time)
+                    last_value = event.behavior.get_value_at_time(current_time - event.get_start_time())
+                    values.append(last_value)
+                    current_time += resolution
+                
+                if current_time > event.get_end_time():
+                    last_value = event.behavior.get_value_at_time(event.get_end_time() - event.get_start_time())
+                    time_points.append(event.get_end_time())
+                    values.append(last_value)
+            
+            if not time_points or time_points[-1] < end_time:
+                time_points.append(end_time)
+                values.append(last_value)
+            
+            ax.plot(time_points, values, label=channel.name)
+            ax.set_ylabel(channel.name)
+            ax.legend()
+            ax.grid(True)
+        
+        axes[-1].set_xlabel("Time")
+        plt.tight_layout()
+        if plot_now:
+            plt.show()  
+
         
 if __name__ == "__main__":
     seq = Sequence("test")
@@ -938,23 +1011,26 @@ if __name__ == "__main__":
 
     root = seq.root_time_instance
     t1 = seq.add_time_instance("t1", root, 0)
-    t2 = seq.add_time_instance("t2", root, 1000)
-    t3 = seq.add_time_instance("t3", t2, 1000)
-    t4 = seq.add_time_instance("t4", t3, 1000)
-    t5 = seq.add_time_instance("t5", t4, 1000)
-    t6 = seq.add_time_instance("t6", t5, 1000)
+    t2 = seq.add_time_instance("t2", root, 1)
+    t3 = seq.add_time_instance("t3", t2, 1)
+    t4 = seq.add_time_instance("t4", t3, 1)
+    t5 = seq.add_time_instance("t5", t4, 1)
+    t6 = seq.add_time_instance("t6", t5, 1)
 
 
     e1 = seq.add_event(ch1, Jump(5), t1)
-    e2 = seq.add_event(ch2, Jump(1), t1)
+    e2 = seq.add_event(ch2, Ramp(t1,t2, RampType.LINEAR, 0, 5,resolution= 0.1), t1,t2)
     e3 = seq.add_event(ch3, Jump(5), t1)
     e4 = seq.add_event(ch4, Jump(3), t1)
-    e5 = seq.add_event(ch1, Jump(5), t2)
+    e5 = seq.add_event(ch1, Jump(-3), t2)
     e6 = seq.add_event(ch2, Jump(1.5), t2)
     e7 = seq.add_event(ch3, Jump(5), t3)
-
+    sweept = seq.sweep_time_instance_relative_time(t2, [3, 4, 5])
+    for s in sweept:
+        s.plot()
+    seq.plot()
     # print(seq.to_json())
-    seq.to_json (filename="test1.json")
-    seq2= Sequence.from_json(file_name="test1.json")
-    seq2.to_json(filename="test2.json")
+    # seq.to_json (filename="test1.json")
+    # seq2= Sequence.from_json(file_name="test1.json")
+    # seq2.to_json(filename="test2.json")
      
