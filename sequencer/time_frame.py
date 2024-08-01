@@ -541,8 +541,10 @@ class Sequence:
     
 
     # adding an event to the sequence by providing the channel, behavior, start_time_instance and end_time_instance (in case of ramp)
-    def add_event(self, channel: Channel, behavior: EventBehavior,start_time_instance: TimeInstance, end_time_instance: Optional[TimeInstance] = None,comment:str="",) -> Event:
+    def add_event(self, channel_name: str, behavior: EventBehavior,start_time_instance: TimeInstance, end_time_instance: Optional[TimeInstance] = None,comment:str="",) -> Event:
         # check if the channel is already in the sequence
+        channel = self.find_channel_by_name(channel_name)
+
         if channel not in self.channels:
             raise ValueError("Channel not found in the sequence.")
         # check if ramp end_time_instance is provided (also validate that the start time instance is less than end time instance)
@@ -1093,8 +1095,17 @@ class SequenceGrid(QWidget):
         self.refresh_grid()
     
     def refresh_grid(self):
+        self.blockSignals(True)
+        self.setUpdatesEnabled(False)
+
         for i in reversed(range(self.layout.count())): 
-            self.layout.itemAt(i).widget().setParent(None)
+            widget_to_remove = self.layout.itemAt(i).widget()
+            self.layout.removeWidget(widget_to_remove)
+            widget_to_remove.setParent(None)
+
+        self.blockSignals(False)
+        self.setUpdatesEnabled(True)
+
         
         # Create headers for time instances
         for col, time_instance in enumerate(self.sequence.get_all_time_instances(), start=1):
@@ -1130,6 +1141,7 @@ class SequenceGrid(QWidget):
             if ok:
                 behavior = Jump(value)
                 self.sequence.add_event(channel, behavior, time_instance)
+                print(f"Added event to channel {channel_name} at time instance {time_instance_name}")
                 self.refresh_grid()
         else:
             QMessageBox.warning(self, "Error", "Channel or Time Instance not found")
@@ -1182,39 +1194,99 @@ class SequenceApp:
 
 
 if __name__ == '__main__':
-    seq = Sequence("test")
-    ch1 = seq.add_analog_channel("ch1", 1, 1)
-    ch2 = seq.add_analog_channel("ch2", 1, 2)
-    ch3 = seq.add_analog_channel("ch3", 1, 3)
-    ch4 = seq.add_analog_channel("ch4", 1, 4)
-    for i in range(6, 100):
-        seq.add_analog_channel(f"ch{i}", 1, i)
+    DFM_ToF = Sequence("test")
 
-    root = seq.root_time_instance
-    t_list = [root]
-    for i in range(1, 100):
-        t_list.append( seq.add_time_instance(f"t{i}", t_list[-1], 1))
+    DFM_ToF.add_analog_channel("MOT Coils", 2,1)
+    DFM_ToF.add_analog_channel("Camera Trigger", 2, 2)
+    DFM_ToF.add_analog_channel("Trap TTL", 2, 3)
+    DFM_ToF.add_analog_channel("Trap FM", 2, 4)
+    DFM_ToF.add_analog_channel("Trap AM", 2, 5)
+    DFM_ToF.add_analog_channel("Repump TTL", 2, 6)
+    DFM_ToF.add_analog_channel("Repump FM", 2, 7)
+    DFM_ToF.add_analog_channel("Repump AM", 2, 8)
+    DFM_ToF.add_analog_channel("D1 AOM FM", 3,1)
+    DFM_ToF.add_analog_channel("D1 AOM AM", 3,2)
+    DFM_ToF.add_analog_channel("D1 EOM FM", 3,3)
+    DFM_ToF.add_analog_channel("D1 EOM AM", 3,4)
+    DFM_ToF.add_analog_channel("Absorption Imaging FM", 3,5)
+    DFM_ToF.add_analog_channel("Absorption Imaging TTL", 3,6)
+
+    Dump_MOT = DFM_ToF.root_time_instance
+    DFM_ToF.add_event("MOT Coils", Jump(3.3), Dump_MOT, comment = 'Coils Off') # Coils Off
+    DFM_ToF.add_event("Camera Trigger", Jump(0), Dump_MOT, comment = 'Cam Trigger Low') # Cam Trigger Low
+    DFM_ToF.add_event("Trap TTL", Jump(0), Dump_MOT, comment = 'Trap Beam Off') # Trap Beam Off
+    DFM_ToF.add_event("Trap FM", Jump(2.5), Dump_MOT, comment = 'Default Trap FM') # Default Trap FM
+    DFM_ToF.add_event("Trap AM", Jump(1.5), Dump_MOT, comment = 'Default Trap AM') # Default Trap AM
+    DFM_ToF.add_event("Repump TTL", Jump(0), Dump_MOT, comment = 'Repump Beam Off') # Repump Beam Off
+    DFM_ToF.add_event("Repump FM", Jump(1.9), Dump_MOT, comment = 'Default Repump FM') # Default Repump FM
+    DFM_ToF.add_event("Repump AM", Jump(0.5), Dump_MOT, comment = 'Default Rempump AM') # Default Rempump AM
+    DFM_ToF.add_event("D1 AOM FM", Jump(0), Dump_MOT, comment = 'Default D1 Cooling FM') # Default D1 Cooling FM
+    DFM_ToF.add_event("D1 AOM AM", Jump(0), Dump_MOT, comment = 'D1 AOM Off') # D1 AOM Off
+    DFM_ToF.add_event("D1 EOM FM", Jump(0), Dump_MOT, comment = 'D1 EOM FM, N/A') # D1 EOM FM, N/A
+    DFM_ToF.add_event("D1 EOM AM", Jump(0), Dump_MOT, comment = 'D1 EOM AM, N/A') # D1 EOM AM, N/A
+    DFM_ToF.add_event("Absorption Imaging FM", Jump(7.5), Dump_MOT, comment = 'Defauly Abs Beam Detuning') # Defauly Abs Beam Detuning
+    DFM_ToF.add_event("Absorption Imaging TTL", Jump(0), Dump_MOT, comment = 'Absorption Beam Off') # Absorption Beam Off
 
 
-    e1 = seq.add_event(ch1, Jump(5), t_list[0])
-    e2 = seq.add_event(ch2, Ramp(t_list[0],t_list[1], RampType.LINEAR, 0, 5,resolution= 0.1), t_list[0],t_list[1])
-    e3 = seq.add_event(ch3, Jump(5), t_list[3])
-    e4 = seq.add_event(ch4, Jump(3), t_list[3])
-    e5 = seq.add_event(ch1, Jump(-3), t_list[1])
-    e6 = seq.add_event(ch2, Jump(1.5), t_list[1])
-    e7 = seq.add_event(ch3, Jump(5), t_list[4])
-     
-    # Run the application
-    app = SequenceApp(seq)
-    app.run()
+
+    Initiate_MOT =DFM_ToF.add_time_instance(f"Initiate_MOT", Dump_MOT, 1)
+
+    DFM_ToF.add_event("MOT Coils", Jump(0), Initiate_MOT, comment = 'Initiate MOT, Coils On') # Coils On
+
+    DFM_ToF.add_event("Trap TTL", Jump(3.3), Initiate_MOT, comment='Trap Beam On') # Trap Beam On
+    DFM_ToF.add_event("Repump TTL", Jump(3.3), Initiate_MOT, comment='Repump Beam On') # Repump Beam On
+
+    DFM_ToF.add_event("Trap FM", Jump(2.5), Initiate_MOT, comment='Trap FM') # Trap FM
+    DFM_ToF.add_event("Repump FM", Jump(1.9), Initiate_MOT, comment='Repump FM') # Repump FM
+
+    DFM_ToF.add_event("Trap AM", Jump(1.5), Initiate_MOT, comment='Trap AM') # Trap AM
+    DFM_ToF.add_event("Repump AM", Jump(0.5), Initiate_MOT, comment='Rempump AM') # Rempump AM
 
 
-    exit()
+    ### Creat a Dual-Frequency MOT by additionally doing Gray Molasses
+    t_load = 5 # MOT Load Time
+    Initiate_DFM =DFM_ToF.add_time_instance(f"Initiate_DFM", Initiate_MOT, t_load)
+    
+    # Turn off the D2 Trap Beam
+    DFM_ToF.add_event("Trap TTL", Jump(0), Initiate_DFM, comment= "End MOT Load, Initiate DFM, Trap Off") # Trap Beam Off
+
+    # Bring the D2 Repump Beam Close to Resonance and Lower its Power
+    DFM_ToF.add_event("Repump FM", Jump(2.5), Initiate_DFM, comment='Repump FM ~ -2Gamma') # Bring the D2 Repump Closer to Resonance
+    DFM_ToF.add_event("Repump AM", Jump(2.5),  Initiate_DFM, comment= "Repump AM Low Power") # Lower the D2 Repump Power
+
+    # Turn On the D1 Cooling Beam (but keep the D1 Repump Beam Off)
+    DFM_ToF.add_event("D1 AOM AM", Jump(10), Initiate_DFM, comment= "D1 AOM On") # D1 AOM On
+    DFM_ToF.add_event("D1 AOM FM", Jump(0), Initiate_DFM, comment= "Set the Detuning of the D1 Beam") # Set the Detuning of the D1 Beam
+    DFM_ToF.add_event("D1 EOM FM", Jump(0), Initiate_DFM, comment= "D1 EOM FM (Should be AM, Unavailable)") # D1 EOM FM (We have a resonant EOM, this creates an RF signal away from the EOM's resonance.)
+
+    ### Image the MOT after the CMOT Stage
+    DFM_Time = 7e-3
+    Initiate_ToF =DFM_ToF.add_time_instance(f"Initiate_ToF", Initiate_DFM, DFM_Time)
+
+### Image the MOT after the CMOT Stage
+
+# Turn off the MOT Beams and bring the MOT Beams on Resonance for ToF Imaging
+
+    DFM_ToF.add_event("MOT Coils", Jump(3.3), Initiate_ToF, comment= "End DFM, Initiate ToF, Coils Off")
+    DFM_ToF.add_event("Trap TTL", Jump(0), Initiate_ToF, comment= "Trap Beam Off")
+    DFM_ToF.add_event("Repump TTL", Jump(0), Initiate_ToF, comment= "Repump Beam Off")
+    DFM_ToF.add_event("D1 AOM AM", Jump(0), Initiate_ToF, comment= "D1 Beams Off")
+
+    DFM_ToF.add_event("Trap FM", Jump(0),  Initiate_ToF, comment= "Trap FM Res")
+    DFM_ToF.add_event("Repump FM", Jump(4),  Initiate_ToF, comment= "Repump FM Res")
+
+    ToF_Time = 0.2e-3
+
+    Trig_High_IWA =DFM_ToF.add_time_instance(f"Trig_High_IWA", Initiate_ToF, ToF_Time)
 
 
-    seq_sweep =SequenceSweeper(seq)
-    seq_sweep.stack_sweep_paramter(e2,"start_value", [1, 2, 3])
-    seq_sweep.stack_sweep_paramter(t_list[1],"end_value", [1, 2, 3])
-    generated_sequences = seq_sweep.sweep()
-    for s in generated_sequences:
-        s.plot()
+    DFM_ToF.add_event("Camera Trigger", Jump(3.3), Trig_High_IWA, comment= "End ToF, Cam Trig High")
+    DFM_ToF.add_event("Repump AM", Jump(0.5),  Trig_High_IWA, comment= "Repump AM High Power") # D1 AM Low Power
+    DFM_ToF.add_event("Trap TTL", Jump(3.3), Trig_High_IWA,comment= "Trap Beam On")
+    DFM_ToF.add_event("Repump TTL", Jump(3.3), Trig_High_IWA,comment= "Repump Beam On")
+    
+    t_exp = 64e-6
+    Trig_Low_IWA =DFM_ToF.add_time_instance(f"Trig_Low_IWA", Trig_High_IWA, t_exp)
+
+    DFM_ToF.add_event("Camera Trigger", Jump(0), Trig_Low_IWA, comment= "Cam Trigger Low")
+    DFM_ToF.to_json("TOF_DFM.json")
