@@ -120,44 +120,22 @@ class QArrowWidget(QLabel):
             
             drawArrow(qp, center_left.x()-cell_width, center_right.x()-cell_width, hp)
         qp.end()
-
 class TimeInstanceWidget(QWidget):
-    def __init__(self, root_time_instance: 'TimeInstance', parent_widget=None):
+    def __init__(self, root_time_instance: 'TimeInstance', parent_widget: 'SequenceViewerWdiget' = None):
         super().__init__(parent_widget)
         self.parent_widget = parent_widget
         self.root_time_instance = root_time_instance
         self.setWindowTitle('Time Instance Visualization')
         self.setGeometry(100, 100, 1000, 600)
-        self.time_instances = self.root_time_instance.get_all_time_instances()
-        self.time_instances.sort(key=lambda ti: ti.get_absolute_time())
 
+        self.setup_UI()
+        self.refresh_UI()
+
+    def setup_UI(self):
         # Create a container widget to hold the grid layout
         self.inner_widget = QWidget()
         self.grid = QGridLayout(self.inner_widget)
         self.inner_widget.setLayout(self.grid)
-
-        # Add labels to grid for each time instance in the row above arrows
-        self.labels = {}
-        for i, time_instance in enumerate(self.time_instances):
-            label = QLabel(time_instance.name)
-            self.grid.addWidget(label, 0, i )  # Place labels in row 0
-            self.grid.addWidget(QLabel(str(time_instance.relative_time)), 1, i )  # Place labels in row 1
-            self.grid.addWidget(QLabel(str(time_instance.get_absolute_time())), 2, i )  # Place labels in row 1
-            
-            self.labels[time_instance] = (0, i )
-
-        # Add the arrow widget in row 2
-        arrow_list = []
-        for time_instance in self.time_instances:
-            if time_instance.parent:
-                parent_index = self.labels[time_instance.parent][1]   # Adjust parent index
-                child_index = self.labels[time_instance][1]   # Adjust child index
-                arrow_list.append((parent_index, child_index))
-
-        # Add the arrow widget, which is placed in row 2
-        self.arrow_widget = QArrowWidget(arrow_list, self.grid, start_pos=(3, 0), parent=self)
-        # change the size of the first column of the grid
-        
 
         # Create a QScrollArea and set the container widget as its widget
         self.scroll_area = ScrollAreaWithShiftScroll()
@@ -168,6 +146,40 @@ class TimeInstanceWidget(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.scroll_area)
         self.setLayout(layout)
+
+    def refresh_UI(self):
+        # Clear the grid layout
+        for i in reversed(range(self.grid.count())):
+            widget = self.grid.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        # Get and sort time instances
+        self.time_instances = self.root_time_instance.get_all_time_instances()
+        self.time_instances.sort(key=lambda ti: ti.get_absolute_time())
+
+        # Add labels to grid for each time instance
+        self.labels = {}
+        for i, time_instance in enumerate(self.time_instances):
+            label = QLabel(time_instance.name)
+            self.grid.addWidget(label, 0, i)
+            self.grid.addWidget(QLabel(str(time_instance.relative_time)), 1, i)
+            self.grid.addWidget(QLabel(str(time_instance.get_absolute_time())), 2, i)
+            self.labels[time_instance] = (0, i)
+
+        # Add the arrow widget in row 2
+        arrow_list = []
+        for time_instance in self.time_instances:
+            if time_instance.parent:
+                parent_index = self.labels[time_instance.parent][1]
+                child_index = self.labels[time_instance][1]
+                arrow_list.append((parent_index, child_index))
+
+        self.arrow_widget = QArrowWidget(arrow_list, self.grid, start_pos=(3, 0), parent=self)
+        size = self.parent_widget.data_table.inner_widget.size()
+        self.inner_widget.setMinimumWidth(size.width())
+
+
 
 class ChannelLabelListWidget(QWidget):
     def __init__(self, sequence, parent_widget=None):
@@ -224,18 +236,38 @@ class EventButton(QPushButton):
         self.clicked.connect(self.delete_col)
     def get_row_and_col(self):
         layout = self.parent_widget.inner_layout
-        for row in range(layout.rowCount()-1):
-            for col in range(layout.columnCount()-1):                                
-                if layout.itemAtPosition(row+1, col+1).widget().channel.name == self.channel.name and layout.itemAtPosition(row+1, col+1).widget().time_instance.name == self.time_instance.name:
-                    print('row:',row+1)
-                    print('col:',col+1)
-                    return row+1, col+1
+        for row in range(layout.rowCount()):
+            for col in range(layout.columnCount()):     
+                try:
+                    if layout.itemAtPosition(row, col).widget().channel.name == self.channel.name and layout.itemAtPosition(row, col).widget().time_instance.name == self.time_instance.name:
+                        return row, col
+                except Exception as e:
+                    pass
+                    # print(e)
+                    # print('row:',row)
+                    # print('col:',col)
+                
         return None, None
+    def get_col(self):
+        layout = self.parent_widget.inner_layout
+        for col in range(layout.columnCount()):
+            if layout.itemAtPosition(1, col+1).widget().time_instance.name == self.time_instance.name:
+                return col+1
+        return
+    
+    def get_row(self):
+        layout = self.parent_widget.inner_layout
+        for row in range(layout.rowCount()):
+            if layout.itemAtPosition(row+1, 1).widget().channel.name == self.channel.name :
+                return row+1
+                
+        return None
+    
 
     def delete_row(self):
         self.parent_widget.sequence.delete_channel(self.channel.name)
         layout = self.parent_widget.inner_layout
-        row, col = self.get_row_and_col()
+        row = self.get_row()
         if row is not None:
             for i in range(layout.columnCount()):
                 item = layout.itemAtPosition(row, i)
@@ -253,11 +285,12 @@ class EventButton(QPushButton):
                         widget = item.widget()
                         layout.removeWidget(widget)
                         layout.addWidget(widget, r - 1, c)
+            print(self.parent_widget.inner_layout.rowCount())
             self.parent_widget.parent_widget.channel_list.refresh_UI()
     def delete_col(self):
         self.parent_widget.sequence.delete_time_instance(self.time_instance.name)
         layout = self.parent_widget.inner_layout
-        row, col = self.get_row_and_col()
+        col = self.get_col()
         if col is not None:
             for i in range(layout.rowCount()):
                 item = layout.itemAtPosition(i, col)
@@ -267,7 +300,7 @@ class EventButton(QPushButton):
                         widget.deleteLater()
                         layout.removeWidget(widget)
                         
-            # Shift remaining widgets up
+            # Shift remaining widgets left
             for c in range(col + 1, layout.columnCount()):
                 for r in range(layout.rowCount()):
                     item = layout.itemAtPosition(r, c)
@@ -275,7 +308,8 @@ class EventButton(QPushButton):
                         widget = item.widget()
                         layout.removeWidget(widget)
                         layout.addWidget(widget, r, c - 1)
-            self.parent_widget.parent_widget.time_axis.refresh_UI()
+            print(self.parent_widget.inner_layout.columnCount())
+            # self.parent_widget.parent_widget.time_axis.refresh_UI()
 
     
     # def remove_row(self):
@@ -316,12 +350,14 @@ class EventsWidget(QWidget):
         
         self.buttons = {}
         self.sequence = sequence
-        time_instances = self.sequence.get_all_time_instances()
+        self.time_instances = self.sequence.root_time_instance.get_all_time_instances()
+        self.time_instances.sort(key=lambda ti: ti.get_absolute_time())
+
         channels = self.sequence.channels
         
         # Add channel names and event buttons
         for row, channel in enumerate(channels):
-            for col, time in enumerate(time_instances):
+            for col, time in enumerate(self.time_instances):
                 button = EventButton(channel, time,self)
                 self.buttons[(row, col)] = button
                 self.inner_layout.addWidget(button, row + 1, col + 1)
