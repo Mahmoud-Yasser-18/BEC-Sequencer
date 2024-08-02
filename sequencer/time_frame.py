@@ -418,8 +418,6 @@ class TimeInstance:
         new_parent.children.append(self)
 
     def edit_name(self, new_name: str) -> None:
-        if self.parent is None:
-            raise Exception("Cannot change name of root time frame")
         
         root = self.get_root()
         all_children = root.get_all_children()
@@ -1192,8 +1190,7 @@ class SequenceApp:
         self.gui.show()
         sys.exit(self.app.exec_())
 
-
-if __name__ == '__main__':
+def creat_test():
     DFM_ToF = Sequence("test")
 
     DFM_ToF.add_analog_channel("MOT Coils", 2,1)
@@ -1210,8 +1207,12 @@ if __name__ == '__main__':
     DFM_ToF.add_analog_channel("D1 EOM AM", 3,4)
     DFM_ToF.add_analog_channel("Absorption Imaging FM", 3,5)
     DFM_ToF.add_analog_channel("Absorption Imaging TTL", 3,6)
-
+    
+    
     Dump_MOT = DFM_ToF.root_time_instance
+    Dump_MOT.edit_name("Dump MOT")
+    
+    
     DFM_ToF.add_event("MOT Coils", Jump(3.3), Dump_MOT, comment = 'Coils Off') # Coils Off
     DFM_ToF.add_event("Camera Trigger", Jump(0), Dump_MOT, comment = 'Cam Trigger Low') # Cam Trigger Low
     DFM_ToF.add_event("Trap TTL", Jump(0), Dump_MOT, comment = 'Trap Beam Off') # Trap Beam Off
@@ -1260,8 +1261,8 @@ if __name__ == '__main__':
     DFM_ToF.add_event("D1 EOM FM", Jump(0), Initiate_DFM, comment= "D1 EOM FM (Should be AM, Unavailable)") # D1 EOM FM (We have a resonant EOM, this creates an RF signal away from the EOM's resonance.)
 
     ### Image the MOT after the CMOT Stage
-    DFM_Time = 7e-3
-    Initiate_ToF =DFM_ToF.add_time_instance(f"Initiate_ToF", Initiate_DFM, DFM_Time)
+    DFM_Time = 20
+    Initiate_ToF =DFM_ToF.add_time_instance(f"Initiate_ToF", Initiate_MOT, DFM_Time)
 
 ### Image the MOT after the CMOT Stage
 
@@ -1289,4 +1290,18 @@ if __name__ == '__main__':
     Trig_Low_IWA =DFM_ToF.add_time_instance(f"Trig_Low_IWA", Trig_High_IWA, t_exp)
 
     DFM_ToF.add_event("Camera Trigger", Jump(0), Trig_Low_IWA, comment= "Cam Trigger Low")
-    DFM_ToF.to_json("TOF_DFM.json")
+
+
+    return DFM_ToF
+
+def create_test_time_instance():
+    root = TimeInstance("root", relative_time=0)
+    child1 = TimeInstance("child1", root, 1)
+    child2 = TimeInstance("child2", root, 2)
+    subchild1 = TimeInstance("subchild1", child1, 1)
+    subchild2 = TimeInstance("subchild2", child1, 2)
+    subchild3 = TimeInstance("subchild3", child2, 1)
+    return root
+
+if __name__ == '__main__':
+    root = create_test_time_instance()
