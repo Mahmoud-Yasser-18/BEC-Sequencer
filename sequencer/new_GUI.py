@@ -243,10 +243,6 @@ class EventButton(QPushButton):
                         return row, col
                 except Exception as e:
                     pass
-                    # print(e)
-                    # print('row:',row)
-                    # print('col:',col)
-                
         return None, None
     def get_col(self):
         layout = self.parent_widget.inner_layout
@@ -285,7 +281,6 @@ class EventButton(QPushButton):
                         widget = item.widget()
                         layout.removeWidget(widget)
                         layout.addWidget(widget, r - 1, c)
-            print(self.parent_widget.inner_layout.rowCount())
             self.parent_widget.parent_widget.channel_list.refresh_UI()
     def delete_col(self):
         self.parent_widget.sequence.delete_time_instance(self.time_instance.name)
@@ -308,36 +303,18 @@ class EventButton(QPushButton):
                         widget = item.widget()
                         layout.removeWidget(widget)
                         layout.addWidget(widget, r, c - 1)
-            print(self.parent_widget.inner_layout.columnCount())
-            # self.parent_widget.parent_widget.time_axis.refresh_UI()
-
-    
-    # def remove_row(self):
-    #     # get the layout of the parent widget
-    #     layout = self.parent_widget.inner_layout
-    
-# gridLayout = QGridLayout(widget)
-
-# # Row index to remove
-# row_index = 1  # Adjust as needed
-
-# # Remove widgets from the specified row
-# for col in range(gridLayout.columnCount()):
-#     item = gridLayout.itemAtPosition(row_index, col)
-#     if item is not None:
-#         widget = item.widget()
-#         if widget is not None:
-#             widget.deleteLater()  # Delete the widget
-
-# # Shift items in the layout to reflect the removal
-# gridLayout.removeRow(row_index)
-
-
+            self.parent_widget.parent_widget.time_axis.refresh_UI()
 
 class EventsWidget(QWidget):
-    def __init__(self, sequence:Sequence, parent_widget:'SequenceViewerWdiget' = None):
+    def __init__(self, sequence: Sequence, parent_widget: 'SequenceViewerWdiget' = None):
         super().__init__(parent_widget)
         self.parent_widget = parent_widget
+        self.sequence = sequence
+        self.buttons = {}
+        self.time_instances = []
+        self.setup_UI()
+
+    def setup_UI(self):
         self.layout = QGridLayout(self)
         
         self.scroll_area = QScrollArea(self)
@@ -348,8 +325,6 @@ class EventsWidget(QWidget):
         self.inner_widget = QWidget()
         self.inner_layout = QGridLayout(self.inner_widget)
         
-        self.buttons = {}
-        self.sequence = sequence
         self.time_instances = self.sequence.root_time_instance.get_all_time_instances()
         self.time_instances.sort(key=lambda ti: ti.get_absolute_time())
 
@@ -358,7 +333,7 @@ class EventsWidget(QWidget):
         # Add channel names and event buttons
         for row, channel in enumerate(channels):
             for col, time in enumerate(self.time_instances):
-                button = EventButton(channel, time,self)
+                button = EventButton(channel, time, self)
                 self.buttons[(row, col)] = button
                 self.inner_layout.addWidget(button, row + 1, col + 1)
         
