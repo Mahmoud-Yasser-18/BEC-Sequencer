@@ -101,6 +101,7 @@ class QArrowWidget(QLabel):
         for arrow, height in zip(self.arrow_list, self.height_list):
             center_left = centers[arrow[0]]
             center_right = centers[arrow[1]]
+            
             hp = 10 * height + 5
 
             def drawArrow(qp, x1, x2, height):
@@ -121,8 +122,9 @@ class QArrowWidget(QLabel):
         qp.end()
 
 class TimeInstanceWidget(QWidget):
-    def __init__(self, root_time_instance: 'TimeInstance', parent=None):
-        super().__init__()
+    def __init__(self, root_time_instance: 'TimeInstance', parent_widget=None):
+        super().__init__(parent_widget)
+        self.parent_widget = parent_widget
         self.root_time_instance = root_time_instance
         self.setWindowTitle('Time Instance Visualization')
         self.setGeometry(100, 100, 1000, 600)
@@ -140,6 +142,7 @@ class TimeInstanceWidget(QWidget):
             label = QLabel(time_instance.name)
             self.grid.addWidget(label, 0, i )  # Place labels in row 0
             self.grid.addWidget(QLabel(str(time_instance.relative_time)), 1, i )  # Place labels in row 1
+            self.grid.addWidget(QLabel(str(time_instance.get_absolute_time())), 2, i )  # Place labels in row 1
             
             self.labels[time_instance] = (0, i )
 
@@ -152,7 +155,7 @@ class TimeInstanceWidget(QWidget):
                 arrow_list.append((parent_index, child_index))
 
         # Add the arrow widget, which is placed in row 2
-        self.arrow_widget = QArrowWidget(arrow_list, self.grid, start_pos=(2, 0), parent=self)
+        self.arrow_widget = QArrowWidget(arrow_list, self.grid, start_pos=(3, 0), parent=self)
         # change the size of the first column of the grid
         
 
@@ -167,8 +170,14 @@ class TimeInstanceWidget(QWidget):
         self.setLayout(layout)
 
 class ChannelLabelListWidget(QWidget):
-    def __init__(self, sequence, parent=None):
-        super().__init__(parent)
+    def __init__(self, sequence, parent_widget=None):
+        super().__init__(parent_widget)
+        self.parent_widget = parent_widget
+        self.sequence = sequence
+        self.buttons = []
+        self.setup_UI()
+        
+    def setup_UI(self):
         self.layout = QVBoxLayout(self)
         
         self.scroll_area = ScrollAreaWithShiftScroll(self)
@@ -176,61 +185,160 @@ class ChannelLabelListWidget(QWidget):
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
-        
         self.inner_widget = QWidget()
-        inner_layout = QVBoxLayout(self.inner_widget)
-        
-        channels = [ch.name for ch in sequence.channels]
-        self.buttons = []
-        for channel in channels:
-            button = QPushButton(channel)
-            self.buttons.append(button)
-            inner_layout.addWidget(button)
-        
-        self.inner_widget.setLayout(inner_layout)
+        self.inner_layout = QVBoxLayout(self.inner_widget)
+
         self.scroll_area.setWidget(self.inner_widget)
         self.layout.addWidget(self.scroll_area)
         self.setLayout(self.layout)
+        
+        self.refresh_UI()
+        
+    def refresh_UI(self):
+        for button in self.buttons:
+            self.inner_layout.removeWidget(button)
+            button.deleteLater()
+        
+        self.buttons = []
+        channels = [ch.name for ch in self.sequence.channels]
+        for channel in channels:
+            button = QPushButton(channel)
+            self.buttons.append(button)
+            self.inner_layout.addWidget(button)
+        
+        self.inner_widget.setLayout(self.inner_layout)
+
+
+from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QApplication, QScrollArea
+from PyQt5.QtCore import Qt
+
+class EventButton(QPushButton):
+    def __init__(self, channel:Channel, time_instance:TimeInstance, parent_widget:'EventsWidget'=None):
+        super().__init__(parent_widget)
+        self.parent_widget = parent_widget
+        self.channel = channel
+        self.time_instance = time_instance
+
+        self.setText(f'{self.channel.name} @ {self.time_instance.name}')
+        # self.clicked.connect(self.get_row_and_col)
+        self.clicked.connect(self.delete_col)
+    def get_row_and_col(self):
+        layout = self.parent_widget.inner_layout
+        for row in range(layout.rowCount()-1):
+            for col in range(layout.columnCount()-1):                                
+                if layout.itemAtPosition(row+1, col+1).widget().channel.name == self.channel.name and layout.itemAtPosition(row+1, col+1).widget().time_instance.name == self.time_instance.name:
+                    print('row:',row+1)
+                    print('col:',col+1)
+                    return row+1, col+1
+        return None, None
+
+    def delete_row(self):
+        self.parent_widget.sequence.delete_channel(self.channel.name)
+        layout = self.parent_widget.inner_layout
+        row, col = self.get_row_and_col()
+        if row is not None:
+            for i in range(layout.columnCount()):
+                item = layout.itemAtPosition(row, i)
+                if item is not None:
+                    widget = item.widget()
+                    if widget is not None:
+                        widget.deleteLater()
+                        layout.removeWidget(widget)
+                        
+            # Shift remaining widgets up
+            for r in range(row + 1, layout.rowCount()):
+                for c in range(layout.columnCount()):
+                    item = layout.itemAtPosition(r, c)
+                    if item is not None:
+                        widget = item.widget()
+                        layout.removeWidget(widget)
+                        layout.addWidget(widget, r - 1, c)
+            self.parent_widget.parent_widget.channel_list.refresh_UI()
+    def delete_col(self):
+        self.parent_widget.sequence.delete_time_instance(self.time_instance.name)
+        layout = self.parent_widget.inner_layout
+        row, col = self.get_row_and_col()
+        if col is not None:
+            for i in range(layout.rowCount()):
+                item = layout.itemAtPosition(i, col)
+                if item is not None:
+                    widget = item.widget()
+                    if widget is not None:
+                        widget.deleteLater()
+                        layout.removeWidget(widget)
+                        
+            # Shift remaining widgets up
+            for c in range(col + 1, layout.columnCount()):
+                for r in range(layout.rowCount()):
+                    item = layout.itemAtPosition(r, c)
+                    if item is not None:
+                        widget = item.widget()
+                        layout.removeWidget(widget)
+                        layout.addWidget(widget, r, c - 1)
+            self.parent_widget.parent_widget.time_axis.refresh_UI()
+
+    
+    # def remove_row(self):
+    #     # get the layout of the parent widget
+    #     layout = self.parent_widget.inner_layout
+    
+# gridLayout = QGridLayout(widget)
+
+# # Row index to remove
+# row_index = 1  # Adjust as needed
+
+# # Remove widgets from the specified row
+# for col in range(gridLayout.columnCount()):
+#     item = gridLayout.itemAtPosition(row_index, col)
+#     if item is not None:
+#         widget = item.widget()
+#         if widget is not None:
+#             widget.deleteLater()  # Delete the widget
+
+# # Shift items in the layout to reflect the removal
+# gridLayout.removeRow(row_index)
+
+
 
 class EventsWidget(QWidget):
-    def __init__(self, sequence, parent=None):
-        super().__init__(parent)
+    def __init__(self, sequence:Sequence, parent_widget:'SequenceViewerWdiget' = None):
+        super().__init__(parent_widget)
+        self.parent_widget = parent_widget
         self.layout = QGridLayout(self)
         
-        self.scroll_area = ScrollAreaWithShiftScroll(self)
+        self.scroll_area = QScrollArea(self)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
-
-        
         self.inner_widget = QWidget()
-        inner_layout = QGridLayout(self.inner_widget)
+        self.inner_layout = QGridLayout(self.inner_widget)
         
         self.buttons = {}
-        time_instances = [t.name for t in sequence.get_all_time_instances()]
-        channels = [ch.name for ch in sequence.channels]
+        self.sequence = sequence
+        time_instances = self.sequence.get_all_time_instances()
+        channels = self.sequence.channels
         
         # Add channel names and event buttons
         for row, channel in enumerate(channels):
             for col, time in enumerate(time_instances):
-                button = QPushButton(f'{channel} @ {time}')
+                button = EventButton(channel, time,self)
                 self.buttons[(row, col)] = button
-                inner_layout.addWidget(button, row + 1, col + 1)
+                self.inner_layout.addWidget(button, row + 1, col + 1)
         
-        self.inner_widget.setLayout(inner_layout)
+        self.inner_widget.setLayout(self.inner_layout)
         self.scroll_area.setWidget(self.inner_widget)
         self.layout.addWidget(self.scroll_area)
         self.setLayout(self.layout)
-
 
 
 
 
 
 class SequenceViewerWdiget(QWidget):
-    def __init__(self, sequence:Sequence):
+    def __init__(self, sequence:Sequence, parent_widget=None):
         super().__init__()
+        self.parent_widget = parent_widget
         self.sequence = sequence
         self.syncing = False  # Flag to prevent multiple updates
         self.layout_main = QGridLayout()
@@ -245,12 +353,11 @@ class SequenceViewerWdiget(QWidget):
         
         
         # Create and configure widgets
-        self.channel_list = ChannelLabelListWidget(self.sequence,parent=self)
-        self.data_table = EventsWidget(self.sequence, parent=self)
-        self.time_axis = TimeInstanceWidget(self.sequence.root_time_instance, parent=self)
+        self.channel_list = ChannelLabelListWidget(self.sequence,parent_widget=self)
+        self.data_table = EventsWidget(self.sequence, parent_widget=self)
 
-        size = self.data_table.inner_widget.sizeHint()
-        self.time_axis.inner_widget.setMinimumWidth(size.width())
+        self.time_axis = TimeInstanceWidget(self.sequence.root_time_instance, parent_widget=self)
+
         
 
 
@@ -275,7 +382,10 @@ class SequenceViewerWdiget(QWidget):
         self.layout_main.setRowStretch(1, 1)  # Row 1 will take up 1 part of the available space
         
 
-        
+    def refresh_channels(self):
+        self.channel_list.refresh_UI()
+        self.time_axis.refresh_UI()
+
     def sync_scroll_vertical(self, value: int) -> None:
         if self.syncing:
             return
