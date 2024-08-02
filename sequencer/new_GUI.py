@@ -125,6 +125,92 @@ from PyQt5.QtGui import QIntValidator
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel, QShortcut
 from PyQt5.QtGui import QIntValidator, QKeySequence
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel, QShortcut
+from PyQt5.QtGui import QIntValidator, QKeySequence
+from PyQt5.QtCore import Qt
+
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel
+from PyQt5.QtGui import QIntValidator, QKeyEvent
+from PyQt5.QtCore import Qt
+
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLineEdit, QLabel, QPushButton, QFormLayout, QMessageBox)
+from PyQt5.QtGui import QIntValidator
+
+class AddChildTimeInstanceDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Add Child Time Instance")
+        self.initUI()
+
+    def initUI(self):
+        layout = QFormLayout()
+
+        self.name_edit = QLineEdit()
+        layout.addRow("Name:", self.name_edit)
+
+        self.relative_time_edit = QLineEdit()
+        self.relative_time_edit.setValidator(QIntValidator())
+        layout.addRow("Relative Time:", self.relative_time_edit)
+
+        self.add_button = QPushButton("Add")
+        self.add_button.clicked.connect(self.add_child)
+        layout.addWidget(self.add_button)
+
+        self.setLayout(layout)
+
+    def add_child(self):
+        name = self.name_edit.text()
+        relative_time = self.relative_time_edit.text()
+
+        if not name or not relative_time:
+            QMessageBox.warning(self, "Input Error", "All fields are required.")
+            return
+
+        try:
+            relative_time = int(relative_time)
+            self.accept()
+        except ValueError:
+            QMessageBox.warning(self, "Input Error", "Relative time must be an integer.")
+            return
+
+        self.name = name
+        self.relative_time = relative_time
+
+class EditParentTimeInstanceDialog(QDialog):
+    def __init__(self, parent_widget: 'TimeInstanceLabel'):
+        super().__init__(parent_widget)
+        self.parent_widget = parent_widget
+        self.all_children = [child.name for child in self.parent_widget.time_instance.get_root().get_all_children() if child.name != self.parent_widget.time_instance.name]
+        self.initUI()
+
+    def initUI(self):
+        layout = QFormLayout()
+
+        self.parent_time_instance_combo = QComboBox()
+        self.parent_time_instance_combo.addItems(self.all_children)
+        layout.addRow("Parent Time Instance:", self.parent_time_instance_combo)
+
+        self.edit_button = QPushButton("Edit")
+        self.edit_button.clicked.connect(self.edit_parent)
+        layout.addWidget(self.edit_button)
+
+        self.setLayout(layout)
+
+    def edit_parent(self):
+        parent_time_instance_name = self.parent_time_instance_combo.currentText()
+
+        if not parent_time_instance_name:
+            QMessageBox.warning(self, "Input Error", "Parent time instance is required.")
+            return
+
+        self.parent_time_instance_name = parent_time_instance_name
+        self.accept()
+
+
+
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLineEdit, QLabel, QMenu, QAction, QDialog, QFormLayout, QPushButton, QMessageBox, QComboBox)
+from PyQt5.QtGui import QIntValidator
+from PyQt5.QtCore import Qt
 
 class TimeInstanceLabel(QWidget):
     def __init__(self, time_instance: 'TimeInstance', parent_widget: 'TimeInstanceWidget' = None):
@@ -138,6 +224,8 @@ class TimeInstanceLabel(QWidget):
 
         # Editable name
         self.name_edit = QLineEdit(self.time_instance.name)
+        self.name_edit.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.name_edit.customContextMenuRequested.connect(self.show_context_menu)
         layout.addWidget(self.name_edit)
 
         # Editable relative time with numeric validation
@@ -153,10 +241,6 @@ class TimeInstanceLabel(QWidget):
         self.name_edit.editingFinished.connect(self.change_name)
         self.relative_time_edit.editingFinished.connect(self.change_relative_time)
 
-        # Add keyboard shortcut for toggling editability
-        self.toggle_shortcut = QShortcut(QKeySequence("Ctrl+E"), self)
-        self.toggle_shortcut.activated.connect(self.toggle_editability)
-
         self.setLayout(layout)
     
     def change_name(self):
@@ -167,11 +251,45 @@ class TimeInstanceLabel(QWidget):
         self.time_instance.edit_relative_time(int(self.relative_time_edit.text()))
         self.parent_widget.refresh_UI()
 
-    def toggle_editability(self):
-        print('Toggling editability')
-        # Toggle the enabled state of the editors
-        self.name_edit.setEnabled(not self.name_edit.isEnabled())
-        self.relative_time_edit.setEnabled(not self.relative_time_edit.isEnabled())
+    def show_context_menu(self, position):
+        context_menu = QMenu(self)
+        
+        add_child_action = QAction("Add Child Time Instance", self)
+        add_child_action.triggered.connect(self.add_child_time_instance)
+        context_menu.addAction(add_child_action)
+        
+        edit_parent_action = QAction("Edit Parent Time Instance", self)
+        edit_parent_action.triggered.connect(self.edit_parent_time_instance)
+        context_menu.addAction(edit_parent_action)
+        
+        delete_action = QAction("Delete Time Instance", self)
+        delete_action.triggered.connect(self.delete_time_instance)
+        context_menu.addAction(delete_action)
+        
+        context_menu.exec_(self.name_edit.mapToGlobal(position))
+
+    def add_child_time_instance(self):
+        dialog = AddChildTimeInstanceDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            try:
+                self.time_instance.add_child_time_instance(dialog.name, dialog.relative_time)
+                self.parent_widget.refresh_UI()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", str(e))
+
+    def edit_parent_time_instance(self):
+        dialog = EditParentTimeInstanceDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            # try:
+                self.parent_widget.parent_widget.sequence.edit_time_instance(self.time_instance,new_parent_name=dialog.parent_time_instance_name)
+                self.parent_widget.refresh_UI()
+            # except Exception as e:
+            #     QMessageBox.critical(self, "Error", str(e))
+
+    def delete_time_instance(self):
+        self.parent_widget.parent_widget.sequence.delete_time_instance(self.time_instance.name)
+        self.parent_widget.refresh_UI()
+        # self.parent_widget.parent_widget.event_table()
 
 
 
@@ -229,7 +347,7 @@ class TimeInstanceWidget(QWidget):
                 arrow_list.append((parent_index, child_index))
 
         self.arrow_widget = QArrowWidget(arrow_list, self.grid, start_pos=(3, 0), parent=self)
-        size = self.parent_widget.data_table.inner_widget.size()
+        size = self.parent_widget.event_table.inner_widget.size()
         self.inner_widget.setMinimumWidth(size.width())
 
 
@@ -356,7 +474,7 @@ class EventButton(QPushButton):
                         layout.removeWidget(widget)
                         layout.addWidget(widget, r, c - 1)
             self.parent_widget.parent_widget.time_axis.refresh_UI()
-
+from typing import Dict, Tuple
 class EventsWidget(QWidget):
     def __init__(self, sequence: Sequence, parent_widget: 'SequenceViewerWdiget' = None):
         super().__init__(parent_widget)
@@ -381,7 +499,7 @@ class EventsWidget(QWidget):
         self.time_instances.sort(key=lambda ti: ti.get_absolute_time())
 
         channels = self.sequence.channels
-        
+        self.buttons: Dict[Tuple[int, int], EventButton] = {}
         # Add channel names and event buttons
         for row, channel in enumerate(channels):
             for col, time in enumerate(self.time_instances):
@@ -394,7 +512,13 @@ class EventsWidget(QWidget):
         self.layout.addWidget(self.scroll_area)
         self.setLayout(self.layout)
 
+    def refresh_UI(self):
+        pass
+        # loops through all the buttons and deletes time instances that has no parents except the root time instance
+        
 
+    def order_UI(self):
+        pass 
 
 
 
@@ -417,7 +541,7 @@ class SequenceViewerWdiget(QWidget):
         
         # Create and configure widgets
         self.channel_list = ChannelLabelListWidget(self.sequence,parent_widget=self)
-        self.data_table = EventsWidget(self.sequence, parent_widget=self)
+        self.event_table = EventsWidget(self.sequence, parent_widget=self)
 
         self.time_axis = TimeInstanceWidget(self.sequence.root_time_instance, parent_widget=self)
 
@@ -425,11 +549,11 @@ class SequenceViewerWdiget(QWidget):
 
 
         self.scroll_bar1 = self.channel_list.scroll_area.verticalScrollBar()
-        self.scroll_bar2 = self.data_table.scroll_area.verticalScrollBar()
+        self.scroll_bar2 = self.event_table.scroll_area.verticalScrollBar()
         self.scroll_bar1.valueChanged.connect(self.sync_scroll)
         self.scroll_bar2.valueChanged.connect(self.sync_scroll)
 
-        self.scroll_bar3 = self.data_table.scroll_area.horizontalScrollBar()
+        self.scroll_bar3 = self.event_table.scroll_area.horizontalScrollBar()
         self.scroll_bar4 = self.time_axis.scroll_area.horizontalScrollBar()
         self.scroll_bar3.valueChanged.connect(self.sync_scroll_vertical)
         self.scroll_bar4.valueChanged.connect(self.sync_scroll_vertical)
@@ -440,7 +564,7 @@ class SequenceViewerWdiget(QWidget):
         self.layout_main.addWidget(self.combo_box_type, 0, 0)
         self.layout_main.addWidget(self.time_axis, 0, 1)  # Top-right slot
         self.layout_main.addWidget(self.channel_list, 1, 0)  # Bottom-left slot
-        self.layout_main.addWidget(self.data_table, 1, 1)  # Bottom-right slot
+        self.layout_main.addWidget(self.event_table, 1, 1)  # Bottom-right slot
         self.layout_main.setColumnStretch(1, 1)  # Column 0 will take up 1 part of the available space
         self.layout_main.setRowStretch(1, 1)  # Row 1 will take up 1 part of the available space
         

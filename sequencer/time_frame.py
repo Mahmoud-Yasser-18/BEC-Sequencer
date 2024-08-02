@@ -407,7 +407,21 @@ class TimeInstance:
 
     
     
-    def edit_parent(self, new_parent: 'TimeInstance') -> None:
+    def edit_parent(self, new_parent_name: str) -> None:
+        # check if the new parent is not the current time instance
+        if self.name == new_parent_name:
+            raise ValueError("Cannot set the parent to self")
+        # check if the parent is not a descendant of the current time instance
+        new_parent = self.get_time_instance_by_name(new_parent_name)
+        
+        if self == new_parent:
+            raise ValueError("Cannot set the parent to self")
+        # check if the parent is not a descendant of the current time instance
+        if new_parent in self.get_all_children():
+            raise ValueError("Cannot set the parent to a descendant")
+        # check the parent belongs to the same sequence
+        if self.get_root() != new_parent.get_root():
+            raise ValueError("Cannot set the parent to a time instance from a different sequence")
         # check if editing the parent will result in negative absolute time
         if new_parent.get_absolute_time() + self.relative_time < 0: 
             raise ValueError("new relative time will result in negative absolute time")
@@ -488,7 +502,7 @@ class TimeInstance:
         if self.name == name:
             return self
         # get all children of the current time instance
-        children = self.get_all_children()
+        children = self.get_root().get_all_children()
         for child in children:
             if child.name == name:
                 return child
@@ -615,7 +629,7 @@ class Sequence:
 
         return event
 
-    def edit_time_instance(self, edited_time_instance: TimeInstance, new_name: Optional[str] = None, new_relative_time: Optional[int] = None, new_parent: Optional[TimeInstance] = None):
+    def edit_time_instance(self, edited_time_instance: TimeInstance, new_name: Optional[str] = None, new_relative_time: Optional[int] = None, new_parent_name:str = None):
         # don't allow to change anything for the root time instance
         if edited_time_instance.parent is None:
             raise ValueError("Cannot change the root")
@@ -628,8 +642,8 @@ class Sequence:
             time_instance.edit_name(new_name)
         if new_relative_time is not None:
             time_instance.edit_relative_time(new_relative_time)
-        if new_parent is not None:
-            time_instance.edit_parent(new_parent)
+        if new_parent_name is not None:
+            time_instance.edit_parent(new_parent_name)
 
         # check for overlapping events
         for channel in temp_sequence.channels:
@@ -641,8 +655,8 @@ class Sequence:
             time_instance.edit_name(new_name)
         if new_relative_time is not None:
             time_instance.edit_relative_time(new_relative_time)
-        if new_parent is not None:
-            time_instance.edit_parent(new_parent)
+        if new_parent_name is not None:
+            time_instance.edit_parent(new_parent_name)
         
         return time_instance
 
@@ -1276,7 +1290,7 @@ def creat_test():
     DFM_ToF.add_event("Trap FM", Jump(0),  Initiate_ToF, comment= "Trap FM Res")
     DFM_ToF.add_event("Repump FM", Jump(4),  Initiate_ToF, comment= "Repump FM Res")
 
-    ToF_Time = 0.2e-3
+    ToF_Time = -0.2e-3
 
     Trig_High_IWA =DFM_ToF.add_time_instance(f"Trig_High_IWA", Initiate_ToF, ToF_Time)
 
