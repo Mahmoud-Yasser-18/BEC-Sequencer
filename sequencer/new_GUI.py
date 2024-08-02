@@ -120,6 +120,61 @@ class QArrowWidget(QLabel):
             
             drawArrow(qp, center_left.x()-cell_width, center_right.x()-cell_width, hp)
         qp.end()
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel
+from PyQt5.QtGui import QIntValidator
+
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel, QShortcut
+from PyQt5.QtGui import QIntValidator, QKeySequence
+
+class TimeInstanceLabel(QWidget):
+    def __init__(self, time_instance: 'TimeInstance', parent_widget: 'TimeInstanceWidget' = None):
+        super().__init__(parent_widget)
+        self.parent_widget = parent_widget
+        self.time_instance = time_instance
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout()
+
+        # Editable name
+        self.name_edit = QLineEdit(self.time_instance.name)
+        layout.addWidget(self.name_edit)
+
+        # Editable relative time with numeric validation
+        self.relative_time_edit = QLineEdit(str(self.time_instance.relative_time))
+        self.relative_time_edit.setValidator(QIntValidator())
+        layout.addWidget(self.relative_time_edit)
+
+        # Non-editable absolute time
+        self.absolute_time_label = QLabel(str(self.time_instance.get_absolute_time()))
+        layout.addWidget(self.absolute_time_label)
+
+        # Connect signals
+        self.name_edit.editingFinished.connect(self.change_name)
+        self.relative_time_edit.editingFinished.connect(self.change_relative_time)
+
+        # Add keyboard shortcut for toggling editability
+        self.toggle_shortcut = QShortcut(QKeySequence("Ctrl+E"), self)
+        self.toggle_shortcut.activated.connect(self.toggle_editability)
+
+        self.setLayout(layout)
+    
+    def change_name(self):
+        self.time_instance.edit_name(self.name_edit.text())
+        self.parent_widget.refresh_UI()
+    
+    def change_relative_time(self):
+        self.time_instance.edit_relative_time(int(self.relative_time_edit.text()))
+        self.parent_widget.refresh_UI()
+
+    def toggle_editability(self):
+        print('Toggling editability')
+        # Toggle the enabled state of the editors
+        self.name_edit.setEnabled(not self.name_edit.isEnabled())
+        self.relative_time_edit.setEnabled(not self.relative_time_edit.isEnabled())
+
+
+
 class TimeInstanceWidget(QWidget):
     def __init__(self, root_time_instance: 'TimeInstance', parent_widget: 'SequenceViewerWdiget' = None):
         super().__init__(parent_widget)
@@ -158,13 +213,11 @@ class TimeInstanceWidget(QWidget):
         self.time_instances = self.root_time_instance.get_all_time_instances()
         self.time_instances.sort(key=lambda ti: ti.get_absolute_time())
 
-        # Add labels to grid for each time instance
+        # Add custom labels to grid for each time instance
         self.labels = {}
         for i, time_instance in enumerate(self.time_instances):
-            label = QLabel(time_instance.name)
-            self.grid.addWidget(label, 0, i)
-            self.grid.addWidget(QLabel(str(time_instance.relative_time)), 1, i)
-            self.grid.addWidget(QLabel(str(time_instance.get_absolute_time())), 2, i)
+            label_widget = TimeInstanceLabel(time_instance, self)
+            self.grid.addWidget(label_widget, 0, i)
             self.labels[time_instance] = (0, i)
 
         # Add the arrow widget in row 2
@@ -178,7 +231,6 @@ class TimeInstanceWidget(QWidget):
         self.arrow_widget = QArrowWidget(arrow_list, self.grid, start_pos=(3, 0), parent=self)
         size = self.parent_widget.data_table.inner_widget.size()
         self.inner_widget.setMinimumWidth(size.width())
-
 
 
 class ChannelLabelListWidget(QWidget):
