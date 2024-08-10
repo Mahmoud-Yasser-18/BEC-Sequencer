@@ -159,7 +159,22 @@ class Ramp(EventBehavior):
     
     def __repr__(self) -> str:
         return f"Ramp({self.get_duration()}, {self.ramp_type.value}, {self.start_value}, {self.end_value})"
+class Digital(EventBehavior):
+    def __init__(self, target_value: float):
+        if target_value not in [0, 1]:
+            raise ValueError("target_value must be 0 or 1")
+        self.target_value = target_value
 
+    def edit_digital(self, target_value: float):
+        if target_value not in [0, 1]:
+            raise ValueError("target_value must be 0 or 1")
+        self.target_value = target_value
+
+    def get_value_at_time(self, t: float) -> float:
+        return self.target_value
+    
+    def __repr__(self) -> str:
+        return f"Digital({self.target_value})"
 class Channel:
     def __init__(self, name: str, card_number: int, channel_number: int, reset: bool, reset_value: float):
         self.name = name
@@ -205,7 +220,33 @@ class Channel:
             if current_event.get_end_time() > next_event.get_start_time():
                 raise ValueError(f"Events {current_event} and {next_event} on channel {self.name} overlap.")
 
+    def detect_a_ramp(self,time_instance:'TimeInstance'):
+        # check if the time instance between two time instances has a ramp
+        # get all the ramps in the channel: 
+        for event in time_instance.events:
+            if event.channel == self:
+                return None
+        for event in time_instance.ending_ramps:
+            if event.channel == self:
+                return None
+        ramps = [event for event in self.events if isinstance(event.behavior, Ramp)] 
+        for ramp in ramps:
+            if ramp.start_time_instance.get_absolute_time() < time_instance.get_absolute_time() < ramp.end_time_instance.get_absolute_time():
+                value = ramp.behavior.get_value_at_time(time_instance.get_absolute_time() - ramp.start_time_instance.get_absolute_time())
+                return ramp, value
+        return None
+    
+    def get_event_by_time_instance(self,time_instance:'TimeInstance'):
+        for event in self.events:
+            if event.start_time_instance == time_instance:
+                return (event,"start")
+        for event in self.events:
+            if event.end_time_instance == time_instance:
+                return (event,"end")
+        return None
+    
 
+             
     def __eq__(self, other: object) -> bool:
         return self.name == other.name and self.card_number == other.card_number and self.channel_number == other.channel_number and self.reset == other.reset and self.reset_value == other.reset_value
 
@@ -287,7 +328,7 @@ class Digital_Channel(Channel):
         }
     
 class Event:
-    def __init__(self, channel: Channel, behavior: EventBehavior,comment:str ="",start_time_instance: Optional['TimeInstance'] = None,end_time_instance: Optional['TimeInstance'] = None):
+    def __init__(self, channel: Optional[Union[Digital_Channel, Analog_Channel]] , behavior: EventBehavior,comment:str ="",start_time_instance: Optional['TimeInstance'] = None,end_time_instance: Optional['TimeInstance'] = None):
 
 
         self.channel = channel
@@ -298,6 +339,15 @@ class Event:
         self.sweep_settings = dict()
         self.reference_original_event = self
         self.associated_parameters = []
+        # check if the start_time_instance and channels already have events, raise an error if there is already an event at the same time and channel
+        for event in start_time_instance.events:
+            if event.channel == channel:
+                raise ValueError(f"Event already exists on channel {channel.name} at time instance {start_time_instance.name}")
+        if end_time_instance:
+            for event in end_time_instance.events:
+                if event.channel == channel:
+                    raise ValueError(f"Event already exists on channel {channel.name} at time instance {end_time_instance.name}")
+            
         if start_time_instance is not None:
             self.start_time_instance = start_time_instance
         else:
@@ -405,6 +455,19 @@ class TimeInstance:
     def add_ending_ramp(self, event: 'Event') -> None:
         self.ending_ramps.append(event)
 
+    def get_child_time_instance_by_name(self, name: str) -> Optional['TimeInstance']:
+        for child in self.children:
+            if child.name == name:
+                return child
+        return
+    def get_descendant_by_name(self, name: str) -> Optional['TimeInstance']:
+        for child in self.children:
+            if child.name == name:
+                return child
+            descendant = child.get_descendant_by_name(name)
+            if descendant:
+                return descendant
+        return None
     
     
     def edit_parent(self, new_parent_name: str) -> None:
@@ -578,7 +641,16 @@ class Sequence:
 
         # create the event 
         return Event(channel, behavior,comment,start_time_instance, end_time_instance)
-    
+    def delete_event(self, time_instance_name: str, channel_name: str) -> None:
+        event = self.find_event_by_time_and_channel(time_instance_name, channel_name)
+        if event is None:
+            raise ValueError(f"Event at time instance {time_instance_name} not found on channel {channel_name}")
+        event.channel.events.remove(event)
+        if event.end_time_instance != event.start_time_instance:
+            event.end_time_instance.ending_ramps.remove(event)
+        event.start_time_instance.events.remove(event)
+        
+        
     def find_event_by_time_and_channel(self, start_time_instance_name: str, channel_name: str) -> Optional[Event]:
         channel = self.find_channel_by_name(channel_name)
         for event in channel.events:
@@ -597,37 +669,25 @@ class Sequence:
         self.copy_original_events_to_new_sequence(self, temp_sequence)
         return temp_sequence
     
-    def edit_event(self, edited_event: Event, new_channel: Optional[Channel] = None, new_behavior: Optional[EventBehavior] = None, new_start_time_instance: Optional[TimeInstance] = None, new_end_time_instance: Optional[TimeInstance] = None, new_comment: Optional[str] = None):
-        temp_sequence = self.create_a_copy_of_sequence()
-        event = temp_sequence.find_event_by_time_and_channel(edited_event.start_time_instance.name, edited_event.channel.name)
-
-        if new_channel is not None:
-            event.channel = new_channel
-        if new_behavior is not None:
-            event.behavior = new_behavior
-        if new_start_time_instance is not None:
-            event.start_time_instance = new_start_time_instance
-        if new_end_time_instance is not None:
-            event.end_time_instance = new_end_time_instance
-        if new_comment is not None:
-            event.comment = new_comment
-        
-        for channel in temp_sequence.channels:
-            channel.check_for_overlapping_events()
-        
-        event = edited_event
-        if new_channel is not None:
-            event.channel = new_channel
-        if new_behavior is not None:
-            event.behavior = new_behavior
-        if new_start_time_instance is not None:
-            event.start_time_instance = new_start_time_instance
-        if new_end_time_instance is not None:
-            event.end_time_instance = new_end_time_instance
-        if new_comment is not None:
-            event.comment = new_comment
-
-        return event
+    def edit_event_behavior(self, edited_event: Event, start_value: Optional[float] = None, end_value: Optional[float] = None, target_value: Optional[float] = None, ramp_type: Optional[RampType] = None, comment: Optional[str] = None) -> Event:
+        if isinstance(edited_event.behavior, Jump):
+            if target_value > edited_event.channel.max_voltage or target_value < edited_event.channel.min_voltage:
+                raise ValueError(f"Jump value {target_value} is out of range for channel {edited_event.channel.name} with min voltage {edited_event.channel.min_voltage} and max voltage {edited_event.channel.max_voltage}")
+        if isinstance(edited_event.behavior, Ramp):
+            if start_value is not None and (start_value > edited_event.channel.max_voltage or start_value < edited_event.channel.min_voltage):
+                raise ValueError(f"Ramp start value {start_value} is out of range for channel {edited_event.channel.name} with min voltage {edited_event.channel.min_voltage} and max voltage {edited_event.channel.max_voltage}")
+            if end_value is not None and (end_value > edited_event.channel.max_voltage or end_value < edited_event.channel.min_voltage):
+                raise ValueError(f"Ramp end value {end_value} is out of range for channel {edited_event.channel.name} with min voltage {edited_event.channel.min_voltage} and max voltage {edited_event.channel.max_voltage}")
+        if isinstance(edited_event.behavior, Digital):
+            if target_value not in [0, 1]:
+                raise ValueError("target_value must be 0 or 1")
+        if isinstance(edited_event.behavior, Jump):
+            edited_event.behavior.edit_jump(target_value)
+        elif isinstance(edited_event.behavior, Ramp):
+            edited_event.behavior.edit_ramp(start_value=start_value, end_value=end_value, ramp_type=ramp_type)
+        edited_event.comment = comment
+        return edited_event
+    
 
     def edit_time_instance(self, edited_time_instance: TimeInstance, new_name: Optional[str] = None, new_relative_time: Optional[int] = None, new_parent_name:str = None):
         # don't allow to change anything for the root time instance
@@ -672,7 +732,7 @@ class Sequence:
         for channel in self.channels:
             channel.check_for_overlapping_events()
     
-    def add_analog_channel(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10) -> Analog_Channel:
+    def add_analog_channel(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0, default_voltage_func: Callable[[float], float] = lambda a: a, max_voltage: float = 10, min_voltage: float = -10,index= None) -> Analog_Channel:
         for channel in self.channels:
             if channel.name == name:
                 raise ValueError(f"Channel name '{name}' is already in use.")
@@ -683,12 +743,14 @@ class Sequence:
                 raise ValueError(f"Card number {card_number} and channel number {channel_number} combination is already in use.")
 
         channel = Analog_Channel(name, card_number, channel_number, reset, reset_value, default_voltage_func, max_voltage, min_voltage)
-        
-        self.channels.append(channel)
+        if index is not None:
+            self.channels.insert(index,channel)
+        else:
+            self.channels.append(channel)
         return channel
 
     # add a new digital channel to the sequence
-    def add_digital_channel(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0) -> Digital_Channel:
+    def add_digital_channel(self, name: str, card_number: int, channel_number: int, reset: bool = False, reset_value: float = 0,index=None) -> Digital_Channel:
         for channel in self.channels:
             if channel.name == name:
                 raise ValueError(f"Channel name '{name}' is already in use.")
@@ -699,7 +761,10 @@ class Sequence:
                 raise ValueError(f"Card number {card_number} and channel number {channel_number} combination is already in use.")
                     
         channel = Digital_Channel(name, card_number, channel_number, reset, reset_value)
-        self.channels.append(channel)
+        if index is not None:
+            self.channels.insert(index,channel)
+        else:
+            self.channels.append(channel)
         return channel
     def find_TimeInstance_by_name(self, name: str) -> Optional[TimeInstance]:
         return self.root_time_instance.get_time_instance_by_name(name)
