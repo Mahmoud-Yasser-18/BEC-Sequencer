@@ -464,31 +464,43 @@ class ChannelLabelListWidget(QWidget):
 
 
 
-class EventButton(QPushButton):
-    def __init__(self, channel:Channel, time_instance:TimeInstance, parent_widget:'EventsWidget'=None):
+
+class EventButton(QWidget):
+    def __init__(self, channel:Channel, time_instance:TimeInstance, parent_widget:'EventsWidget'):
         super().__init__(parent_widget)
         self.parent_widget = parent_widget
         self.channel = channel
         self.time_instance = time_instance
 
+        # Initialize the layout
+        self.layout = QVBoxLayout(self)
+        self.setLayout(self.layout)
+
+        # Initial call to set up the UI
         self.refresh_UI()
-        # self.clicked.connect(self.get_row_and_col)
+
     def get_col(self):
         layout = self.parent_widget.inner_layout
         for col in range(layout.columnCount()):
-            if layout.itemAtPosition(1, col+1).widget().time_instance.name == self.time_instance.name:
-                return col+1
-        return
-    
+            if layout.itemAtPosition(1, col + 1).widget().time_instance.name == self.time_instance.name:
+                return col + 1
+        return None
+
     def get_row(self):
         layout = self.parent_widget.inner_layout
         for row in range(layout.rowCount()):
-            if layout.itemAtPosition(row+1, 1).widget().channel.name == self.channel.name :
-                return row+1
-                
+            if layout.itemAtPosition(row + 1, 1).widget().channel.name == self.channel.name:
+                return row + 1
         return None
-    
+
     def refresh_UI(self):
+        # Clear the current layout
+        for i in reversed(range(self.layout.count())):
+            widget_to_remove = self.layout.itemAt(i).widget()
+            self.layout.removeWidget(widget_to_remove)
+            widget_to_remove.setParent(None)
+
+        # Check if the time instance contains any events in the channel
         # check if the time instance contains any events in the channel
 
         ramp_value = self.channel.detect_a_ramp(self.time_instance)
@@ -496,7 +508,9 @@ class EventButton(QPushButton):
             ramp = ramp_value[0]
             value = ramp_value[1]
             # add a label to display the value
-            return 
+            value_label = QLabel(f'Ramp detected: {value}')
+            self.layout.addWidget(value_label)
+            return
 
         event_time = self.channel.get_event_by_time_instance(self.time_instance)
         if event_time is None:
@@ -511,26 +525,39 @@ class EventButton(QPushButton):
                 value = self.channel.reset_value
             else:
                 value = all_events[i-1].behavior.get_value_at_time(self.time_instance.get_absolute_time())
+            value_button = QPushButton(f'Value: {value}')
+            value_button.clicked.connect(self.add_event)
             # add a button to display the value and connect to the create event when clicked 
+            self.layout.addWidget(value_button)
         else:
             event = event_time[0]
-            time_ref= event_time[1]
+            time_ref = event_time[1]
             if isinstance(event.behavior, Ramp):
                 ramp_type = event.behavior.ramp_type
                 if time_ref == 'start':
                     value = event.behavior.start_value
                     # create edit text to display the value and connect to the start value
+                    edit_text = QLineEdit(f'Start Value: {value}')
+                    self.layout.addWidget(edit_text)
                 else:
                     value = event.behavior.end_value
                     # create edit text to display the value and connect to the start value
-               
+                    edit_text = QLineEdit(f'End Value: {value}')
+                    self.layout.addWidget(edit_text)
             elif isinstance(event.behavior, Jump):
                 value = event.behavior.target_value
                 # create edit text to display the value and connect to the target value
+                edit_text = QLineEdit(f'Target Value: {value}')
+                self.layout.addWidget(edit_text)
             elif isinstance(event.behavior, Digital):
-                value= event.behavior.target_value
+                value = event.behavior.target_value
+                combo_box = QComboBox()
+                combo_box.addItems(['Off', 'On'])
+                combo_box.setCurrentIndex(1 if value == 1 else 0)
+                self.layout.addWidget(combo_box)
                 # create a combo box to display the value and connect to the target value (On =1 , Off = 0)
                 # connect it to edit target value
+                combo_box.currentIndexChanged.connect(self.edit_target_value)
                     
     def edit_start_value(self,event:Event,value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event,start_value=value)
