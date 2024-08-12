@@ -181,3 +181,13 @@ class DigitalEventDialog(QDialog):
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         self.layout.addWidget(self.buttons)
+    
+    def get_behavior(self):
+        behavior_type = "Digital"
+        state = self.target_value_combo.currentText()
+        behavior_params = {
+            'behavior_type': behavior_type,
+            'state': 0 if state == "low" else 1,
+            'comment': self.comment_text.text()
+        }
+        return behavior_params
