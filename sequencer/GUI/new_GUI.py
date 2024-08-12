@@ -458,6 +458,7 @@ class ChannelLabelListWidget(QWidget):
         for channel in self.sequence.channels:
             button = ChannelButton(channel,self)
             self.buttons.append(button)
+            button.setFixedHeight(50)
             self.inner_layout.addWidget(button)
         
         self.inner_widget.setLayout(self.inner_layout)
@@ -465,8 +466,10 @@ class ChannelLabelListWidget(QWidget):
 
 
 
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
+
 class EventButton(QWidget):
-    def __init__(self, channel:Channel, time_instance:TimeInstance, parent_widget:'EventsWidget'):
+    def __init__(self, channel: Channel, time_instance: TimeInstance, parent_widget: 'EventsWidget'):
         super().__init__(parent_widget)
         self.parent_widget = parent_widget
         self.channel = channel
@@ -501,14 +504,12 @@ class EventButton(QWidget):
             widget_to_remove.setParent(None)
 
         # Check if the time instance contains any events in the channel
-        # check if the time instance contains any events in the channel
-
         ramp_value = self.channel.detect_a_ramp(self.time_instance)
         if ramp_value is not None:
             ramp = ramp_value[0]
             value = ramp_value[1]
-            # add a label to display the value
-            value_label = QLabel(f'Ramp detected: {value}')
+            # Add a label to display the value
+            value_label = QLabel(f'Ramp {ramp.behavior.ramp_type}: {value}')
             self.layout.addWidget(value_label)
             return
 
@@ -527,54 +528,94 @@ class EventButton(QWidget):
                 value = all_events[i-1].behavior.get_value_at_time(self.time_instance.get_absolute_time())
             value_button = QPushButton(f'Value: {value}')
             value_button.clicked.connect(self.add_event)
-            # add a button to display the value and connect to the create event when clicked 
+            # Add a button to display the value and connect to the create event when clicked 
             self.layout.addWidget(value_button)
         else:
             event = event_time[0]
             time_ref = event_time[1]
             if isinstance(event.behavior, Ramp):
-                ramp_type = event.behavior.ramp_type
                 if time_ref == 'start':
                     value = event.behavior.start_value
-                    # create edit text to display the value and connect to the start value
-                    edit_text = QLineEdit(f'Start Value: {value}')
-                    self.layout.addWidget(edit_text)
+                    # Create a vertical layout with a label and numeric value spin box
+                    value_layout = QVBoxLayout()
+                    # add a combobox to select the ramp type
+                    ramp_combo = QComboBox()
+                    ramp_combo.addItems([e.value for e in RampType])
+                    preselected_ramp_type = event.behavior.ramp_type.value
+                    ramp_combo.setCurrentText(preselected_ramp_type)
+                    ramp_combo.currentIndexChanged.connect(lambda index: self.edit_ramp_type(event))
+                    value_layout.addWidget(ramp_combo)
+                    value_label = QLabel('Start Value:')
+                    value_spinbox = QDoubleSpinBox()
+                    # make the range of the spin box between the min and max voltage of the channel
+                    value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
+                    value_spinbox.setValue(value)
+                    value_spinbox.valueChanged.connect(lambda val: self.edit_start_value(event, val))
+                    value_layout.addWidget(value_label)
+                    value_layout.addWidget(value_spinbox)
+                    self.layout.addLayout(value_layout)
                 else:
                     value = event.behavior.end_value
-                    # create edit text to display the value and connect to the start value
-                    edit_text = QLineEdit(f'End Value: {value}')
-                    self.layout.addWidget(edit_text)
+                    # Create a vertical layout with a label and numeric value spin box
+                    value_layout = QVBoxLayout()
+                    value_label = QLabel('End Value:')
+                    value_spinbox = QDoubleSpinBox()
+                    # make the range of the spin box between the min and max voltage of the channel
+                    value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
+                    value_spinbox.setValue(value)
+                    value_spinbox.valueChanged.connect(lambda val: self.edit_end_value(event, val))
+                    value_layout.addWidget(value_label)
+                    value_layout.addWidget(value_spinbox)
+                    self.layout.addLayout(value_layout)
             elif isinstance(event.behavior, Jump):
                 value = event.behavior.target_value
-                # create edit text to display the value and connect to the target value
-                edit_text = QLineEdit(f'Target Value: {value}')
-                self.layout.addWidget(edit_text)
+                # Create a vertical layout with a label and numeric value spin box
+                value_layout = QVBoxLayout()
+                value_label = QLabel('Target Value:')
+                value_spinbox = QDoubleSpinBox()
+                value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
+                value_spinbox.setValue(value)
+                value_spinbox.valueChanged.connect(lambda val: self.edit_target_value(event, val))
+                value_layout.addWidget(value_label)
+                value_layout.addWidget(value_spinbox)
+                self.layout.addLayout(value_layout)
             elif isinstance(event.behavior, Digital):
                 value = event.behavior.target_value
                 combo_box = QComboBox()
                 combo_box.addItems(['Off', 'On'])
                 combo_box.setCurrentIndex(1 if value == 1 else 0)
                 self.layout.addWidget(combo_box)
-                # create a combo box to display the value and connect to the target value (On =1 , Off = 0)
-                # connect it to edit target value
-                combo_box.currentIndexChanged.connect(self.edit_target_value)
-                    
-    def edit_start_value(self,event:Event,value):
-        self.parent_widget.sequence.edit_event_behavior(edited_event=event,start_value=value)
-        # make a deep copy of the event behavior
-    def edit_end_value(self,event:Event,value):
-        self.parent_widget.sequence.edit_event_behavior(edited_event=event,end_value=value)
-        # make a deep copy of the event behavior
-    def edit_target_value(self,event:Event,value):
-        self.parent_widget.sequence.edit_event_behavior(edited_event=event,target_value=value)
-        # make a deep copy of the event behavior
-    def edit_ramp_type(self,event:Event,value):
-        self.parent_widget.sequence.edit_event_behavior(edited_event=event,ramp_type=value)
-        # make a deep copy of the event behavior
+                # Create a combo box to display the value and connect to the target value (On =1 , Off = 0)
+                # Connect it to edit target value
+                combo_box.currentIndexChanged.connect(lambda index: self.edit_target_value(event, index))
+            # Connect to delete event
 
-        
+    def edit_start_value(self, event, value):
+        self.parent_widget.sequence.edit_event_behavior(edited_event=event, start_value=value)
+        self.refresh_row_after_me()
+        # Make a deep copy of the event behavior
+
+    def edit_end_value(self, event, value):
+        self.parent_widget.sequence.edit_event_behavior(edited_event=event, end_value=value)
+        self.refresh_row_after_me()
+        self.refresh_row_after_me()
+        self.refresh_row_before_me()
+        self.refresh_row_before_me()
+
+        # Make a deep copy of the event behavior
+
+    def edit_target_value(self, event, value):
+        self.parent_widget.sequence.edit_event_behavior(edited_event=event, target_value=value)
+        # Make a deep copy of the event behavior
+
+    def edit_ramp_type(self,event):
+        value = RampType(self.sender().currentText())
+        self.parent_widget.sequence.edit_event_behavior(edited_event=event, ramp_type=value)
+        self.refresh_row_after_me()
+        # Make a deep copy of the event behavior
+
     def add_event(self):
-        # add an event to the time instance and channel 
+        # Add an event to the time instance and channel 
         if isinstance(self.channel, Analog_Channel):
             dialog = AnalogEventDialog(self.channel, self.time_instance)
         else:
@@ -583,17 +624,48 @@ class EventButton(QWidget):
         if dialog.exec_() == QDialog.Accepted:
             behavior = dialog.get_behavior()
             if isinstance(self.channel, Analog_Channel):
-                self.time_instance.add_event(self.channel, **behavior)
+                if behavior['behavior_type'] == 'Ramp':
+                    behavior_instance = Ramp(behavior['ramp_type'], behavior['start_value'], behavior['end_value'], behavior['ramp_duration'], behavior['resolution'],comment= behavior['comment'])
+                
+                elif behavior['behavior_type'] == 'Jump':
+                    behavior_instance = Jump(behavior['jump_target_value'])
+                    self.parent_widget.sequence.add_event(self.channel.name,behavior_instance, self.time_instance,comment= behavior['comment'])
             else:
-                self.time_instance.add_event(self.channel, **behavior)
+                behavior_instance = Digital(behavior['state'])
+                self.parent_widget.sequence.add_event(self.channel.name,behavior_instance, self.time_instance,comment= behavior['comment'])
             self.refresh_UI()
+        self.refresh_row_after_me()
+
     def delete_event(self):
-        # delete the event from the time instance and channel
+        # Delete the event from the time instance and channel
         self.parent_widget.sequence.delete_event(self.channel.name, self.time_instance.name)
         self.refresh_UI()
-
-
-
+        self.refresh_row_after_me()
+    
+    def refresh_row_after_me(self):
+        row = self.get_row()
+        col = self.get_col()
+        # loop over the columns and refresh the UI
+        for i in range(col+1, self.parent_widget.inner_layout.columnCount()):
+            item = self.parent_widget.inner_layout.itemAtPosition(row, i)
+            if item is not None:
+                try:
+                    widget = item.widget()
+                    widget.refresh_UI()
+                except Exception as e:
+                    pass
+    def refresh_row_before_me(self):
+        row = self.get_row()
+        col = self.get_col()
+        # loop over the columns and refresh the UI
+        for i in range(col-1, 0, -1):
+            item = self.parent_widget.inner_layout.itemAtPosition(row, i)
+            if item is not None:
+                try:
+                    widget = item.widget()
+                    widget.refresh_UI()
+                except Exception as e:
+                    pass
 
 from typing import Dict, Tuple
 class EventsWidget(QWidget):
@@ -620,11 +692,15 @@ class EventsWidget(QWidget):
 
         channels = self.sequence.channels
         max_width = 0
+        fixed_width = 200
+        fixed_height = 60
         # Calculate the maximum width and height required for the buttons
         for row, channel in enumerate(channels):
             for col, time in enumerate(self.time_instances):
                 button = EventButton(channel, time, self)
-                self.inner_layout.addWidget(button, row + 1, col + 1)
+                self.inner_layout.addWidget(button, row , col )
+                self.inner_layout.setColumnMinimumWidth(col,fixed_width)
+                self.inner_layout.setRowMinimumHeight(row,fixed_height)
 
         self.inner_widget.setLayout(self.inner_layout)
         self.scroll_area.setWidget(self.inner_widget)
