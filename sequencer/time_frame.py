@@ -26,12 +26,12 @@ class Parameter:
 
 
 class RampType(Enum):
-    LINEAR = 'linear'
-    QUADRATIC = 'quadratic'
-    EXPONENTIAL = 'exponential'
-    LOGARITHMIC = 'logarithmic'
-    GENERIC = 'generic'
-    MINIMUM_JERK = 'minimum jerk'
+    LINEAR = 'Linear'
+    QUADRATIC = 'Quadratic'
+    EXPONENTIAL = 'Exponential'
+    LOGARITHMIC = 'Logarithmic'
+    GENERIC = 'Generic'
+    MINIMUM_JERK = 'Minimum Jerk'
 
     def __str__(self):
         return self.value
@@ -60,8 +60,8 @@ class Jump(EventBehavior):
 
 class Ramp(EventBehavior):
     def __init__(self, start_time_instance:'TimeInstance',end_time_instance:'TimeInstance', ramp_type: RampType = RampType.LINEAR, start_value: float = 0, end_value: float = 1, func: Optional[Callable[[float], float]] = None, resolution=0.001):
-        if start_value == end_value:
-            raise ValueError("start_value and end_value must be different")
+        # if start_value == end_value:
+        #     raise ValueError("start_value and end_value must be different")
         
         if end_time_instance =="temp":
             pass 
@@ -107,8 +107,15 @@ class Ramp(EventBehavior):
         else : 
             raise ValueError("Invalid ramp type")
         
-    def edit_ramp(self, start_time_instance: Optional['TimeInstance'] = None,end_time_instance: Optional['TimeInstance'] = None, 
-      ramp_type: Optional[RampType] = None, start_value: Optional[float] = None, end_value: Optional[float] = None, func: Optional[Callable[[float], float]] = None, resolution: Optional[float] = None):
+    def edit_ramp(self, 
+                        start_time_instance: Optional['TimeInstance'] = None,
+                        end_time_instance: Optional['TimeInstance'] = None, 
+                        ramp_type: Optional[RampType] = None,
+                        start_value: Optional[float] = None,
+                        end_value: Optional[float] = None,
+                        func: Optional[Callable[[float], float]] = None,
+                        resolution: Optional[float] = None):
+        
         new_start_time_instance = start_time_instance if start_time_instance is not None else self.start_time_instance
         new_end_time_instance = end_time_instance if end_time_instance is not None else self.end_time_instance
 
@@ -125,8 +132,8 @@ class Ramp(EventBehavior):
         new_end_value = end_value if end_value is not None else self.end_value
         new_resolution = resolution if resolution is not None else self.resolution
         
-        if new_start_value == new_end_value:
-            raise ValueError("start_value and end_value must be different")
+        # if new_start_value == new_end_value:
+        #     raise ValueError("start_value and end_value must be different")
         
         if new_start_time_instance.get_absolute_time() >= new_end_time_instance.get_absolute_time():
             raise ValueError("duration must be negative")
@@ -619,6 +626,20 @@ class Sequence:
     def add_event(self, channel_name: str, behavior: EventBehavior,start_time_instance: TimeInstance, end_time_instance: Optional[TimeInstance] = None,comment:str="",) -> Event:
         # check if the channel is already in the sequence
         channel = self.find_channel_by_name(channel_name)
+        # check if the start_time_instance already has an event on the channel
+        for event in start_time_instance.events + start_time_instance.ending_ramps:
+            if event.channel == channel:
+                raise ValueError(f"Event already exists on channel {channel_name} at time instance {start_time_instance.name}")
+        # check if the end_time_instance already has an event on the channel
+        if end_time_instance:
+            for event in end_time_instance.events + end_time_instance.ending_ramps:
+                if event.channel == channel:
+                    raise ValueError(f"Event already exists on channel {channel_name} at time instance {end_time_instance.name}")
+        # check if the start_time_instance is less than end_time_instance
+        if isinstance(behavior, Ramp):
+            if start_time_instance.get_absolute_time() >= end_time_instance.get_absolute_time():
+                raise ValueError("start_time_instance must be less than end_time_instance")
+        # check if the behavior is a jump and is not within the max min range of the channel
 
         if channel not in self.channels:
             raise ValueError("Channel not found in the sequence.")
@@ -1280,18 +1301,21 @@ def creat_test():
     DFM_ToF.add_analog_channel("Repump TTL", 2, 6)
     DFM_ToF.add_analog_channel("Repump FM", 2, 7)
     DFM_ToF.add_analog_channel("Repump AM", 2, 8)
+    DFM_ToF.add_digital_channel("Digital", 5, 8)
     DFM_ToF.add_analog_channel("D1 AOM FM", 3,1)
     DFM_ToF.add_analog_channel("D1 AOM AM", 3,2)
     DFM_ToF.add_analog_channel("D1 EOM FM", 3,3)
     DFM_ToF.add_analog_channel("D1 EOM AM", 3,4)
     DFM_ToF.add_analog_channel("Absorption Imaging FM", 3,5)
     DFM_ToF.add_analog_channel("Absorption Imaging TTL", 3,6)
+
     
     
     Dump_MOT = DFM_ToF.root_time_instance
     Dump_MOT.edit_name("Dump MOT")
     
     
+    DFM_ToF.add_event("Digital", Digital(1), Dump_MOT, comment = 'Coils Off') # Coils Off
     DFM_ToF.add_event("MOT Coils", Jump(3.3), Dump_MOT, comment = 'Coils Off') # Coils Off
     DFM_ToF.add_event("Camera Trigger", Jump(0), Dump_MOT, comment = 'Cam Trigger Low') # Cam Trigger Low
     DFM_ToF.add_event("Trap TTL", Jump(0), Dump_MOT, comment = 'Trap Beam Off') # Trap Beam Off
@@ -1311,7 +1335,6 @@ def creat_test():
 
     Initiate_MOT =DFM_ToF.add_time_instance(f"Initiate_MOT", Dump_MOT, 1)
 
-    DFM_ToF.add_event("MOT Coils", Jump(0), Initiate_MOT, comment = 'Initiate MOT, Coils On') # Coils On
 
     DFM_ToF.add_event("Trap TTL", Jump(3.3), Initiate_MOT, comment='Trap Beam On') # Trap Beam On
     DFM_ToF.add_event("Repump TTL", Jump(3.3), Initiate_MOT, comment='Repump Beam On') # Repump Beam On
@@ -1342,12 +1365,14 @@ def creat_test():
     ### Image the MOT after the CMOT Stage
     DFM_Time = 20
     Initiate_ToF =DFM_ToF.add_time_instance(f"Initiate_ToF", Initiate_MOT, DFM_Time)
+    
+    DFM_ToF.add_event("MOT Coils", Ramp(Initiate_MOT,Initiate_ToF,RampType.LINEAR,start_value=3.3,end_value=0), Initiate_MOT,Initiate_ToF, comment = 'Initiate MOT, Coils On') # Coils On
 
 ### Image the MOT after the CMOT Stage
 
 # Turn off the MOT Beams and bring the MOT Beams on Resonance for ToF Imaging
 
-    DFM_ToF.add_event("MOT Coils", Jump(3.3), Initiate_ToF, comment= "End DFM, Initiate ToF, Coils Off")
+    # DFM_ToF.add_event("MOT Coils", Jump(3.3), Initiate_ToF, comment= "End DFM, Initiate ToF, Coils Off")
     DFM_ToF.add_event("Trap TTL", Jump(0), Initiate_ToF, comment= "Trap Beam Off")
     DFM_ToF.add_event("Repump TTL", Jump(0), Initiate_ToF, comment= "Repump Beam Off")
     DFM_ToF.add_event("D1 AOM AM", Jump(0), Initiate_ToF, comment= "D1 Beams Off")
@@ -1369,7 +1394,6 @@ def creat_test():
     Trig_Low_IWA =DFM_ToF.add_time_instance(f"Trig_Low_IWA", Trig_High_IWA, t_exp)
 
     DFM_ToF.add_event("Camera Trigger", Jump(0), Trig_Low_IWA, comment= "Cam Trigger Low")
-
 
     return DFM_ToF
 
