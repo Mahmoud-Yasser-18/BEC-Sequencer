@@ -746,8 +746,8 @@ class Sequence:
 
     def get_all_events(self) -> List[Event]:
         all_events: List[Event] = []
-        for channel in self.channels:
-            all_events += channel.events
+        for time_instance in self.get_all_time_instances():
+            all_events += time_instance.events
         return all_events
     
     def check_for_overlapping_events(self):
@@ -1039,6 +1039,12 @@ class Sequence:
         root = deserialize_TimeInstances(data["root_time_instance"], None)
         sequence.root_time_instance = root
         return sequence
+    def find_sequence_dauation(self):
+        all_events = self.get_all_events()
+        return max(
+            (event.get_start_time() + (event.behavior.get_duration() if isinstance(event.behavior, Ramp) else 0))
+            for event in all_events
+        )
 
     
 
@@ -1113,11 +1119,544 @@ class Sequence:
         plt.tight_layout()
         if plot_now:
             plt.show()  
+    # returns a new sequence with the events of the new sequence added to the original sequence with a time difference if specified
+    def add_sequence(self, new_sequence: 'Sequence', time_difference: float = 0.000001):
+        temp_original_sequence = copy.deepcopy(self)
+        temp_new_sequence = copy.deepcopy(new_sequence)
+        self.copy_original_events_to_new_sequence(self, temp_original_sequence)
+        self.copy_original_events_to_new_sequence(new_sequence, temp_new_sequence)
+
+
+
+        # Check for channel conflicts in names and properties
+        original_sequence_channels_names = [ch.name for ch in temp_original_sequence.channels]
+        new_sequence_channels_names = [ch.name for ch in temp_new_sequence.channels]
+        intersection_channels_name = list(set(original_sequence_channels_names) & set(new_sequence_channels_names))
+        
+        
+        for channel_name in intersection_channels_name:
+            if  temp_original_sequence.find_channel_by_name(channel_name)== temp_new_sequence.find_channel_by_name(channel_name):
+                pass
+            else:
+                raise ValueError(f"Channel {channel_name} already exists in the original sequence but with different properties")
+
+        # Check for channel conflicts in channel_number and card number 
+        original_sequence_channels_number = [(ch.card_number, ch.channel_number) for ch in temp_original_sequence.channels]
+        new_sequence_channels_numbers = [(ch.card_number, ch.channel_number) for ch in temp_new_sequence.channels]
+        intersection_channels_numbers = list(set(original_sequence_channels_number) & set(new_sequence_channels_numbers))
+        for channel in intersection_channels_numbers:
+            if  temp_original_sequence.find_channel_by_channel_and_card_number(channel[0], channel[1])== temp_new_sequence.find_channel_by_channel_and_card_number(channel[0], channel[1]):
+                pass
+            else:
+                raise ValueError(f"Channel {channel} already exists in the original sequence but with different properties")
+        # all channels are unique and do not conflict with the original sequence 
+        
+
+        original_sequence_channels_duration = temp_original_sequence.find_sequence_dauation()
+        # shift the new sequence by the duration of the original sequence
+        # shift the new sequence by the time difference
+        for time_instance in temp_new_sequence.get_all_time_instances():
+            time_instance.relative_time += original_sequence_channels_duration + time_difference
+        # add the root time instance of the new sequence to the root time instance of the original sequence
+        temp_original_sequence.root_time_instance.children.append(temp_new_sequence.root_time_instance)
+        # add the events of the overlapping channels to the original sequence
+
+
+        
+
+        return temp_original_sequence
+
+
+from collections import OrderedDict
     
 
+class SequenceManager:
+    def __init__(self) -> None:
+        self.main_sequences = OrderedDict()
+        self.custom_sequence= None
+        self.view_type = "Event"
+        self.to_be_swept = []
+        
+        
+    def get_all_channels_names(self): 
+        all_channels_names = []
+        all_channels_references = []
+        for sequence in self.main_sequences.values():
+            for channel in sequence["seq"].channels:
+                if channel.name not in all_channels_names: 
+                    all_channels_names.append(channel.name)
+                    all_channels_references.append(channel)
+        return all_channels_names,all_channels_references 
+    
+    def create_new_existing_channel(self, channel_name):
+        all_channels,all_channels_references = self.get_all_channels_names()
+        if channel_name not in all_channels:
+            raise ValueError(f"Channel with name {channel_name} does not exist.")
+        target_channel   = all_channels_references[all_channels.index(channel_name)]
+        # create a new channel with the same properties as the target channel 
+        if isinstance(target_channel, Analog_Channel):
+            new_channel = Analog_Channel(
+                name=target_channel.name,
+                card_number=target_channel.card_number,
+                channel_number=target_channel.channel_number,
+                reset=target_channel.reset,
+                reset_value=target_channel.reset_value,
+                max_voltage=target_channel.max_voltage,
+                min_voltage=target_channel.min_voltage
+            )
+        elif isinstance(target_channel, Digital_Channel):
+            new_channel = Digital_Channel(
+                name=target_channel.name,
+                card_number=target_channel.card_number,
+                channel_number=target_channel.channel_number,
+                reset=target_channel.reset,
+                reset_value=target_channel.reset_value,
+                card_id=target_channel.card_id,
+                bitpos=target_channel.bitpos
+            )
+        return new_channel
+    def add_existing_channel_to_sequence(self, sequence_name, channel_name): 
+        sequence = self.main_sequences[sequence_name]["seq"]
+        new_channel = self.create_new_existing_channel(channel_name)
+        # chen
+        for channel in sequence.channels:
+            if channel.name == new_channel.name:
+                raise ValueError(f"Channel already exists in the sequence.")
+            
+        # Ensure combination of card_number and channel_number is unique
+        for channel in sequence.channels:
+            if channel.card_number == new_channel.card_number and channel.channel_number == new_channel.channel_number:
+                raise ValueError(f"Card number {new_channel.card_number} and channel number {new_channel.channel_number} combination is already in use.")
+
+        sequence.channels.append(new_channel)
+
+        
+    def add_new_sequence(self,  sequence_name: str,index: Optional[int] = None):
+        #assert non conflicting index or name
+        if sequence_name in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} already exists.")
+        if index in (seq["index"] for seq in self.main_sequences.values()):
+            raise ValueError(f"Sequence with index {index} already exists.")
+        
+        if index is None:
+            index = len(self.main_sequences)
+        self.main_sequences[sequence_name] = {"index":index, "seq":Sequence(sequence_name),"sweep_list":OrderedDict()}
+    
+    def load_sequence(self,  sequence: Sequence,index: Optional[int] = None):
+        if sequence.sequence_name in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence.sequence_name} already exists.")
+        if index in (seq["index"] for seq in self.main_sequences.values()):
+            raise ValueError(f"Sequence wi  th index {index} already exists.")
+        
+        if index is None:
+            index = len(self.main_sequences)
+
+        self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence,"sweep_list":OrderedDict()}
+
+    def change_sequence_name(self, old_name: str, new_name: str):
+        if old_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {old_name} not found.")
+        
+        if new_name in self.main_sequences:
+            raise ValueError(f"Sequence with name {new_name} already exists.")
+        
+        self.main_sequences[new_name] = self.main_sequences.pop(old_name)
+        self.main_sequences[new_name]["seq"].sequence_name = new_name
+        if self.main_sequences[new_name]["sweep_list"]:
+            for key, seq in self.main_sequences[new_name]["sweep_list"]:
+                seq.sequence_name = new_name
+
+    def change_sequence_index(self, sequence_name: str, new_index: int):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        
+        if new_index in (seq["index"] for seq in self.main_sequences.values()):
+            raise ValueError(f"Sequence with index {new_index} already exists.")
+        
+        self.main_sequences[sequence_name]["index"] = new_index
+    
+    def swap_sequence_index(self, sequence_name1: str, sequence_name2: str):
+        if sequence_name1 not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name1} not found.")
+        
+        if sequence_name2 not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name2} not found.")
+        
+        index1 = self.main_sequences[sequence_name1]["index"]
+        index2 = self.main_sequences[sequence_name2]["index"]
+        self.main_sequences[sequence_name1]["index"] = index2
+        self.main_sequences[sequence_name2]["index"] = index1
+    
+    def move_sequence_to_index(self, sequence_name: str, new_index: int):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+
+        current_index = self.main_sequences[sequence_name]["index"]
+
+        if new_index not in (seq["index"] for seq in self.main_sequences.values()):
+            raise ValueError(f" can not exchange index with {new_index} as it does not exist.")
+
+        if current_index == new_index:
+            return
+        
+        for seq_name, seq_data in self.main_sequences.items():
+            if  current_index> seq_data["index"] and seq_data["index"]>=new_index:
+                self.main_sequences[seq_name]["index"] += 1
+            elif current_index< seq_data["index"] and seq_data["index"]<=new_index:
+                self.main_sequences[seq_name]["index"] -= 1
+        
+        self.main_sequences[sequence_name]["index"] = new_index
+        #swap the indexes index of the sequence to be moved with the index of the sequence at the new index
+        self.sort_sequences()
+        
+
+    def delete_sequence(self, sequence_name: str):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        
+        self.main_sequences.pop(sequence_name)
+        self.sort_sequences()
+
+    
+    def sort_sequences(self):
+        self.main_sequences = OrderedDict(sorted(self.main_sequences.items(), key=lambda item: item[1]["index"]))
+        # reindex the sequences
+        for i, (seq_name, seq_data) in enumerate(self.main_sequences.items()):
+            self.main_sequences[seq_name]["index"] = i
+        
 
 
-class SequenceSweeper:
+    def load_sequence_json(self, json: str, index):
+        if index in self.main_sequences:
+            raise ValueError(f"Sequence with index {index} already exists.")
+        
+        sequence = Sequence.from_json(json)
+        if sequence.sequence_name in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence.sequence_name} already exists.")
+        
+        self.main_sequences[sequence.sequence_name] = {"index":index, "seq":sequence}
+    
+    
+    def sweep_sequence_temp(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None,sweep_type: Optional[str] = None, settings: Optional[Dict[str, Any]] = None):
+        # get event to sweep from start time and channel name
+        parameter_name, parameter_label = parameter
+        if event_to_sweep is None:
+            if start_time is None or channel_name is None:
+                raise ValueError("Either event_to_sweep or start_time and channel_name must be provided.")
+            
+            sequence = self.main_sequences[sequence_name]["seq"]
+            event_to_sweep = sequence.find_event_by_time_and_channel(start_time, channel_name)
+        sequence:Sequence = self.main_sequences[sequence_name]["seq"]
+
+        # make a dictionary to store the sweeping information 
+        
+        
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        self.to_be_swept.append({"sequence_name":sequence_name,
+                                 "parameter":parameter_name,
+                                 "parameter_label":parameter_label,
+                                 "values":values,
+                                 "start_time":start_time,
+                                 "channel_name":channel_name,
+                                 "event_to_sweep":event_to_sweep})
+        # create a Paramter and then associate it to the event 
+        sequence.add_parameter_to_event(event_to_sweep, parameter_name=parameter_label,parameter_origin=parameter_name )
+
+        event_to_sweep.is_sweept = True 
+        event_to_sweep.sweep_type = sweep_type
+        event_to_sweep.sweep_settings = settings
+
+
+
+    
+    def remove_sweep_sequence(self,sequence_name: str, event_to_sweep: Optional[Event] = None):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+        
+        self.to_be_swept = [sweep for sweep in self.to_be_swept if event_to_sweep!=sweep["event_to_sweep"]]
+        event_to_sweep.is_sweept = False
+        event_to_sweep.sweep_type = None
+        event_to_sweep.sweep_settings = dict()
+        
+        
+     
+
+    def sweep_sequence(self,sequence_name: str,parameter: str, values: List[float],start_time: Optional[float]=None, channel_name: Optional[str]=None, event_to_sweep: Optional[Event] = None):
+        if sequence_name not in self.main_sequences:
+            raise ValueError(f"Sequence with name {sequence_name} not found.")
+
+        new_sweep_dict = OrderedDict()
+        if  len(self.main_sequences[sequence_name]["sweep_list"])!=0:
+            for old_key, old_seq in self.main_sequences[sequence_name]["sweep_list"].items():
+
+                temp_sweep = old_seq.sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, event_to_sweep=event_to_sweep)
+                for new_key, new_seq in temp_sweep.items():
+
+                    new_sweep_dict[(new_key,old_key)] = new_seq
+            self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
+                
+        else:
+            new_sweep_dict = self.main_sequences[sequence_name]["seq"].sweep_event_parameters(parameter=parameter, values=values, start_time=start_time, channel_name=channel_name, event_to_sweep=event_to_sweep)
+            self.main_sequences[sequence_name]["sweep_list"]= new_sweep_dict
+
+    def get_main_sequence(self ):
+     
+        # put all sequences in a list and sort them by the index
+        seq_list = list(self.main_sequences.values())
+        seq_list.sort(key=lambda seq: seq["index"])
+
+        # Run the sequences in order
+        main_sequence = seq_list[0]["seq"]
+        for seq in seq_list[1:]:
+            main_sequence = main_sequence.add_sequence(seq["seq"])
+
+        return main_sequence
+
+    def get_sweep_sequences_main(self):
+        # put all sequences in a list and sort them by the index
+        #  use self.to_be_swept
+        if not self.to_be_swept:
+            return [] 
+        for sweep in self.to_be_swept:
+            self.sweep_sequence(sequence_name=sweep["sequence_name"],parameter=sweep["parameter"], values=sweep["values"],start_time=sweep["start_time"], channel_name=sweep["channel_name"], event_to_sweep=sweep["event_to_sweep"])
+        
+        
+        
+        seq_list = list(self.main_sequences.values())
+        seq_list.sort(key=lambda seq: seq["index"])
+
+        # make a list of all the sweep sequences and compine them according to the index
+        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [[seq_list[0]["seq"]]]
+        sweep_sequences_keys = [[s] for s in seq_list[0]["sweep_list"].keys()  ]if len(seq_list[0]["sweep_list"].items())!=0 else [] 
+
+        for seq in seq_list[1:]:
+            if len(seq["sweep_list"].items())!=0:
+                
+                if sweep_sequences_keys == []:
+                    for key in seq["sweep_list"].keys():
+                        sweep_sequences_keys.append([key])
+                else:
+
+                    new_sweep_sequences_key = []
+                    for sweep_seq_key in seq["sweep_list"].keys():
+                        for sweep in sweep_sequences_keys:
+                            temp_key = list(copy.copy(sweep))
+                            temp_key.append(sweep_seq_key)
+                            new_sweep_sequences_key.append(tuple((temp_key)))
+                    
+                    sweep_sequences_keys = new_sweep_sequences_key
+
+
+                
+                
+                    
+                    
+
+                new_sweep_sequences = []
+                for sweep_seq in seq["sweep_list"].values():
+                    for sweep in sweep_sequences:
+                        temp = copy.copy(sweep)
+                        temp.append(sweep_seq)
+                        new_sweep_sequences.append(temp)
+                
+                sweep_sequences = new_sweep_sequences
+            else:
+                for sweep in sweep_sequences:
+                    sweep.append(seq["seq"])
+        
+
+        final_sweep_sequences = []
+
+        
+        
+        if sweep_sequences_keys:
+            for sweep in sweep_sequences:
+
+                main_sweep = sweep[0]
+                for seq in sweep[1:]:
+                    main_sweep = main_sweep.add_sequence(seq)   
+                final_sweep_sequences.append(main_sweep)
+            
+            if len(sweep_sequences_keys[0]) <2:
+                new_sweep_sequences_key = [tuple(s) for s in sweep_sequences_keys]
+                sweep_sequences_keys= new_sweep_sequences_key
+ 
+        final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
+        # clear the  seq["sweep_list"] from the main sequences 
+        for seq in self.main_sequences.values():
+            seq["sweep_list"] = OrderedDict()
+        
+        return final_dictionary
+
+    def get_custom_sequence(self, sequence_name: List[str]) -> Sequence:
+        if not self.to_be_swept:
+            return [] 
+        for sweep in self.to_be_swept:
+            self.sweep_sequence(sequence_name=sweep["sequence_name"],parameter=sweep["parameter"], values=sweep["values"],start_time=sweep["start_time"], channel_name=sweep["channel_name"], event_to_sweep=sweep["event_to_sweep"])
+        
+        # put all sequences in a list and sort them by the index
+        seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
+        if not seq_list: 
+            return []
+        # Run the sequences in order
+        self.custom_sequence = seq_list[0]["seq"]
+        for seq in seq_list[1:]:
+            self.custom_sequence = self.custom_sequence.add_sequence(seq["seq"])
+
+        return self.custom_sequence
+
+    def get_sweep_sequences_custom(self, sequence_name: List[str]):
+        seq_list = [self.main_sequences[seq_name] for seq_name in sequence_name]
+
+        # make a list of all the sweep sequences and compine them according to the index
+        sweep_sequences = [[s] for s in seq_list[0]["sweep_list"].values()] if len(seq_list[0]["sweep_list"].items())!=0 else [[seq_list[0]["seq"]]]
+        sweep_sequences_keys = [[s] for s in seq_list[0]["sweep_list"].keys()  ]if len(seq_list[0]["sweep_list"].items())!=0 else [] 
+
+        for seq in seq_list[1:]:
+            if len(seq["sweep_list"].items())!=0:
+                
+                if sweep_sequences_keys == []:
+                    for key in seq["sweep_list"].keys():
+                        sweep_sequences_keys.append([key])
+                else:
+
+                    new_sweep_sequences_key = []
+                    for sweep_seq_key in seq["sweep_list"].keys():
+                        for sweep in sweep_sequences_keys:
+                            temp_key = list(copy.copy(sweep))
+                            temp_key.append(sweep_seq_key)
+                            new_sweep_sequences_key.append(tuple((temp_key)))
+                    
+                    sweep_sequences_keys = new_sweep_sequences_key
+
+
+                
+                
+                    
+                    
+
+                new_sweep_sequences = []
+                for sweep_seq in seq["sweep_list"].values():
+                    for sweep in sweep_sequences:
+                        temp = copy.copy(sweep)
+                        temp.append(sweep_seq)
+                        new_sweep_sequences.append(temp)
+                
+                sweep_sequences = new_sweep_sequences
+            else:
+                for sweep in sweep_sequences:
+                    sweep.append(seq["seq"])
+        final_sweep_sequences = []
+
+        
+
+        if sweep_sequences_keys:
+            for sweep in sweep_sequences:
+                main_sweep = sweep[0]
+                for seq in sweep[1:]:
+                    main_sweep = main_sweep.add_sequence(seq)   
+                final_sweep_sequences.append(main_sweep)
+
+            if len(sweep_sequences_keys[0]) <2:
+                new_sweep_sequences_key = [tuple(s) for s in sweep_sequences_keys]
+                sweep_sequences_keys= new_sweep_sequences_key
+                
+            final_dictionary = dict(zip(sweep_sequences_keys,final_sweep_sequences))
+                    # clear the  seq["sweep_list"] from the main sequences 
+            for seq in self.main_sequences.values():
+                seq["sweep_list"] = OrderedDict()
+
+            return final_dictionary
+                # clear the  seq["sweep_list"] from the main sequences 
+        for seq in self.main_sequences.values():
+            seq["sweep_list"] = OrderedDict()
+
+        return None
+        # make a list of all the sweep sequences and compine them according to the index
+
+        
+    def to_json(self,file_name: Optional[str] = None) -> str:
+        data = {
+            "sequences": [],
+            "sweep_list": []
+        }
+        
+        # doing the sweep sequences first
+        for sweep in self.to_be_swept:
+            data["sweep_list"].append({
+                "sequence_name": sweep["sequence_name"],
+                "parameter": sweep["parameter"],
+                "values": sweep["values"],
+                "start_time": sweep["event_to_sweep"].start_time if sweep["event_to_sweep"] else sweep["start_time"],
+                "channel_name": sweep["event_to_sweep"].channel.name if sweep["event_to_sweep"] else sweep["channel_name"],
+                "sweep_type": sweep["event_to_sweep"].sweep_type if sweep["event_to_sweep"] else None,
+                "settings": sweep["event_to_sweep"].sweep_settings if sweep["event_to_sweep"] else dict()
+            })
+
+
+        #sort sequences by index before saving 
+        self.sort_sequences()
+        
+        for seq_name, seq_data in self.main_sequences.items():
+            data["sequences"].append({
+                "name": seq_name,
+                "index": seq_data["index"],
+                "sequence": seq_data["seq"].to_json(),
+                "sweep_list": {str(key): seq.to_json() for key, seq in seq_data["sweep_list"].items()}   
+            })
+
+        if file_name:
+            with open(file_name, 'w') as file:
+                json.dump(data, file, indent=4)
+            
+        return json.dumps(data, indent=4)
+    
+    @staticmethod
+    def from_json( file_name: Optional[str] = None,json_input: Optional[str] = None) -> 'SequenceManager':
+        
+        if json_input is not None and file_name is not None:
+            raise ValueError("Provide either a JSON string or a file name, not both.")
+
+        if json_input is None and file_name is None:
+            raise ValueError("Provide either a JSON string or a file name.")
+
+        if file_name:
+            with open(file_name, 'r') as file:
+                json_str = file.read()
+        else:
+            json_str = json_input
+
+        seq_manager = SequenceManager()
+
+        data = json.loads(json_str)
+        for seq_data in data["sequences"]:
+            sequence = Sequence.from_json(json_input=seq_data["sequence"])
+            seq_manager.main_sequences[seq_data["name"]] = {"index":seq_data["index"], "seq":sequence}
+            #sweep_list
+            seq_manager.main_sequences[seq_data["name"]]["sweep_list"] = {key: Sequence.from_json(json_input=seq) for key, seq in seq_data["sweep_list"].items()}
+        # doing the sweep sequences 
+        for sweep in data["sweep_list"]:
+            seq_manager.main_sequences[sweep["sequence_name"]]["seq"].find_event_by_time_and_channel(sweep["start_time"],sweep["channel_name"]).is_sweept = True
+
+            seq_manager.to_be_swept.append({"sequence_name":sweep["sequence_name"]
+                                    ,"parameter":sweep["parameter"]
+                                    ,"values":sweep["values"]
+                                    ,"start_time": None
+                                    ,"channel_name": None
+                                    ,"event_to_sweep":seq_manager.main_sequences[sweep["sequence_name"]]["seq"].find_event_by_time_and_channel(sweep["start_time"],sweep["channel_name"])
+                                    , "sweep_type":sweep["sweep_type"]
+                                    , "settings":sweep["settings"]
+                                    }
+                                    )
+            seq_manager.to_be_swept[-1]["event_to_sweep"].sweep_type = sweep["sweep_type"]
+            seq_manager.to_be_swept[-1]["event_to_sweep"].sweep_settings = sweep["settings"]
+
+            
+
+        return seq_manager 
+
+class SequenceManager:
     def __init__(self, sequence: Sequence):
         self.sequence = sequence
         self.sweep_dict = {}
@@ -1165,131 +1704,8 @@ class SequenceSweeper:
             
 
 from sequencer.ADwin_Modules import ADwin_Driver
-import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QPushButton, QLabel, QMessageBox
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
-   QComboBox, QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
-)
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QGridLayout, QPushButton, QLabel, QMessageBox,
-    QScrollArea, QVBoxLayout, QHBoxLayout, QFrame
-)
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QGridLayout, QPushButton, QLabel, QMessageBox,
-    QScrollArea, QVBoxLayout, QHBoxLayout, QFrame, QMainWindow, QInputDialog,
-    QSizePolicy
-)
-from PyQt5.QtCore import Qt
 
-class SequenceGrid(QWidget):
-    def __init__(self, sequence:Sequence, parent=None):
-        super().__init__(parent)
-        self.sequence = sequence
-        self.initUI()
-    
-    def initUI(self):
-        self.layout = QGridLayout()
-        self.setLayout(self.layout)
-        self.refresh_grid()
-    
-    def refresh_grid(self):
-        self.blockSignals(True)
-        self.setUpdatesEnabled(False)
 
-        for i in reversed(range(self.layout.count())): 
-            widget_to_remove = self.layout.itemAt(i).widget()
-            self.layout.removeWidget(widget_to_remove)
-            widget_to_remove.setParent(None)
-
-        self.blockSignals(False)
-        self.setUpdatesEnabled(True)
-
-        
-        # Create headers for time instances
-        for col, time_instance in enumerate(self.sequence.get_all_time_instances(), start=1):
-            self.layout.addWidget(QLabel(time_instance.name), 0, col)
-        
-        # Create rows for channels
-        for row, channel in enumerate(self.sequence.channels, start=1):
-            self.layout.addWidget(QLabel(channel.name), row, 0)
-            for col, time_instance in enumerate(self.sequence.get_all_time_instances(), start=1):
-                event = self.sequence.find_event_by_time_and_channel(time_instance.name, channel.name)
-                if event:
-                    if isinstance(event.behavior, Jump):
-                        value = event.behavior.target_value
-                    elif isinstance(event.behavior, Ramp):
-                        value = event.behavior.start_value
-                    self.layout.addWidget(QLabel(str(value)), row, col)
-                else:
-                    btn = QPushButton('+')
-                    btn.clicked.connect(lambda _, r=row, c=col: self.add_event(r, c))
-                    self.layout.addWidget(btn, row, col)
-    
-    def add_event(self, row, col):
-        # Get the channel and time instance names from row and col
-        channel_name = self.layout.itemAtPosition(row, 0).widget().text()
-        time_instance_name = self.layout.itemAtPosition(0, col).widget().text()
-        
-        # Find the corresponding objects in the sequence
-        channel = self.sequence.find_channel_by_name(channel_name)
-        time_instance = self.sequence.root_time_instance.get_time_instance_by_name(time_instance_name)
-        
-        if channel and time_instance:
-            value, ok = QInputDialog.getDouble(self, "Add Event", "Enter the event value:", 0.0, -1000, 1000, 2)
-            if ok:
-                behavior = Jump(value)
-                self.sequence.add_event(channel, behavior, time_instance)
-                print(f"Added event to channel {channel_name} at time instance {time_instance_name}")
-                self.refresh_grid()
-        else:
-            QMessageBox.warning(self, "Error", "Channel or Time Instance not found")
-
-class SequenceGUI(QMainWindow):
-    def __init__(self, sequence:Sequence):
-        super().__init__()
-        self.sequence = sequence
-        self.initUI()
-    
-    def initUI(self):
-        self.setWindowTitle("Sequence GUI")
-        self.setGeometry(100, 100, 800, 600)
-        
-        # Main widget and layout
-        main_widget = QWidget()
-        main_layout = QVBoxLayout(main_widget)
-        
-        # Header layout for fixed headers
-        header_layout = QHBoxLayout()
-        header_layout.addWidget(QLabel("Channels/Time Instances"), alignment=Qt.AlignTop)
-
-        for time_instance in self.sequence.get_all_time_instances():
-            header_layout.addWidget(QLabel(time_instance.name), alignment=Qt.AlignTop)
-
-        main_layout.addLayout(header_layout)
-
-        # Scroll area for the grid
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-
-        # Sequence grid
-        self.sequence_grid = SequenceGrid(self.sequence)
-        scroll_area.setWidget(self.sequence_grid)
-
-        main_layout.addWidget(scroll_area)
-        self.setCentralWidget(main_widget)
-        
-    def refresh_grid(self):
-        self.sequence_grid.refresh_grid()
-
-class SequenceApp:
-    def __init__(self, sequence:Sequence):
-        self.app = QApplication(sys.argv)
-        self.gui = SequenceGUI(sequence)
-    
-    def run(self):
-        self.gui.show()
-        sys.exit(self.app.exec_())
 
 def creat_test():
     DFM_ToF = Sequence("test")
