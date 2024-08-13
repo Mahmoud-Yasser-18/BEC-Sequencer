@@ -1183,13 +1183,13 @@ class Sequence:
 
 
 from collections import OrderedDict
-    
+from typing import Dict, Sequence, Any
+
 
 class SequenceManager:
     def __init__(self) -> None:
-        self.main_sequences = OrderedDict()
+        self.main_sequences:OrderedDict[str, OrderedDict[str,Union[Sequence,int,str]]]  = OrderedDict() 
         self.custom_sequence= None
-        self.view_type = "Event"
         self.to_be_swept = []
         
         
@@ -1226,8 +1226,6 @@ class SequenceManager:
                 channel_number=target_channel.channel_number,
                 reset=target_channel.reset,
                 reset_value=target_channel.reset_value,
-                card_id=target_channel.card_id,
-                bitpos=target_channel.bitpos
             )
         return new_channel
     def add_existing_channel_to_sequence(self, sequence_name, channel_name): 
