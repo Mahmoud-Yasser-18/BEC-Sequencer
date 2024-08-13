@@ -702,6 +702,7 @@ class Sequence:
         if isinstance(edited_event.behavior, Digital):
             if target_value not in [0, 1]:
                 raise ValueError("target_value must be 0 or 1")
+            edited_event.behavior.edit_digital(target_value)
         if isinstance(edited_event.behavior, Jump):
             edited_event.behavior.edit_jump(target_value)
         elif isinstance(edited_event.behavior, Ramp):
