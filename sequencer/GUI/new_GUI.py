@@ -48,8 +48,9 @@ class ScrollAreaWithShiftScroll(QScrollArea):
 
 class QArrowWidget(QLabel):
     """Responsible for drawing arrows which show parent-child relationship."""
-    def __init__(self, arrow_list, grid, start_pos=(0, 0), parent=None):
-        super().__init__(parent)
+    def __init__(self, arrow_list, grid, start_pos=(0, 0), parent_widget:'TimeInstanceWidget'=None):
+        super().__init__(parent_widget)
+        self.parent_widget = parent_widget
         self.grid = grid
         self.start_pos = start_pos
         self.grid.addWidget(self, self.start_pos[0], self.start_pos[1], 1, -1)
@@ -57,7 +58,7 @@ class QArrowWidget(QLabel):
         # self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
 
     def sizeHint(self):
-        return QSize(1000, (self.max_height + 1) * 10 + 5)
+        return QSize(5000, (self.max_height + 1) * 10 + 5)
 
     def figureOutHowToDrawArrows(self, arrow_list):
         n_cols = 0
@@ -96,10 +97,15 @@ class QArrowWidget(QLabel):
         qp = QPainter()
         qp.begin(self)
         # get self size 
-        size = self.size()
-        # get the width of a cell 
-        cell_width = size.width() / self.n_cols
+        # get the width of the cell by the parent widget
+        size_width = self.grid.geometry().width()
+        print(f"size_width: {size_width}")
+        size_width=0
 
+
+        
+        
+        
 
         for arrow, height in zip(self.arrow_list, self.height_list):
             center_left = centers[arrow[0]]
@@ -121,7 +127,7 @@ class QArrowWidget(QLabel):
                 arrowHead = QPolygon(points)
                 qp.drawPolygon(arrowHead)
             
-            drawArrow(qp, center_left.x()-cell_width, center_right.x()-cell_width, hp)
+            drawArrow(qp, center_left.x()-size_width, center_right.x()-size_width, hp)
         qp.end()
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel
 from PyQt5.QtGui import QIntValidator
@@ -306,9 +312,7 @@ class TimeInstanceWidget(QWidget):
         super().__init__(parent_widget)
         self.parent_widget = parent_widget
         self.root_time_instance = root_time_instance
-        self.setWindowTitle('Time Instance Visualization')
-        self.setGeometry(100, 100, 1000, 600)
-
+        
         self.setup_UI()
         self.refresh_UI()
 
@@ -344,7 +348,11 @@ class TimeInstanceWidget(QWidget):
         self.labels = {}
         for i, time_instance in enumerate(self.time_instances):
             label_widget = TimeInstanceLabel(time_instance, self)
+            # label_widget.setFixedWidth(200)
+            
+
             self.grid.addWidget(label_widget, 0, i)
+            self.grid.setColumnMinimumWidth(i,200)
             self.labels[time_instance] = (0, i)
 
         # Add the arrow widget in row 2
@@ -355,7 +363,7 @@ class TimeInstanceWidget(QWidget):
                 child_index = self.labels[time_instance][1]
                 arrow_list.append((parent_index, child_index))
 
-        self.arrow_widget = QArrowWidget(arrow_list, self.grid, start_pos=(3, 0), parent=self)
+        self.arrow_widget = QArrowWidget(arrow_list, self.grid, start_pos=(3, 0), parent_widget=self)
 
 from PyQt5.QtWidgets import QPushButton
 
@@ -522,6 +530,7 @@ class EventButton(QWidget):
             # Add a label to display the value
             value_label = QLabel(f'Ramp {ramp.behavior.ramp_type}: {value}')
             self.layout_button.addWidget(value_label)
+            self.no_event = True
             return
 
         event_time = self.channel.get_event_by_time_instance(self.time_instance)
@@ -541,7 +550,9 @@ class EventButton(QWidget):
             value_button.clicked.connect(self.add_event)
             # Add a button to display the value and connect to the create event when clicked 
             self.layout_button.addWidget(value_button)
+            self.no_event = True
         else:
+            self.no_event = False
             event = event_time[0]
             time_ref = event_time[1]
             if isinstance(event.behavior, Ramp):
@@ -598,9 +609,9 @@ class EventButton(QWidget):
                 # Connect it to edit target value
                 combo_box.currentIndexChanged.connect(lambda index: self.edit_digtial_state(event, index))
             # Connect to delete event when right clicked
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.context_menu)
-
+            self.setContextMenuPolicy(Qt.CustomContextMenu)
+            self.customContextMenuRequested.connect(self.context_menu)
+            
 
     def context_menu(self, position):
         context_menu = QMenu(self)
@@ -719,7 +730,6 @@ class EventsWidget(QWidget):
         self.time_instances.sort(key=lambda ti: ti.get_absolute_time())
 
         channels = self.sequence.channels
-        max_width = 0
         fixed_width = 200
         fixed_height = 100
         # Calculate the maximum width and height required for the buttons
@@ -861,37 +871,46 @@ class EventsWidget(QWidget):
         # get the shape of the grid
         n_row, n_col = self.get_shape()
         # get the time instances
-        current_time_instances = [self.inner_layout.itemAtPosition(1, i).widget().time_instance for i in range(1, n_col+1)]
+        current_time_instances = [self.inner_layout.itemAtPosition(0, i).widget().time_instance for i in range(0, n_col+1)]
         target_time_instances = self.sequence.root_time_instance.get_all_time_instances()
         target_time_instances.sort(key=lambda ti: ti.get_absolute_time())
         # make a dictionary of column current index and target index
-        col_map = {}
-        for i, current_time_instance in enumerate(current_time_instances):
-            target_time_instance = target_time_instances[i]
-            col_map[current_time_instance] = target_time_instance
         # iterate over the layout and reorder the time instances
-        for i in range(1, n_col+1):
-            current_time_instance = self.inner_layout.itemAtPosition(1, i).widget().time_instance
-            target_time_instance = col_map[current_time_instance]
+        for i in range(0, n_col):
+            current_time_instance = self.inner_layout.itemAtPosition(0, i).widget().time_instance
+            print(f"current time instance: {current_time_instance.name}")
+            target_time_instance = target_time_instances[i]
             if current_time_instance != target_time_instance:
                 # get the index of the target time instance
-                target_index = target_time_instances.index(target_time_instance)
+                print(f"target time instance: {target_time_instance.name}")
+                target_index = current_time_instances.index(target_time_instance)
                 # shift the columns to the right if needed
+                # put the target time instance widget in a list 
+                list_of_widgets = []
                 for j in range(n_row+1):
-                    for k in range(n_col+1, target_index, -1):
-                        item = self.inner_layout.itemAtPosition(j+1, k)
-                        if item is not None:
-                            widget = item.widget()
-                            self.inner_layout.removeWidget(widget)
-                            self.inner_layout.addWidget(widget, j+1, k + 1)
-                # reorder the time instance for each channel
-                for j in range(1, n_row+1):
-                    item = self.inner_layout.itemAtPosition(j, i)
+                    item = self.inner_layout.itemAtPosition(j, target_index)
                     if item is not None:
                         widget = item.widget()
-                        self.inner_layout.removeWidget(widget)
-                        self.inner_layout.addWidget(widget, j, target_index+1)
+                        if widget.no_event:
+                            widget.refresh_UI()
 
+                        list_of_widgets.append(widget)
+                        self.inner_layout.removeWidget(widget)
+
+                for j in range(n_row+1):
+                    for k in range(i, target_index, 1):
+                        item = self.inner_layout.itemAtPosition(j, k)
+                        if item is not None:
+                            widget = item.widget()
+                            print(f"widget: {widget.time_instance.name}")
+                            if widget.no_event:
+                                widget.refresh_UI()
+                            self.inner_layout.removeWidget(widget)
+                            self.inner_layout.addWidget(widget, j, k + 1)
+                # reorder the time instance for each channel
+                
+                for j, widget in enumerate(list_of_widgets):
+                    self.inner_layout.addWidget(widget, j, i)
 
 class SequenceViewerWdiget(QWidget):
     def __init__(self, sequence:Sequence, parent_widget=None):
