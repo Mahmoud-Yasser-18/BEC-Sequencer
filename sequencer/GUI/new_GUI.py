@@ -432,6 +432,7 @@ class ChannelLabelListWidget(QWidget):
         self.setup_UI()
         
     def setup_UI(self):
+        # Use QGridLayout instead of QVBoxLayout
         self.layout = QVBoxLayout(self)
         
         self.scroll_area = ScrollAreaWithShiftScroll(self)
@@ -440,7 +441,7 @@ class ChannelLabelListWidget(QWidget):
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         self.inner_widget = QWidget()
-        self.inner_layout = QVBoxLayout(self.inner_widget)
+        self.inner_layout = QGridLayout(self.inner_widget)  # Use QGridLayout here as well
 
         self.scroll_area.setWidget(self.inner_widget)
         self.layout.addWidget(self.scroll_area)
@@ -449,21 +450,22 @@ class ChannelLabelListWidget(QWidget):
         self.refresh_UI()
         
     def refresh_UI(self):
+        # Clear existing buttons from the layout
         for button in self.buttons:
             self.inner_layout.removeWidget(button)
             button.deleteLater()
         
         self.buttons = []
         
-        for channel in self.sequence.channels:
-            button = ChannelButton(channel,self)
+        # Add buttons to the grid layout
+        for row, channel in enumerate(self.sequence.channels):
+            button = ChannelButton(channel, self)  # Assuming ChannelButton is a QPushButton
             self.buttons.append(button)
-            button.setFixedHeight(50)
-            self.inner_layout.addWidget(button)
+            self.inner_layout.addWidget(button, row, 0)  # Add each button in a new row
+            self.inner_layout.setRowMinimumHeight(row,100)
+
         
         self.inner_widget.setLayout(self.inner_layout)
-
-
 
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
@@ -476,8 +478,8 @@ class EventButton(QWidget):
         self.time_instance = time_instance
 
         # Initialize the layout
-        self.layout = QVBoxLayout(self)
-        self.setLayout(self.layout)
+        self.layout_button = QVBoxLayout(self)
+        self.setLayout(self.layout_button)
 
         # Initial call to set up the UI
         self.refresh_UI()
@@ -492,15 +494,20 @@ class EventButton(QWidget):
     def get_row(self):
         layout = self.parent_widget.inner_layout
         for row in range(layout.rowCount()):
-            if layout.itemAtPosition(row + 1, 1).widget().channel.name == self.channel.name:
-                return row + 1
+            try:
+                if layout.itemAtPosition(row, 1).widget().channel.name == self.channel.name:
+                    return row  
+            except Exception as e:
+                pass 
+            # if layout.itemAtPosition(row + 1, 1).widget().channel.name == self.channel.name:
+            #     return row + 1
         return None
 
     def refresh_UI(self):
         # Clear the current layout
-        for i in reversed(range(self.layout.count())):
-            widget_to_remove = self.layout.itemAt(i).widget()
-            self.layout.removeWidget(widget_to_remove)
+        for i in reversed(range(self.layout_button.count())):
+            widget_to_remove = self.layout_button.itemAt(i).widget()
+            self.layout_button.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
 
         # Check if the time instance contains any events in the channel
@@ -510,7 +517,7 @@ class EventButton(QWidget):
             value = ramp_value[1]
             # Add a label to display the value
             value_label = QLabel(f'Ramp {ramp.behavior.ramp_type}: {value}')
-            self.layout.addWidget(value_label)
+            self.layout_button.addWidget(value_label)
             return
 
         event_time = self.channel.get_event_by_time_instance(self.time_instance)
@@ -529,7 +536,7 @@ class EventButton(QWidget):
             value_button = QPushButton(f'Value: {value}')
             value_button.clicked.connect(self.add_event)
             # Add a button to display the value and connect to the create event when clicked 
-            self.layout.addWidget(value_button)
+            self.layout_button.addWidget(value_button)
         else:
             event = event_time[0]
             time_ref = event_time[1]
@@ -553,7 +560,7 @@ class EventButton(QWidget):
                     value_spinbox.valueChanged.connect(lambda val: self.edit_start_value(event, val))
                     value_layout.addWidget(value_label)
                     value_layout.addWidget(value_spinbox)
-                    self.layout.addLayout(value_layout)
+                    self.layout_button.addLayout(value_layout)
                 else:
                     value = event.behavior.end_value
                     # Create a vertical layout with a label and numeric value spin box
@@ -566,7 +573,7 @@ class EventButton(QWidget):
                     value_spinbox.valueChanged.connect(lambda val: self.edit_end_value(event, val))
                     value_layout.addWidget(value_label)
                     value_layout.addWidget(value_spinbox)
-                    self.layout.addLayout(value_layout)
+                    self.layout_button.addLayout(value_layout)
             elif isinstance(event.behavior, Jump):
                 value = event.behavior.target_value
                 # Create a vertical layout with a label and numeric value spin box
@@ -578,17 +585,28 @@ class EventButton(QWidget):
                 value_spinbox.valueChanged.connect(lambda val: self.edit_target_value(event, val))
                 value_layout.addWidget(value_label)
                 value_layout.addWidget(value_spinbox)
-                self.layout.addLayout(value_layout)
+                self.layout_button.addLayout(value_layout)
             elif isinstance(event.behavior, Digital):
                 value = event.behavior.target_value
                 combo_box = QComboBox()
                 combo_box.addItems(['Off', 'On'])
                 combo_box.setCurrentIndex(1 if value == 1 else 0)
-                self.layout.addWidget(combo_box)
+                self.layout_button.addWidget(combo_box)
                 # Create a combo box to display the value and connect to the target value (On =1 , Off = 0)
                 # Connect it to edit target value
                 combo_box.currentIndexChanged.connect(lambda index: self.edit_target_value(event, index))
-            # Connect to delete event
+            # Connect to delete event when right clicked
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.context_menu)
+
+
+    def context_menu(self, position):
+        context_menu = QMenu(self)
+        delete_action = context_menu.addAction("Delete Event")
+        delete_action.triggered.connect(self.delete_event)
+        context_menu.exec_(self.mapToGlobal(position))
+
+        
 
     def edit_start_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, start_value=value)
@@ -598,8 +616,6 @@ class EventButton(QWidget):
     def edit_end_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, end_value=value)
         self.refresh_row_after_me()
-        self.refresh_row_after_me()
-        self.refresh_row_before_me()
         self.refresh_row_before_me()
 
         # Make a deep copy of the event behavior
@@ -638,7 +654,7 @@ class EventButton(QWidget):
 
     def delete_event(self):
         # Delete the event from the time instance and channel
-        self.parent_widget.sequence.delete_event(self.channel.name, self.time_instance.name)
+        self.parent_widget.sequence.delete_event(self.time_instance.name,self.channel.name)
         self.refresh_UI()
         self.refresh_row_after_me()
     
@@ -663,7 +679,10 @@ class EventButton(QWidget):
             if item is not None:
                 try:
                     widget = item.widget()
-                    widget.refresh_UI()
+                    if self.channel.detect_a_ramp(widget.time_instance):
+                        widget.refresh_UI()
+                    else:
+                        break
                 except Exception as e:
                     pass
 
@@ -693,7 +712,7 @@ class EventsWidget(QWidget):
         channels = self.sequence.channels
         max_width = 0
         fixed_width = 200
-        fixed_height = 60
+        fixed_height = 100
         # Calculate the maximum width and height required for the buttons
         for row, channel in enumerate(channels):
             for col, time in enumerate(self.time_instances):
