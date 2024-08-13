@@ -746,6 +746,14 @@ class Sequence:
 
     def get_all_events(self) -> List[Event]:
         all_events: List[Event] = []
+        for channel in self.channels:
+            all_events += channel.events
+        return all_events
+    
+    
+    def get_all_events2(self) -> List[Event]:
+        # should be equivalent to the above function
+        all_events: List[Event] = []
         for time_instance in self.get_all_time_instances():
             all_events += time_instance.events
         return all_events
@@ -1124,8 +1132,7 @@ class Sequence:
         temp_original_sequence = copy.deepcopy(self)
         temp_new_sequence = copy.deepcopy(new_sequence)
         self.copy_original_events_to_new_sequence(self, temp_original_sequence)
-        self.copy_original_events_to_new_sequence(new_sequence, temp_new_sequence)
-
+        self.copy_original_events_to_new_sequence(new_sequence, temp_new_sequence)        
 
 
         # Check for channel conflicts in names and properties
@@ -1151,18 +1158,26 @@ class Sequence:
                 raise ValueError(f"Channel {channel} already exists in the original sequence but with different properties")
         # all channels are unique and do not conflict with the original sequence 
         
-
-        original_sequence_channels_duration = temp_original_sequence.find_sequence_dauation()
-        # shift the new sequence by the duration of the original sequence
-        # shift the new sequence by the time difference
-        for time_instance in temp_new_sequence.get_all_time_instances():
-            time_instance.relative_time += original_sequence_channels_duration + time_difference
-        # add the root time instance of the new sequence to the root time instance of the original sequence
-        temp_original_sequence.root_time_instance.children.append(temp_new_sequence.root_time_instance)
         # add the events of the overlapping channels to the original sequence
-
+        for channel_name in intersection_channels_name:
+            channel = temp_new_sequence.find_channel_by_name(channel_name)
+            for event in channel.events:
+                new_channel = temp_original_sequence.find_channel_by_name(channel_name)
+                event.channel = new_channel
+                new_channel.events.append(event)
 
         
+        new_sequence_channels = [channel for channel in temp_new_sequence.channels if channel.name not in intersection_channels_name]
+        
+        for channel in new_sequence_channels:
+            temp_original_sequence.channels.append(channel)
+
+        original_sequence_channels_duration = temp_original_sequence.find_sequence_dauation()
+        for time_instance in temp_new_sequence.get_all_time_instances():
+            time_instance.relative_time += original_sequence_channels_duration + time_difference
+        temp_original_sequence.root_time_instance.children.append(temp_new_sequence.root_time_instance)
+        temp_new_sequence.root_time_instance.parent = temp_original_sequence.root_time_instance
+        # add the events of the overlapping channels to the original sequence
 
         return temp_original_sequence
 
