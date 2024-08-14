@@ -376,8 +376,13 @@ class ChannelButton(QPushButton):
 
     def get_channel_index(self):
         return self.parent_widget.sequence.channels.index(self.channel)
+    def enterEvent(self,event):
+        text = f"Card Number: {self.channel.card_number}\nChannel Number: {self.channel.channel_number}"
+        if isinstance(self.channel, Analog_Channel):
+            text += f"\nMax Voltage: {self.channel.max_voltage}\nMin Voltage: {self.channel.min_voltage}"
+        QToolTip.showText(event.globalPos(),text , self)
+        super().enterEvent(event)
 
-    
     def delete_channel(self):
         self.parent_widget.sequence.delete_channel(self.channel.name)
         self.parent_widget.refresh_UI()
@@ -416,8 +421,17 @@ class ChannelButton(QPushButton):
             else: 
                 self.parent_widget.sequence.edit_analog_channel(name=self.channel.name,new_name=data['name'], card_number=data['card_number'], channel_number=data['channel_number'], reset_value=data['reset_value'], max_voltage=data['max_voltage'], min_voltage=data['min_voltage'])
             self.parent_widget.refresh_UI()
-            
-        
+    
+    def change_order(self,index):
+        # open input dialog to get the index which is a drop down list of indexes
+        len_channels = len(self.parent_widget.sequence.channels)
+        current_index = self.get_channel_index()
+        index, ok = QInputDialog.getInt(self, "Change Order", "Enter the new index", value=index, min=0, max=len_channels-1)
+        if ok:
+            self.parent_widget.sequence.change_channel_order(self.channel, index)
+            self.parent_widget.refresh_UI()
+            self.parent_widget.parent_widget.event_table.change_channel_order(self.channel,current_index, index)
+
     def contextMenuEvent(self, event):
         context_menu = QMenu(self)
         delete_action = context_menu.addAction("Delete Channel")
@@ -426,6 +440,8 @@ class ChannelButton(QPushButton):
         add_action.triggered.connect(self.add_channel)
         edit_action = context_menu.addAction("Edit Channel")
         edit_action.triggered.connect(self.edit_channel)
+        change_order_action = context_menu.addAction("Change Order")
+        change_order_action.triggered.connect(self.change_order)
         context_menu.exec_(event.globalPos())
 
 
@@ -477,7 +493,11 @@ class ChannelLabelListWidget(QWidget):
         self.inner_widget.setLayout(self.inner_layout)
 
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDialog
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QDoubleSpinBox, QDialog
+
+class QDouble_NO_mouse_SpinBox(QDoubleSpinBox):
+    def wheelEvent(self, event):
+        event.ignore()
 
 class EventButton(QWidget):
     def __init__(self, channel: Channel, time_instance: TimeInstance, parent_widget: 'EventsWidget'):
@@ -554,6 +574,7 @@ class EventButton(QWidget):
         else:
             self.no_event = False
             event = event_time[0]
+            self.event_instance = event
             time_ref = event_time[1]
             if isinstance(event.behavior, Ramp):
                 if time_ref == 'start':
@@ -568,7 +589,7 @@ class EventButton(QWidget):
                     ramp_combo.currentIndexChanged.connect(lambda index: self.edit_ramp_type(event))
                     self.layout_button.addWidget(ramp_combo)
                     value_label = QLabel('Start Value:')
-                    value_spinbox = QDoubleSpinBox()
+                    value_spinbox = QDouble_NO_mouse_SpinBox()
                     # make the range of the spin box between the min and max voltage of the channel
                     value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
                     value_spinbox.setValue(value)
@@ -580,7 +601,7 @@ class EventButton(QWidget):
                     # Create a vertical layout with a label and numeric value spin box
                     
                     value_label = QLabel('End Value:')
-                    value_spinbox = QDoubleSpinBox()
+                    value_spinbox = QDouble_NO_mouse_SpinBox()
                     # make the range of the spin box between the min and max voltage of the channel
                     value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
                     value_spinbox.setValue(value)
@@ -592,7 +613,7 @@ class EventButton(QWidget):
                 # Create a vertical layout with a label and numeric value spin box
                 
                 value_label = QLabel('Target Value:')
-                value_spinbox = QDoubleSpinBox()
+                value_spinbox = QDouble_NO_mouse_SpinBox()
                 value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
                 value_spinbox.setValue(value)
                 value_spinbox.valueChanged.connect(lambda val: self.edit_target_value(event, val))
@@ -607,11 +628,20 @@ class EventButton(QWidget):
                 self.layout_button.addWidget(combo_box)
                 # Create a combo box to display the value and connect to the target value (On =1 , Off = 0)
                 # Connect it to edit target value
-                combo_box.currentIndexChanged.connect(lambda index: self.edit_digtial_state(event, index))
+                combo_box.currentIndexChanged.connect(lambda index: self.edit_digtial_state(event))
             # Connect to delete event when right clicked
             self.setContextMenuPolicy(Qt.CustomContextMenu)
             self.customContextMenuRequested.connect(self.context_menu)
-            
+    
+    def enterEvent(self,event):
+        if not self.no_event:
+            text = self.event_instance.comment
+        else:
+            text = "Holding Value: click to add an event"
+        QToolTip.showText(event.globalPos(),text , self)
+        super().enterEvent(event)
+
+
 
     def context_menu(self, position):
         context_menu = QMenu(self)
@@ -652,25 +682,32 @@ class EventButton(QWidget):
 
     def add_event(self):
         # Add an event to the time instance and channel 
-        if isinstance(self.channel, Analog_Channel):
-            dialog = AnalogEventDialog(self.channel, self.time_instance)
-        else:
-            dialog = DigitalEventDialog(self.channel, self.time_instance)
-        dialog.add_ok_cancel_buttons()
-        if dialog.exec_() == QDialog.Accepted:
-            behavior = dialog.get_behavior()
+        try: 
             if isinstance(self.channel, Analog_Channel):
-                if behavior['behavior_type'] == 'Ramp':
-                    behavior_instance = Ramp(behavior['ramp_type'], behavior['start_value'], behavior['end_value'], behavior['ramp_duration'], behavior['resolution'],comment= behavior['comment'])
-                
-                elif behavior['behavior_type'] == 'Jump':
-                    behavior_instance = Jump(behavior['jump_target_value'])
-                    self.parent_widget.sequence.add_event(self.channel.name,behavior_instance, self.time_instance,comment= behavior['comment'])
+                dialog = AnalogEventDialog(self.channel, self.time_instance)
             else:
-                behavior_instance = Digital(behavior['state'])
-                self.parent_widget.sequence.add_event(self.channel.name,behavior_instance, self.time_instance,comment= behavior['comment'])
-            self.refresh_UI()
-        self.refresh_row_after_me()
+                dialog = DigitalEventDialog(self.channel, self.time_instance)
+            dialog.add_ok_cancel_buttons()
+            if dialog.exec_() == QDialog.Accepted:
+                behavior = dialog.get_behavior()
+                if isinstance(self.channel, Analog_Channel):
+                    if behavior['behavior_type'] == 'Ramp':
+                        end_time_instance_name = behavior['end_time_instance']
+                        end_time_instance = self.parent_widget.sequence.find_TimeInstance_by_name(end_time_instance_name)
+                        ramp_type =RampType(behavior['ramp_type']) 
+                        behavior_instance = Ramp(self.time_instance,end_time_instance, ramp_type, behavior['start_value'], behavior['end_value'], resolution=behavior['resolution'])
+                        self.parent_widget.sequence.add_event(self.channel.name,behavior_instance, self.time_instance, end_time_instance=end_time_instance,comment= behavior['comment'])
+                    elif behavior['behavior_type'] == 'Jump':
+                        behavior_instance = Jump(behavior['jump_target_value'])
+                        self.parent_widget.sequence.add_event(self.channel.name,behavior_instance, self.time_instance,comment= behavior['comment'])
+                else:
+                    behavior_instance = Digital(behavior['state'])
+                    self.parent_widget.sequence.add_event(self.channel.name,behavior_instance, self.time_instance,comment= behavior['comment'])
+                self.refresh_UI()
+            self.refresh_row_after_me()
+        except Exception as e:
+                QMessageBox.critical(self, "Error", f"An error occurred while adding the event: {str(e)}")
+
 
     def delete_event(self):
         # Delete the event from the time instance and channel
@@ -774,6 +811,42 @@ class EventsWidget(QWidget):
             
         return max_row, max_col
     
+    def change_channel_order(self, channel: Channel, current_index: int, new_index: int):
+        n_rows, n_cols = self.get_shape()
+        
+        # Ensure indices are within bounds
+        current_index = max(0, min(current_index, n_rows - 1))
+        new_index = max(0, min(new_index, n_rows - 1))
+        
+        if current_index == new_index:
+            return  # No change needed
+        
+        # Remove widgets from the current row
+        widgets_to_move = []
+        for col in range(n_cols):
+            item = self.inner_layout.itemAtPosition(current_index, col)
+            if item and item.widget():
+                widget = item.widget()
+                self.inner_layout.removeWidget(widget)
+                widgets_to_move.append(widget)
+        
+        # Shift other widgets
+        step = 1 if new_index > current_index else -1
+        for row in range(current_index, new_index, step):
+            for col in range(n_cols):
+                next_row = row + step
+                item = self.inner_layout.itemAtPosition(next_row, col)
+                if item and item.widget():
+                    widget = item.widget()
+                    self.inner_layout.removeWidget(widget)
+                    self.inner_layout.addWidget(widget, row, col)
+        
+        # Place moved widgets in their new position
+        for col, widget in enumerate(widgets_to_move):
+            self.inner_layout.addWidget(widget, new_index, col)
+        
+        # Update any necessary data structures to reflect the new order
+        # (This part depends on how you're storing channel order information)                
     
     def add_channel(self, channel: Channel):
         # check for the index of the channel
