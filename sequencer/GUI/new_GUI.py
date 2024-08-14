@@ -1,7 +1,7 @@
 
 import copy 
 from PyQt5.QtWidgets import (
-   QComboBox, QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
+   QComboBox, QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog,QFrame
 )
 
 from PyQt5.QtCore import Qt, QRect, pyqtSignal,QPoint
@@ -259,6 +259,7 @@ class TimeInstanceLabel(QWidget):
     def change_relative_time(self):
         self.time_instance.edit_relative_time(int(self.relative_time_edit.text()))
         self.parent_widget.refresh_UI()
+        self.parent_widget.parent_widget.event_table.order_UI()
 
     def show_context_menu(self, position):
         context_menu = QMenu(self)
@@ -407,7 +408,6 @@ class ChannelButton(QPushButton):
             self.parent_widget.refresh_UI()
             self.parent_widget.parent_widget.event_table.add_channel(new_channel)
 
-
     def edit_channel(self):
         # open the edit channel dialog
         if isinstance(self.channel, Analog_Channel):
@@ -486,7 +486,7 @@ class ChannelLabelListWidget(QWidget):
         for row, channel in enumerate(self.sequence.channels):
             button = ChannelButton(channel, self)  # Assuming ChannelButton is a QPushButton
             self.buttons.append(button)
-            self.inner_layout.addWidget(button, row, 0)  # Add each button in a new row
+            self.inner_layout.addWidget(button, row, 0,alignment=Qt.AlignBottom)  # Add each button in a new row
             self.inner_layout.setRowMinimumHeight(row,100)
 
         
@@ -632,6 +632,12 @@ class EventButton(QWidget):
             # Connect to delete event when right clicked
             self.setContextMenuPolicy(Qt.CustomContextMenu)
             self.customContextMenuRequested.connect(self.context_menu)
+                # Add a horizontal line at the bottom
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        self.layout_button.addWidget(line)
+
     
     def enterEvent(self,event):
         if not self.no_event:
@@ -773,7 +779,7 @@ class EventsWidget(QWidget):
         for row, channel in enumerate(channels):
             for col, time in enumerate(self.time_instances):
                 button = EventButton(channel, time, self)
-                self.inner_layout.addWidget(button, row , col )
+                self.inner_layout.addWidget(button, row , col,alignment=Qt.AlignBottom )
                 self.inner_layout.setColumnMinimumWidth(col,fixed_width)
                 self.inner_layout.setRowMinimumHeight(row,fixed_height)
 
@@ -839,11 +845,11 @@ class EventsWidget(QWidget):
                 if item and item.widget():
                     widget = item.widget()
                     self.inner_layout.removeWidget(widget)
-                    self.inner_layout.addWidget(widget, row, col)
+                    self.inner_layout.addWidget(widget, row, col,alignment=Qt.AlignBottom)
         
         # Place moved widgets in their new position
         for col, widget in enumerate(widgets_to_move):
-            self.inner_layout.addWidget(widget, new_index, col)
+            self.inner_layout.addWidget(widget, new_index, col,alignment=Qt.AlignBottom)
         
         # Update any necessary data structures to reflect the new order
         # (This part depends on how you're storing channel order information)                
@@ -859,11 +865,11 @@ class EventsWidget(QWidget):
                 if item is not None:
                     widget = item.widget()
                     self.inner_layout.removeWidget(widget)
-                    self.inner_layout.addWidget(widget, i+1, j)
+                    self.inner_layout.addWidget(widget, i+1, j,alignment=Qt.AlignBottom)
         # add the channel to the layout by looping over the time instances
         for i, time_instance in enumerate(self.sequence.root_time_instance.get_all_time_instances()):
             button = EventButton(channel, time_instance, self)
-            self.inner_layout.addWidget(button, index, i)
+            self.inner_layout.addWidget(button, index, i, alignment=Qt.AlignBottom)
 
 
     
@@ -886,7 +892,7 @@ class EventsWidget(QWidget):
                     if item is not None:
                         widget = item.widget()
                         self.inner_layout.removeWidget(widget)
-                        self.inner_layout.addWidget(widget, r - 1, c)
+                        self.inner_layout.addWidget(widget, r - 1, c,alignment=Qt.AlignBottom)
     def delete_time_instance(self, time_instance):
         # get the column of the time instance 
         col = self.get_col(time_instance=time_instance)
@@ -907,7 +913,7 @@ class EventsWidget(QWidget):
                     if item is not None:
                         widget = item.widget()
                         self.inner_layout.removeWidget(widget)
-                        self.inner_layout.addWidget(widget, r, c - 1)
+                        self.inner_layout.addWidget(widget, r, c - 1,alignment=Qt.AlignBottom)
         self.order_UI()
     
     
@@ -930,13 +936,13 @@ class EventsWidget(QWidget):
                     if item is not None:
                         widget = item.widget()
                         self.inner_layout.removeWidget(widget)
-                        self.inner_layout.addWidget(widget, j+1, k + 1)
+                        self.inner_layout.addWidget(widget, j+1, k + 1,alignment=Qt.AlignBottom)
         # add a dummy button for the new time instance
 
         # add the time instance for each channel
         for j, channel in enumerate(self.sequence.channels):
-            button = EventButton(channel, time_instance, self)
-            self.inner_layout.addWidget(button, j+1 , i+1)
+            button = EventButton(channel, time_instance, self, alignment=Qt.AlignBottom)
+            self.inner_layout.addWidget(button, j+1 , i+1,alignment=Qt.AlignBottom)
         
         self.order_UI()
             
@@ -979,11 +985,11 @@ class EventsWidget(QWidget):
                             if widget.no_event:
                                 widget.refresh_UI()
                             self.inner_layout.removeWidget(widget)
-                            self.inner_layout.addWidget(widget, j, k + 1)
+                            self.inner_layout.addWidget(widget, j, k + 1,alignment=Qt.AlignBottom)
                 # reorder the time instance for each channel
                 
                 for j, widget in enumerate(list_of_widgets):
-                    self.inner_layout.addWidget(widget, j, i)
+                    self.inner_layout.addWidget(widget, j, i,alignment=Qt.AlignBottom)
 
 class SequenceViewerWdiget(QWidget):
     def __init__(self, sequence:Sequence, parent_widget=None):
