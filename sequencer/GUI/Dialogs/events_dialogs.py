@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
 from sequencer.time_frame import Event, Channel, TimeInstance
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel
 from PyQt5.QtGui import QPainter, QPolygon, QBrush,QDoubleValidator
-
+from sequencer.time_frame import RampType
 class AnalogEventDialog(QDialog):
     def __init__(self,channal:Channel, time_instance:TimeInstance):
         super().__init__()
@@ -46,12 +46,15 @@ class AnalogEventDialog(QDialog):
         self.layout.addWidget(self.target_value_label)
         self.layout.addWidget(self.target_value_input)
 
-        # Ramp parameters
-        self.ramp_duration_label = QLabel("Ramp Duration (for Ramp):")
-        self.ramp_duration_input = QLineEdit()
-        self.ramp_duration_input.setValidator(QDoubleValidator())
-        self.layout.addWidget(self.ramp_duration_label)
-        self.layout.addWidget(self.ramp_duration_input)
+        # Ramp duration for Ramp
+        # combo box for time instances after me
+        time_instances_after_me = time_instance.get_all_time_instances_after_me()
+        self.time_instance_after_me_label = QLabel("End Time Instance")
+        self.time_instance_after_me_combo = QComboBox()
+        self.time_instance_after_me_combo.addItems([time_instance.name for time_instance in time_instances_after_me])
+        self.layout.addWidget(self.time_instance_after_me_label)
+        self.layout.addWidget(self.time_instance_after_me_combo)
+
 
         self.start_value_label = QLabel("Start Value (for Ramp):")
         self.start_value_input = QLineEdit()
@@ -73,7 +76,7 @@ class AnalogEventDialog(QDialog):
 
         self.ramp_type_label = QLabel("Ramp Type (for Ramp):")
         self.ramp_type_combo = QComboBox()
-        self.ramp_type_combo.addItems(["linear","quadratic","exponential","logarithmic","generic","minimum jerk"])
+        self.ramp_type_combo.addItems([e.value for e in RampType])
         self.layout.addWidget(self.ramp_type_label)
         self.layout.addWidget(self.ramp_type_combo)
 
@@ -98,8 +101,6 @@ class AnalogEventDialog(QDialog):
         is_jump = self.behavior_combo.currentText() == "Jump"
         self.target_value_label.setVisible(is_jump)
         self.target_value_input.setVisible(is_jump)
-        self.ramp_duration_label.setVisible(not is_jump)
-        self.ramp_duration_input.setVisible(not is_jump)
         self.start_value_label.setVisible(not is_jump)
         self.start_value_input.setVisible(not is_jump)
         self.end_value_label.setVisible(not is_jump)
@@ -108,6 +109,8 @@ class AnalogEventDialog(QDialog):
         self.ramp_type_combo.setVisible(not is_jump)
         self.resoltion_label.setVisible(not is_jump)
         self.resoltion_input.setVisible(not is_jump)
+        self.time_instance_after_me_label.setVisible(not is_jump)
+        self.time_instance_after_me_combo.setVisible(not is_jump)
         self.adjustSize()
 
     def get_behavior(self):
@@ -125,15 +128,15 @@ class AnalogEventDialog(QDialog):
                 'comment': self.comment_text.text()
             }
         else:
-            ramp_duration = self.ramp_duration_input.text()
-            ramp_type = self.ramp_type_combo.currentText().lower()
+            end_time_instance = self.time_instance_after_me_combo.currentText()
+            ramp_type = self.ramp_type_combo.currentText()
             start_value = self.start_value_input.text()
             end_value = self.end_value_input.text()
             resolution = self.resoltion_input.text()
             behavior_params = {
                 'behavior_type': behavior_type,
                 'jump_target_value': None,
-                'ramp_duration': float(ramp_duration),
+                'end_time_instance': end_time_instance,
                 'ramp_type': ramp_type,
                 'start_value': float (start_value),
                 'end_value': float (end_value),

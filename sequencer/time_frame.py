@@ -567,6 +567,16 @@ class TimeInstance:
         time_instances += self.get_all_children()
         return time_instances
     
+    def get_all_time_instances_after_me(self) -> List['TimeInstance']:
+        # get root time instance
+        root = self.get_root()
+        # get all time instances in the sequence
+        all_time_instances = root.get_all_time_instances()
+        sort_time_instances = sorted(all_time_instances, key=lambda x: x.get_absolute_time())
+        index = sort_time_instances.index(self)
+        return sort_time_instances[index + 1:]
+    
+
     
     def get_time_instance_by_name(self, name: str) -> Optional['TimeInstance']:
         if self.name == name:
@@ -621,7 +631,11 @@ class Sequence:
     def get_all_time_instances(self) -> List[TimeInstance]:
         return self.root_time_instance.get_all_time_instances()
     
-
+    def change_channel_order(self, channel, new_index):
+        index = self.channels.index(channel)
+        self.channels.pop(index)
+        self.channels.insert(new_index, channel)
+            
     # adding an event to the sequence by providing the channel, behavior, start_time_instance and end_time_instance (in case of ramp)
     def add_event(self, channel_name: str, behavior: EventBehavior,start_time_instance: TimeInstance, end_time_instance: Optional[TimeInstance] = None,comment:str="",) -> Event:
         # check if the channel is already in the sequence
@@ -1183,7 +1197,7 @@ class Sequence:
 
 
 from collections import OrderedDict
-from typing import Dict, Sequence, Any
+from typing import Dict, Any
 
 
 class SequenceManager:
