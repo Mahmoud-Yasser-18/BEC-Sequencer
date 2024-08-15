@@ -12,6 +12,42 @@ import copy
 import matplotlib.pyplot as plt
 import itertools
 
+
+
+from sympy import symbols
+from sympy.parsing.sympy_parser import parse_expr
+from sympy.utilities.lambdify import lambdify
+
+
+def exp_to_func(exp_str):
+    x = symbols('t')
+    expr = parse_expr(exp_str)
+    return lambdify(x, expr)
+def find_min_max(func, start, end, step=1):
+    """
+    Find the minimum and maximum values of a function within a given range using NumPy.
+    
+    Args:
+    func (callable): The function to evaluate
+    start (float): The start of the range
+    end (float): The end of the range
+    step (float): The step size for the range (default is 1)
+    
+    Returns:
+    tuple: (min_value, max_value, t_min, t_max)
+    """
+    t_range = np.arange(start, end + step, step)
+    values = func(t_range)
+    
+    max_value = np.max(values)
+    min_value = np.min(values)
+    
+    t_max = t_range[np.argmax(values)]
+    t_min = t_range[np.argmin(values)]
+    
+    return min_value, max_value, t_min, t_max
+
+
 class Parameter:
     def __init__(self, name: str,event: 'Event',parameter_origin):
         self.name = name
@@ -59,7 +95,7 @@ class Jump(EventBehavior):
 
 
 class Ramp(EventBehavior):
-    def __init__(self, start_time_instance:'TimeInstance',end_time_instance:'TimeInstance', ramp_type: RampType = RampType.LINEAR, start_value: float = 0, end_value: float = 1, func: Optional[Callable[[float], float]] = None, resolution=0.001):
+    def __init__(self, start_time_instance:'TimeInstance',end_time_instance:'TimeInstance', ramp_type: RampType = RampType.LINEAR, start_value: float = 0, end_value: float = 1, func_text: str = None, resolution=0.001):
         # if start_value == end_value:
         #     raise ValueError("start_value and end_value must be different")
         
@@ -83,9 +119,12 @@ class Ramp(EventBehavior):
         self.start_value = start_value
         self.end_value = end_value
         self.resolution = resolution
-        
-        if func:
-            self.func = func
+        self.func_text = func_text
+        if func_text:
+            if self.ramp_type == RampType.GENERIC:
+                self.func = exp_to_func(func_text)
+            else:
+                raise ValueError("func can only be provided for generic ramp type, not for other ramp types")
         else:
             self._set_func()
     
@@ -104,16 +143,20 @@ class Ramp(EventBehavior):
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (np.log10(t + 1) / np.log10(duration + 1))
         elif self.ramp_type == RampType.MINIMUM_JERK:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (10 * (t/duration)**3 - 15 * (t/duration)**4 + 6 * (t/duration)**5)
-        else : 
+        else:
             raise ValueError("Invalid ramp type")
-        
+    def get_start_value(self):
+        return self.func(0)
+
+    def get_end_value(self):
+        return self.func(self.get_duration())
     def edit_ramp(self, 
                         start_time_instance: Optional['TimeInstance'] = None,
                         end_time_instance: Optional['TimeInstance'] = None, 
                         ramp_type: Optional[RampType] = None,
                         start_value: Optional[float] = None,
                         end_value: Optional[float] = None,
-                        func: Optional[Callable[[float], float]] = None,
+                        func_text: str = None,
                         resolution: Optional[float] = None):
         
         new_start_time_instance = start_time_instance if start_time_instance is not None else self.start_time_instance
@@ -152,8 +195,9 @@ class Ramp(EventBehavior):
         self.end_value = new_end_value
         self.resolution = new_resolution
 
-        if func:
-            self.func = func
+        if func_text:
+            self.func_text = func_text
+            self.func = exp_to_func(func_text)
         else:
             self._set_func()
 
@@ -162,10 +206,10 @@ class Ramp(EventBehavior):
         if 0 <= t <= self.get_duration():
             return self.func(t)
         else:
-            return self.end_value
+            return self.func(self.get_duration())
     
     def __repr__(self) -> str:
-        return f"Ramp({self.get_duration()}, {self.ramp_type.value}, {self.start_value}, {self.end_value})"
+        return f"Ramp({self.get_duration()}, {self.ramp_type.value}, {self.get_start_value()}, {self.get_end_value()})"
 class Digital(EventBehavior):
     def __init__(self, target_value: float):
         if target_value not in [0, 1]:
@@ -383,6 +427,7 @@ class Event:
             self.end_time_instance = self.start_time_instance
 
         self.check_for_overlap(channel, behavior, self.get_start_time(), self.get_end_time())
+        self.check_if_generic_ramp_is_valid()
         
 
 
@@ -392,7 +437,16 @@ class Event:
         self.start_time_instance.add_event(self)
         if isinstance(behavior, Ramp) and not isinstance(behavior, Jump) and self.end_time_instance != self.start_time_instance:
             self.end_time_instance.add_ending_ramp(self)
-        
+    
+    def check_if_generic_ramp_is_valid(self):
+        if isinstance(self.behavior, Ramp) and self.behavior.ramp_type == RampType.GENERIC:
+            # get the min and max values of the function
+            min_value, max_value, _, _ = find_min_max(self.behavior.func, 0, self.behavior.get_duration())
+            if min_value < self.channel.min_voltage or max_value > self.channel.max_voltage:
+                raise ValueError(f"Generic ramp values are out of range for channel {self.channel.name} with min voltage {self.channel.min_voltage} and max voltage {self.channel.max_voltage}")
+        else:
+            return
+            
     def get_start_time(self):
         return self.start_time_instance.get_absolute_time()
 
@@ -420,7 +474,7 @@ class Event:
                 "ramp_type": self.behavior.ramp_type,
                 "start_value": self.behavior.start_value,
                 "end_value": self.behavior.end_value,
-                "func": self.behavior.func,
+                "func": self.behavior.func_text,
                 "resolution": self.behavior.resolution,
                 "channel_name": self.channel.name,
                 "comment":self.comment,
@@ -704,7 +758,7 @@ class Sequence:
         self.copy_original_events_to_new_sequence(self, temp_sequence)
         return temp_sequence
     
-    def edit_event_behavior(self, edited_event: Event, start_value: Optional[float] = None, end_value: Optional[float] = None, target_value: Optional[float] = None, ramp_type: Optional[RampType] = None, comment: Optional[str] = None) -> Event:
+    def edit_event_behavior(self, edited_event: Event, start_value: Optional[float] = None, end_value: Optional[float] = None, target_value: Optional[float] = None, ramp_type: Optional[RampType] = None, func_text: str = None, comment: Optional[str] = None) -> Event:
         if isinstance(edited_event.behavior, Jump):
             if target_value > edited_event.channel.max_voltage or target_value < edited_event.channel.min_voltage:
                 raise ValueError(f"Jump value {target_value} is out of range for channel {edited_event.channel.name} with min voltage {edited_event.channel.min_voltage} and max voltage {edited_event.channel.max_voltage}")
@@ -717,10 +771,23 @@ class Sequence:
             if target_value not in [0, 1]:
                 raise ValueError("target_value must be 0 or 1")
             edited_event.behavior.edit_digital(target_value)
+
+
         if isinstance(edited_event.behavior, Jump):
             edited_event.behavior.edit_jump(target_value)
         elif isinstance(edited_event.behavior, Ramp):
-            edited_event.behavior.edit_ramp(start_value=start_value, end_value=end_value, ramp_type=ramp_type)
+            if func_text:
+                # make a deep copy of the event
+                copy_event = copy.deepcopy(edited_event)
+                # edit the ramp
+                copy_event.behavior.edit_ramp(ramp_type=ramp_type, func_text=func_text)
+                print(copy_event.behavior.func_text)
+                copy_event.check_if_generic_ramp_is_valid()
+                # check if the new ramp is valid
+                edited_event.behavior.edit_ramp(ramp_type=ramp_type, func_text=func_text)
+            else:
+                edited_event.behavior.edit_ramp(start_value=start_value, end_value=end_value, ramp_type=ramp_type)
+
         edited_event.comment = comment
         return edited_event
     
@@ -1810,7 +1877,9 @@ def creat_test():
     DFM_Time = 20
     Initiate_ToF =DFM_ToF.add_time_instance(f"Initiate_ToF", Initiate_MOT, DFM_Time)
     
-    DFM_ToF.add_event("MOT Coils", Ramp(Initiate_MOT,Initiate_ToF,RampType.LINEAR,start_value=3.3,end_value=0), Initiate_MOT,Initiate_ToF, comment = 'Initiate MOT, Coils On') # Coils On
+    
+    # DFM_ToF.add_event("MOT Coils", Ramp(Initiate_MOT,Initiate_ToF,RampType.LINEAR,start_value=3.3,end_value=0), Initiate_MOT,Initiate_ToF, comment = 'Initiate MOT, Coils On') # Coils On
+    DFM_ToF.add_event("MOT Coils", Ramp(Initiate_MOT,Initiate_ToF,RampType.GENERIC,func_text="2*cos(2*pi*t)"), Initiate_MOT,Initiate_ToF, comment = 'Initiate MOT, Coils On') # Coils On
 
 ### Image the MOT after the CMOT Stage
 
@@ -1851,4 +1920,5 @@ def create_test_time_instance():
     return root
 
 if __name__ == '__main__':
-    root = create_test_time_instance()
+    test = creat_test()
+    test.plot()

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 
 from PyQt5.QtCore import Qt, QRect, pyqtSignal,QPoint
 from sequencer.ADwin_Modules2 import calculate_time_ranges
-from sequencer.time_frame import TimeInstance,Sequence,Event , Analog_Channel, Digital_Channel, Channel, RampType,creat_test ,Jump,Ramp,Digital
+from sequencer.time_frame import TimeInstance,Sequence,Event , Analog_Channel, Digital_Channel, Channel, RampType,creat_test ,Jump,Ramp,Digital,exp_to_func
 import sys
 from typing import List, Optional
 from PyQt5.QtWidgets import (
@@ -96,17 +96,6 @@ class QArrowWidget(QLabel):
 
         qp = QPainter()
         qp.begin(self)
-        # get self size 
-        # get the width of the cell by the parent widget
-        size_width = self.grid.geometry().width()
-        print(f"size_width: {size_width}")
-        size_width=0
-
-
-        
-        
-        
-
         for arrow, height in zip(self.arrow_list, self.height_list):
             center_left = centers[arrow[0]]
             center_right = centers[arrow[1]]
@@ -127,7 +116,7 @@ class QArrowWidget(QLabel):
                 arrowHead = QPolygon(points)
                 qp.drawPolygon(arrowHead)
             
-            drawArrow(qp, center_left.x()-size_width, center_right.x()-size_width, hp)
+            drawArrow(qp, center_left.x(), center_right.x(), hp)
         qp.end()
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel
 from PyQt5.QtGui import QIntValidator
@@ -496,8 +485,17 @@ class ChannelLabelListWidget(QWidget):
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QDoubleSpinBox, QDialog
 
 class QDouble_NO_mouse_SpinBox(QDoubleSpinBox):
+    def __init__(self, text_view="") -> None:
+        super().__init__()
+        self.text_view = text_view
+
+
     def wheelEvent(self, event):
         event.ignore()
+
+    def enterEvent(self,event):
+        QToolTip.showText(event.globalPos(),self.text_view , self)
+        super().enterEvent(event)
 
 class EventButton(QWidget):
     def __init__(self, channel: Channel, time_instance: TimeInstance, parent_widget: 'EventsWidget'):
@@ -578,7 +576,7 @@ class EventButton(QWidget):
             time_ref = event_time[1]
             if isinstance(event.behavior, Ramp):
                 if time_ref == 'start':
-                    value = event.behavior.start_value
+                    value = event.behavior.get_start_value()
                     # Create a vertical layout with a label and numeric value spin box
                     
                     # add a combobox to select the ramp type
@@ -588,32 +586,49 @@ class EventButton(QWidget):
                     ramp_combo.setCurrentText(preselected_ramp_type)
                     ramp_combo.currentIndexChanged.connect(lambda index: self.edit_ramp_type(event))
                     self.layout_button.addWidget(ramp_combo)
+                    if event.behavior.ramp_type == RampType.GENERIC:
+                        func = event.behavior.func_text
+                        func_label = QLabel(f"Function: {func}")
+                        self.layout_button.addWidget(func_label)
                     value_label = QLabel('Start Value:')
-                    value_spinbox = QDouble_NO_mouse_SpinBox()
+                    value_spinbox = QDouble_NO_mouse_SpinBox(text_view=self.event_instance.comment)
                     # make the range of the spin box between the min and max voltage of the channel
                     value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
                     value_spinbox.setValue(value)
+
                     value_spinbox.valueChanged.connect(lambda val: self.edit_start_value(event, val))
+                    if event.behavior.ramp_type == RampType.GENERIC:
+                        value_spinbox.setEnabled(False)
                     self.layout_button.addWidget(value_label)
                     self.layout_button.addWidget(value_spinbox)
+                    # if value > event.channel.max_voltage or value < event.channel.min_voltage:
+                    #     QMessageBox.warning(self, "Warning", f"Generic Ramp will result in a value outside the channel range, please fix the ramp, the value will be set to the edge of the voltage range {value_spinbox.text()}")
+
                 else:
-                    value = event.behavior.end_value
+                    value = event.behavior.get_end_value()
+
+
                     # Create a vertical layout with a label and numeric value spin box
                     
                     value_label = QLabel('End Value:')
-                    value_spinbox = QDouble_NO_mouse_SpinBox()
+                    value_spinbox = QDouble_NO_mouse_SpinBox(text_view=self.event_instance.comment)
                     # make the range of the spin box between the min and max voltage of the channel
-                    value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
+                    value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)    
                     value_spinbox.setValue(value)
                     value_spinbox.valueChanged.connect(lambda val: self.edit_end_value(event, val))
+                    if event.behavior.ramp_type == RampType.GENERIC:
+                        value_spinbox.setEnabled(False)
                     self.layout_button.addWidget(value_label)
                     self.layout_button.addWidget(value_spinbox)
+                    # if value > event.channel.max_voltage or value < event.channel.min_voltage:
+                    #     QMessageBox.warning(self, "Warning", f"Generic Ramp will result in a value outside the channel range, please fix the ramp, the value will be set to the edge of the voltage range {value_spinbox.text()}")
+
             elif isinstance(event.behavior, Jump):
                 value = event.behavior.target_value
                 # Create a vertical layout with a label and numeric value spin box
                 
                 value_label = QLabel('Target Value:')
-                value_spinbox = QDouble_NO_mouse_SpinBox()
+                value_spinbox = QDouble_NO_mouse_SpinBox(self.event_instance.comment)
                 value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
                 value_spinbox.setValue(value)
                 value_spinbox.valueChanged.connect(lambda val: self.edit_target_value(event, val))
@@ -681,9 +696,24 @@ class EventButton(QWidget):
         self.refresh_row_after_me()
         # Make a deep copy of the event behavior
     def edit_ramp_type(self,event):
-        value = RampType(self.sender().currentText())
-        self.parent_widget.sequence.edit_event_behavior(edited_event=event, ramp_type=value)
-        self.refresh_row_after_me()
+        try:
+            value = RampType(self.sender().currentText())
+            if value == RampType.GENERIC:
+                # open a dialog to get the function
+                func_text, ok = QInputDialog.getText(self, "Generic Function", "Enter the generic function")
+                if ok:
+                    
+                    self.parent_widget.sequence.edit_event_behavior(edited_event=event, ramp_type=value, func_text=func_text)
+                    self.refresh_UI()
+            else:
+                self.parent_widget.sequence.edit_event_behavior(edited_event=event, ramp_type=value)
+            
+            self.refresh_row_after_me()
+        except Exception as e:
+            self.sender().setCurrentText(event.behavior.ramp_type.value)
+            QMessageBox.critical(self, "Error", f"An error occurred while editing the ramp type: {str(e)}")
+            
+
         # Make a deep copy of the event behavior
 
     def add_event(self):
@@ -701,7 +731,10 @@ class EventButton(QWidget):
                         end_time_instance_name = behavior['end_time_instance']
                         end_time_instance = self.parent_widget.sequence.find_TimeInstance_by_name(end_time_instance_name)
                         ramp_type =RampType(behavior['ramp_type']) 
-                        behavior_instance = Ramp(self.time_instance,end_time_instance, ramp_type, behavior['start_value'], behavior['end_value'], resolution=behavior['resolution'])
+                        if ramp_type == RampType. GENERIC:
+                            behavior_instance = Ramp(self.time_instance,end_time_instance, ramp_type,func= exp_to_func( behavior['generic_function']),resolution=behavior['resolution'])
+                        else: 
+                            behavior_instance = Ramp(self.time_instance,end_time_instance, ramp_type, behavior['start_value'], behavior['end_value'], resolution=behavior['resolution'])
                         self.parent_widget.sequence.add_event(self.channel.name,behavior_instance, self.time_instance, end_time_instance=end_time_instance,comment= behavior['comment'])
                     elif behavior['behavior_type'] == 'Jump':
                         behavior_instance = Jump(behavior['jump_target_value'])

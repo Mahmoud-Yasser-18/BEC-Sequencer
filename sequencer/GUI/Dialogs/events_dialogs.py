@@ -2,12 +2,15 @@
 from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QVBoxLayout, QApplication, QScrollArea
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
-   QComboBox, QApplication, QHBoxLayout,QToolTip,QDialogButtonBox,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
+   QComboBox, QApplication, QTextEdit,QHBoxLayout,QToolTip,QDialogButtonBox,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
 )
-from sequencer.time_frame import Event, Channel, TimeInstance
+from sequencer.time_frame import Event, Channel, TimeInstance,exp_to_func
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel
 from PyQt5.QtGui import QPainter, QPolygon, QBrush,QDoubleValidator
 from sequencer.time_frame import RampType
+
+
+
 class AnalogEventDialog(QDialog):
     def __init__(self,channal:Channel, time_instance:TimeInstance):
         super().__init__()
@@ -55,6 +58,11 @@ class AnalogEventDialog(QDialog):
         self.layout.addWidget(self.time_instance_after_me_label)
         self.layout.addWidget(self.time_instance_after_me_combo)
 
+        self.ramp_type_label = QLabel("Ramp Type (for Ramp):")
+        self.ramp_type_combo = QComboBox()
+        self.ramp_type_combo.addItems([e.value for e in RampType])
+        self.layout.addWidget(self.ramp_type_label)
+        self.layout.addWidget(self.ramp_type_combo)
 
         self.start_value_label = QLabel("Start Value (for Ramp):")
         self.start_value_input = QLineEdit()
@@ -68,27 +76,26 @@ class AnalogEventDialog(QDialog):
         self.layout.addWidget(self.end_value_label)
         self.layout.addWidget(self.end_value_input)
 
+        # New: Generic function text editor
+        self.generic_function_label = QLabel("Generic Function:")
+        self.generic_function_input = QTextEdit()
+        self.generic_function_input.setPlaceholderText("Enter your custom function here (e.g., 3*x*cos(x))")
+        self.layout.addWidget(self.generic_function_label)
+        self.layout.addWidget(self.generic_function_input)
+
         self.resoltion_label = QLabel("Resolution (for Ramp):")
         self.resoltion_input = QLineEdit()
         self.resoltion_input.setValidator(QDoubleValidator())
         self.layout.addWidget(self.resoltion_label)
         self.layout.addWidget(self.resoltion_input)
 
-        self.ramp_type_label = QLabel("Ramp Type (for Ramp):")
-        self.ramp_type_combo = QComboBox()
-        self.ramp_type_combo.addItems([e.value for e in RampType])
-        self.layout.addWidget(self.ramp_type_label)
-        self.layout.addWidget(self.ramp_type_combo)
-
-
 
         self.behavior_combo.currentIndexChanged.connect(self.update_behavior_fields)
-
-
-
+        self.ramp_type_combo.currentIndexChanged.connect(self.update_ramp_fields)
 
         self.setLayout(self.layout)
         self.update_behavior_fields()
+        self.update_ramp_fields()
 
 
     def add_ok_cancel_buttons(self):
@@ -96,6 +103,7 @@ class AnalogEventDialog(QDialog):
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         self.layout.addWidget(self.buttons)
+
 
     def update_behavior_fields(self):
         is_jump = self.behavior_combo.currentText() == "Jump"
@@ -111,6 +119,18 @@ class AnalogEventDialog(QDialog):
         self.resoltion_input.setVisible(not is_jump)
         self.time_instance_after_me_label.setVisible(not is_jump)
         self.time_instance_after_me_combo.setVisible(not is_jump)
+        self.generic_function_label.setVisible(not is_jump and self.ramp_type_combo.currentText() == "Generic")
+        self.generic_function_input.setVisible(not is_jump and self.ramp_type_combo.currentText() == "Generic")
+        self.adjustSize()
+
+    def update_ramp_fields(self):
+        is_generic = self.ramp_type_combo.currentText() == "Generic"
+        self.start_value_label.setVisible(not is_generic)
+        self.start_value_input.setVisible(not is_generic)
+        self.end_value_label.setVisible(not is_generic)
+        self.end_value_input.setVisible(not is_generic)
+        self.generic_function_label.setVisible(is_generic)
+        self.generic_function_input.setVisible(is_generic)
         self.adjustSize()
 
     def get_behavior(self):
@@ -130,22 +150,35 @@ class AnalogEventDialog(QDialog):
         else:
             end_time_instance = self.time_instance_after_me_combo.currentText()
             ramp_type = self.ramp_type_combo.currentText()
-            start_value = self.start_value_input.text()
-            end_value = self.end_value_input.text()
             resolution = self.resoltion_input.text()
-            behavior_params = {
-                'behavior_type': behavior_type,
-                'jump_target_value': None,
-                'end_time_instance': end_time_instance,
-                'ramp_type': ramp_type,
-                'start_value': float (start_value),
-                'end_value': float (end_value),
-                'resolution': float(resolution),
-                'comment': self.comment_text.text()
-
-            }
+            
+            if ramp_type == "Generic":
+                behavior_params = {
+                    'behavior_type': behavior_type,
+                    'jump_target_value': None,
+                    'end_time_instance': end_time_instance,
+                    'ramp_type': ramp_type,
+                    'generic_function': self.generic_function_input.toPlainText(),
+                    'resolution': float(resolution),
+                    'comment': self.comment_text.text()
+                }
+            else:
+                start_value = self.start_value_input.text()
+                end_value = self.end_value_input.text()
+                behavior_params = {
+                    'behavior_type': behavior_type,
+                    'jump_target_value': None,
+                    'end_time_instance': end_time_instance,
+                    'ramp_type': ramp_type,
+                    'start_value': float(start_value),
+                    'end_value': float(end_value),
+                    'resolution': float(resolution),
+                    'comment': self.comment_text.text()
+                }
         
         return behavior_params
+
+
 
 class DigitalEventDialog(QDialog):
     def __init__(self,channal:Channel, time_instance:TimeInstance):
