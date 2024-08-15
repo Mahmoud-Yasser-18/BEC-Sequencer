@@ -23,7 +23,7 @@ def exp_to_func(exp_str):
     x = symbols('t')
     expr = parse_expr(exp_str)
     return lambdify(x, expr)
-def find_min_max(func, start, end, step=1):
+def find_min_max(func, start, end, step=0.000001):
     """
     Find the minimum and maximum values of a function within a given range using NumPy.
     
