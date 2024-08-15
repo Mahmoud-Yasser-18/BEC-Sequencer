@@ -79,7 +79,7 @@ class AnalogEventDialog(QDialog):
         # New: Generic function text editor
         self.generic_function_label = QLabel("Generic Function:")
         self.generic_function_input = QTextEdit()
-        self.generic_function_input.setPlaceholderText("Enter your custom function here (e.g., 3*x*cos(x))")
+        self.generic_function_input.setPlaceholderText("Enter your custom function here (e.g., 3*x*cos(t))")
         self.layout.addWidget(self.generic_function_label)
         self.layout.addWidget(self.generic_function_input)
 

@@ -9,6 +9,7 @@ fonttools=4.53.1=pypi_0
 importlib-resources=6.4.0=pypi_0
 kiwisolver=1.4.5=pypi_0
 matplotlib=3.9.1=pypi_0
+mpmath=1.3.0=pypi_0
 numexpr=2.10.1=pypi_0
 numpy=2.0.0=pypi_0
 openssl=3.0.14=h827c3e9_0
@@ -29,6 +30,7 @@ sequencer=0.1.0=dev_0
 setuptools=69.5.1=py39haa95532_0
 six=1.16.0=pypi_0
 sqlite=3.45.3=h2bbff1b_0
+sympy=1.13.2=pypi_0
 thorlabs-tsi-sdk=0.0.8=dev_0
 tzdata=2024a=h04d1e81_0
 vc=14.2=h2eaa2aa_4
