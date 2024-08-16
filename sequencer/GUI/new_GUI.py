@@ -381,7 +381,7 @@ class ChannelButton(QPushButton):
             QPushButton {{
                 background-color: { 'gray'  if isinstance(self.channel, Analog_Channel) else 'black'};
                 font-weight: bold;
-                color:  { 'black'  if isinstance(self.channel, Analog_Channel) else 'white'};
+                color:  { 'white'  if isinstance(self.channel, Analog_Channel) else 'white'};
                 padding: 10px;
                 border-radius: 5px;
             }}
@@ -564,13 +564,13 @@ class EventButton(QWidget):
 
     def get_col(self):
         layout = self.parent_widget.inner_layout
-        try:
-            for col in range(layout.columnCount()):
-                if layout.itemAtPosition(1, col + 1).widget().time_instance.name == self.time_instance.name:
+        for col in range(layout.columnCount()):
+            try:
+                if layout.itemAtPosition(2, col).widget().time_instance.name == self.time_instance.name:
                     return col 
-        except Exception as e:
-            pass
-        return 0
+            except Exception as e:
+                pass
+        return None
 
     def get_row(self):
         layout = self.parent_widget.inner_layout
@@ -580,7 +580,7 @@ class EventButton(QWidget):
                     return row 
             except Exception as e:
                 pass 
-        return 0
+        return None
     def clear_layout(self):
         for i in reversed(range(self.layout_button.count())):
             widget = self.layout_button.itemAt(i).widget()
@@ -775,7 +775,7 @@ class EventButton(QWidget):
             value = RampType(self.sender().currentText())
             if value == RampType.GENERIC:
                 # open a dialog to get the function
-                func_text, ok = QInputDialog.getText(self, "Generic Function", "Enter the generic function")
+                func_text, ok = QInputDialog.getText(self, "Generic Function", "Enter the generic function as a function of time (t):")
                 if ok:
                     
                     self.parent_widget.sequence.edit_event_behavior(edited_event=event, ramp_type=value, func_text=func_text)
@@ -890,16 +890,13 @@ class EventButton(QWidget):
     def refresh_row_after_me(self):
         row = self.get_row()
         col = self.get_col()
-        if col ==0:
-            col = -1
+        print(row,col)
         # loop over the columns and refresh the UI
-        for i in range(col+2, self.parent_widget.inner_layout.columnCount()):
+        for i in range(col+1, self.parent_widget.inner_layout.columnCount()):
             item = self.parent_widget.inner_layout.itemAtPosition(row, i)
             if item is not None:
                 try:
                     widget = item.widget()
-                    if not widget.no_event:
-                        break
                     widget.refresh_UI()
 
                 except Exception as e:
@@ -908,15 +905,12 @@ class EventButton(QWidget):
         row = self.get_row()
         col = self.get_col()
         # loop over the columns and refresh the UI
-        for i in range(col, 0, -1):
+        for i in range(col-1, 0, -1):
             item = self.parent_widget.inner_layout.itemAtPosition(row, i)
             if item is not None:
                 try:
                     widget = item.widget()
-                    if self.channel.detect_a_ramp(widget.time_instance):
-                        widget.refresh_UI()
-                    else:
-                        break
+                    widget.refresh_UI()
                 except Exception as e:
                     pass
 
