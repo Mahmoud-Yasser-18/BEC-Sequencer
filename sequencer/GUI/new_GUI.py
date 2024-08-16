@@ -28,6 +28,20 @@ from PyQt5.QtCore import QPoint, Qt, QSize
 from sequencer.GUI.Dialogs.channel_dialog import ChannelDialog, Edit_Digital_Channel, Edit_Analog_Channel
 from sequencer.GUI.Dialogs.events_dialogs import AnalogEventDialog, DigitalEventDialog
 
+def voltage_to_color(voltage):
+    """
+    Convert a voltage between -10 and 10 to a color.
+    Dark blue represents extreme negative voltage, white is zero, and dark red is extreme positive voltage.
+    """
+    voltage = max(-10.0, min(10.0, float(voltage)))
+    if voltage < 0:
+        # Dark Blue to White
+        intensity = int(255 * ((1 + voltage / 10) ** 0.5))  # Using square root for more contrast
+        return f'#{intensity:02x}{intensity:02x}ff'
+    else:
+        # White to Dark Red
+        intensity = int(255 * ((1 - voltage / 10) ** 0.5))  # Using square root for more contrast
+        return f'#ff{intensity:02x}{intensity:02x}'
 
 class ScrollAreaWithShiftScroll(QScrollArea):
     def __init__(self, parent=None):
@@ -363,6 +377,15 @@ class ChannelButton(QPushButton):
         self.parent_widget = parent_widget
         self.channel = channel
         self.setText(f'{self.channel.name}')
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: { 'gray'  if isinstance(self.channel, Analog_Channel) else 'black'};
+                font-weight: bold;
+                color:  { 'black'  if isinstance(self.channel, Analog_Channel) else 'white'};
+                padding: 10px;
+                border-radius: 5px;
+            }}
+        """)
 
     def get_channel_index(self):
         return self.parent_widget.sequence.channels.index(self.channel)
@@ -383,12 +406,10 @@ class ChannelButton(QPushButton):
         
         # get current index
         index = self.get_channel_index()
-        print(f"index: {index}")
 
         if dialog.exec_() == QDialog.Accepted:
             
             data= dialog.get_data()
-            print(f"data: {data}")
             if data['type'] == 'Analog':
                 self.parent_widget.sequence.add_analog_channel(name=data['name'], card_number=data['card_number'], channel_number=data['channel_number'], reset_value=data['reset_value'], max_voltage=data['max_voltage'], min_voltage=data['min_voltage'],index=index+1)
             else:
@@ -432,6 +453,7 @@ class ChannelButton(QPushButton):
         change_order_action = context_menu.addAction("Change Order")
         change_order_action.triggered.connect(self.change_order)
         context_menu.exec_(event.globalPos())
+
 
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
@@ -488,6 +510,34 @@ class QDouble_NO_mouse_SpinBox(QDoubleSpinBox):
     def __init__(self, text_view="") -> None:
         super().__init__()
         self.text_view = text_view
+        self.setDecimals(4)
+
+    def stepBy(self, steps):
+        cursor_position = self.lineEdit().cursorPosition()
+        # number of characters before the decimal separator including +/- sign
+        n_chars_before_sep = len(str(abs(int(self.value())))) + 1
+        if cursor_position == 0:
+            # set the cursor right of the +/- sign
+            self.lineEdit().setCursorPosition(1)
+            cursor_position = self.lineEdit().cursorPosition()
+        single_step = 10 ** (n_chars_before_sep - cursor_position)
+        # Handle decimal separator. Step should be 0.1 if cursor is at `1.|23` or
+        # `1.2|3`.
+        if cursor_position >= n_chars_before_sep + 2:
+            single_step = 10 * single_step
+        # Change single step and perform the step
+        self.setSingleStep(single_step)
+        super().stepBy(steps)
+        # Undo selection of the whole text.
+        self.lineEdit().deselect()
+        # Handle cases where the number of characters before the decimal separator
+        # changes. Step size should remain the same.
+        new_n_chars_before_sep = len(str(abs(int(self.value())))) + 1
+        if new_n_chars_before_sep < n_chars_before_sep:
+            cursor_position -= 1
+        elif new_n_chars_before_sep > n_chars_before_sep:
+            cursor_position += 1
+        self.lineEdit().setCursorPosition(cursor_position)
 
 
     def wheelEvent(self, event):
@@ -548,6 +598,9 @@ class EventButton(QWidget):
             # Add a label to display the value
             value_label = QLabel(f'Ramp {ramp.behavior.ramp_type}: {value}')
             self.layout_button.addWidget(value_label)
+            self.refresh_color(value,value_label)
+
+
             self.no_event = True
             return
 
@@ -568,6 +621,8 @@ class EventButton(QWidget):
             value_button.clicked.connect(self.add_event)
             # Add a button to display the value and connect to the create event when clicked 
             self.layout_button.addWidget(value_button)
+            self.refresh_color(value,value_button)
+
             self.no_event = True
         else:
             self.no_event = False
@@ -599,10 +654,14 @@ class EventButton(QWidget):
                     value_spinbox.valueChanged.connect(lambda val: self.edit_start_value(event, val))
                     if event.behavior.ramp_type == RampType.GENERIC:
                         value_spinbox.setEnabled(False)
+                    color = voltage_to_color(value)
+                    self.refresh_color(value,value_spinbox)
+
                     self.layout_button.addWidget(value_label)
                     self.layout_button.addWidget(value_spinbox)
-                    # if value > event.channel.max_voltage or value < event.channel.min_voltage:
-                    #     QMessageBox.warning(self, "Warning", f"Generic Ramp will result in a value outside the channel range, please fix the ramp, the value will be set to the edge of the voltage range {value_spinbox.text()}")
+                    value_spinbox.valueChanged.connect(lambda val: self.refresh_color(val,value_spinbox))
+                    self.refresh_color(value,value_spinbox)
+
 
                 else:
                     value = event.behavior.get_end_value()
@@ -620,6 +679,11 @@ class EventButton(QWidget):
                         value_spinbox.setEnabled(False)
                     self.layout_button.addWidget(value_label)
                     self.layout_button.addWidget(value_spinbox)
+                    color = voltage_to_color(value)
+                    value_spinbox.valueChanged.connect(lambda val: self.refresh_color(val,value_spinbox))
+                    self.refresh_color(value,value_spinbox)
+
+
                     # if value > event.channel.max_voltage or value < event.channel.min_voltage:
                     #     QMessageBox.warning(self, "Warning", f"Generic Ramp will result in a value outside the channel range, please fix the ramp, the value will be set to the edge of the voltage range {value_spinbox.text()}")
 
@@ -634,6 +698,11 @@ class EventButton(QWidget):
                 value_spinbox.valueChanged.connect(lambda val: self.edit_target_value(event, val))
                 self.layout_button.addWidget(value_label)
                 self.layout_button.addWidget(value_spinbox)
+                color = voltage_to_color(value)
+                text_color = 'black' if abs(value) < 7 else 'white'
+                self.refresh_color(value,value_spinbox)
+                value_spinbox.valueChanged.connect(lambda val: self.refresh_color(val,value_spinbox))
+
             elif isinstance(event.behavior, Digital):
                 
                 value = event.behavior.target_value
@@ -644,6 +713,9 @@ class EventButton(QWidget):
                 # Create a combo box to display the value and connect to the target value (On =1 , Off = 0)
                 # Connect it to edit target value
                 combo_box.currentIndexChanged.connect(lambda index: self.edit_digtial_state(event))
+                self.refresh_color(value,combo_box)
+                combo_box.currentIndexChanged.connect(lambda val: self.refresh_color(val,combo_box))
+
             # Connect to delete event when right clicked
             self.setContextMenuPolicy(Qt.CustomContextMenu)
             self.customContextMenuRequested.connect(self.context_menu)
@@ -670,7 +742,7 @@ class EventButton(QWidget):
         delete_action.triggered.connect(self.delete_event)
         context_menu.exec_(self.mapToGlobal(position))
 
-        
+    
 
     def edit_start_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, start_value=value)
@@ -686,6 +758,8 @@ class EventButton(QWidget):
 
     def edit_target_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, target_value=value)
+        #self.refresh_UI()
+        self.refresh_row_after_me()
         # Make a deep copy of the event behavior
     def edit_digtial_state(self, event):
         if self.sender().currentText() == 'On':
@@ -693,6 +767,7 @@ class EventButton(QWidget):
         else:
             value = 0
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, target_value=value)
+        # self.refresh_UI()
         self.refresh_row_after_me()
         # Make a deep copy of the event behavior
     def edit_ramp_type(self,event):
@@ -704,11 +779,13 @@ class EventButton(QWidget):
                 if ok:
                     
                     self.parent_widget.sequence.edit_event_behavior(edited_event=event, ramp_type=value, func_text=func_text)
+                    self.refresh_row_after_me()
                     self.refresh_UI()
             else:
                 self.parent_widget.sequence.edit_event_behavior(edited_event=event, ramp_type=value)
+                self.refresh_row_after_me()
+                self.refresh_UI()            
             
-            self.refresh_row_after_me()
         except Exception as e:
             self.sender().setCurrentText(event.behavior.ramp_type.value)
             QMessageBox.critical(self, "Error", f"An error occurred while editing the ramp type: {str(e)}")
@@ -753,24 +830,85 @@ class EventButton(QWidget):
         self.parent_widget.sequence.delete_event(self.time_instance.name,self.channel.name)
         self.refresh_UI()
         self.refresh_row_after_me()
-    
+
+    def refresh_color(self, value, widget):
+        try:
+            color = voltage_to_color(value)
+            text_color = 'black' if abs(float(value)) < 7 else 'white'
+            
+            common_style = f"""
+                background-color: {color};
+                font-weight: bold;
+                color: {text_color};
+                padding: 10px;
+                border-radius: 5px;
+            """
+            
+            specific_styles = {
+                "QComboBox": f"""
+                QComboBox {{
+                    border: 1px solid gray;
+                    padding: 1px 18px 1px 3px;
+                    min-width: 6em;
+                }}
+                QComboBox::drop-down {{
+                    subcontrol-origin: padding;
+                    subcontrol-position: top right;
+                    width: 15px;
+                    border-left-width: 1px;
+                    border-left-color: darkgray;
+                    border-left-style: solid;
+                }}
+                QComboBox QAbstractItemView {{
+                    border: 2px solid darkgray;
+                    selection-background-color: {color};
+                    color: {text_color};
+                }}
+                """,
+                "QDoubleSpinBox": """
+                    padding: 5px;
+                    border: 1px solid #555;
+                    border-radius: 3px;
+                """,
+                "QPushButton": """
+                    border: 1px solid gray;
+                """,
+                "QLabel": """
+                    border: 2px solid gray;
+                """
+            }
+            
+            widget_type = widget.__class__.__name__
+            style = common_style + specific_styles.get(widget_type, "")
+            
+            widget.setStyleSheet(style)
+        except ValueError:
+            print(f"Invalid value: {value}")
+        except AttributeError:
+            print(f"Unsupported widget type: {type(widget)}")
+
     def refresh_row_after_me(self):
         row = self.get_row()
         col = self.get_col()
+        if col ==0:
+            col = -1
         # loop over the columns and refresh the UI
-        for i in range(col+1, self.parent_widget.inner_layout.columnCount()):
+        for i in range(col+2, self.parent_widget.inner_layout.columnCount()):
             item = self.parent_widget.inner_layout.itemAtPosition(row, i)
             if item is not None:
                 try:
                     widget = item.widget()
+                    if not widget.no_event:
+                        break
                     widget.refresh_UI()
+
                 except Exception as e:
                     pass
     def refresh_row_before_me(self):
         row = self.get_row()
         col = self.get_col()
         # loop over the columns and refresh the UI
-        for i in range(col-1, 0, -1):
+        for i in range(col, 0, -1):
             item = self.parent_widget.inner_layout.itemAtPosition(row, i)
             if item is not None:
                 try:
@@ -990,11 +1128,9 @@ class EventsWidget(QWidget):
         # iterate over the layout and reorder the time instances
         for i in range(0, n_col):
             current_time_instance = self.inner_layout.itemAtPosition(0, i).widget().time_instance
-            print(f"current time instance: {current_time_instance.name}")
             target_time_instance = target_time_instances[i]
             if current_time_instance != target_time_instance:
                 # get the index of the target time instance
-                print(f"target time instance: {target_time_instance.name}")
                 target_index = current_time_instances.index(target_time_instance)
                 # shift the columns to the right if needed
                 # put the target time instance widget in a list 
@@ -1014,7 +1150,6 @@ class EventsWidget(QWidget):
                         item = self.inner_layout.itemAtPosition(j, k)
                         if item is not None:
                             widget = item.widget()
-                            print(f"widget: {widget.time_instance.name}")
                             if widget.no_event:
                                 widget.refresh_UI()
                             self.inner_layout.removeWidget(widget)
