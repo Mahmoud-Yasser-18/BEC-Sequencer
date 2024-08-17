@@ -798,7 +798,6 @@ class EventButton(QWidget):
 
         else:
             text = "Holding Value: click to add an event"
-        print(text)
         QToolTip.showText(event.globalPos(),text , self)
         super().enterEvent(event)
 

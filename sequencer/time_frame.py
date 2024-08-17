@@ -19,6 +19,40 @@ from sympy.parsing.sympy_parser import parse_expr
 from sympy.utilities.lambdify import lambdify
 
 
+def tuple_to_string(tuple_input):
+    """
+    Convert a tuple of three strings to one string.
+    
+    Args:
+    tuple_input (tuple): A tuple containing three strings.
+    
+    Returns:
+    str: A single string combining the three input strings.
+    """
+    if len(tuple_input) != 3:
+        raise ValueError("Input tuple must contain exactly three strings.")
+    
+    return "|".join(tuple_input)
+
+def string_to_tuple(string_input):
+    """
+    Convert one string to a tuple of three strings.
+    
+    Args:
+    string_input (str): A string containing three parts separated by '|'.
+    
+    Returns:
+    tuple: A tuple containing three strings.
+    """
+    parts = string_input.split("|")
+    
+    if len(parts) != 3:
+        raise ValueError("Input string must contain exactly two '|' separators.")
+    
+    return tuple(parts)
+
+
+
 def exp_to_func(exp_str):
     x = symbols('t')
     expr = parse_expr(exp_str)
@@ -120,8 +154,8 @@ class Ramp(EventBehavior):
         self.end_value = end_value
         self.resolution = resolution
         self.func_text = func_text
-        if func_text:
-            if self.ramp_type == RampType.GENERIC:
+        if self.ramp_type == RampType.GENERIC:
+            if func_text:
                 self.func = exp_to_func(func_text)
             else:
                 raise ValueError("func can only be provided for generic ramp type, not for other ramp types")
@@ -132,6 +166,9 @@ class Ramp(EventBehavior):
         return self.end_time_instance.get_absolute_time() - self.start_time_instance.get_absolute_time()
 
     def _set_func(self):
+        if self.end_time_instance == "temp":
+            return
+        
         duration = self.get_duration()
         if self.ramp_type == RampType.LINEAR:
             self.func = lambda t: self.start_value + (self.end_value - self.start_value) * (t / duration)
@@ -394,7 +431,7 @@ class Event:
         for event in start_time_instance.events:
             if event.channel == channel:
                 raise ValueError(f"Event already exists on channel {channel.name} at time instance {start_time_instance.name}")
-        if end_time_instance:
+        if end_time_instance and end_time_instance != "temp":
             for event in end_time_instance.events:
                 if event.channel == channel:
                     raise ValueError(f"Event already exists on channel {channel.name} at time instance {end_time_instance.name}")
@@ -426,8 +463,9 @@ class Event:
         else:
             self.end_time_instance = self.start_time_instance
 
-        self.check_for_overlap(channel, behavior, self.get_start_time(), self.get_end_time())
-        self.check_if_generic_ramp_is_valid()
+        if end_time_instance != "temp":
+            self.check_for_overlap(channel, behavior, self.get_start_time(), self.get_end_time())
+            self.check_if_generic_ramp_is_valid()
         
 
 
@@ -435,8 +473,9 @@ class Event:
         index = bisect.bisect_left([e.get_start_time() for e in self.channel.events], self.get_start_time())
         self.channel.events.insert(index, self)
         self.start_time_instance.add_event(self)
-        if isinstance(behavior, Ramp) and not isinstance(behavior, Jump) and self.end_time_instance != self.start_time_instance:
-            self.end_time_instance.add_ending_ramp(self)
+        if self.end_time_instance != "temp":
+            if isinstance(behavior, Ramp) and not isinstance(behavior, Jump) and self.end_time_instance != self.start_time_instance:
+                self.end_time_instance.add_ending_ramp(self)
     
     def check_if_generic_ramp_is_valid(self):
         if isinstance(self.behavior, Ramp) and self.behavior.ramp_type == RampType.GENERIC:
@@ -471,7 +510,7 @@ class Event:
         elif isinstance(self.behavior, Ramp):
             return {
                 "type": "ramp",
-                "ramp_type": self.behavior.ramp_type,
+                "ramp_type": self.behavior.ramp_type.value,
                 "start_value": self.behavior.start_value,
                 "end_value": self.behavior.end_value,
                 "func": self.behavior.func_text,
@@ -481,6 +520,15 @@ class Event:
                 "start_time_instance":self.start_time_instance.name,
                 "end_time_instance":self.end_time_instance.name
                 }   
+        elif isinstance(self.behavior, Digital):
+            return {
+                "type": "digital",
+                "target_value": self.behavior.target_value,
+                "start_time": self.get_start_time(),
+                "channel_name": self.channel.name,
+                "comment":self.comment,
+                "start_time_instance":self.start_time_instance.name,
+                }
 
 
 
@@ -504,6 +552,7 @@ class TimeInstance:
         self.children: List['TimeInstance'] = []
         self.events: List[Event] = []
         self.ending_ramps: List[Event] = []
+        self.is_sweept = False
         if parent:
             parent.children.append(self)
         else :
@@ -673,6 +722,9 @@ class Sequence:
         
         self.sequence_name=name
         self.root_time_instance = TimeInstance("root")
+        self.sweep_dict = {}
+        self.sweep_values = []
+
         
         
         # list of all channels in the sequence 
@@ -742,7 +794,9 @@ class Sequence:
         
     def find_event_by_time_and_channel(self, start_time_instance_name: str, channel_name: str) -> Optional[Event]:
         channel = self.find_channel_by_name(channel_name)
+        print(len(channel.events))
         for event in channel.events:
+            print(event.start_time_instance.name)
             if event.start_time_instance.name == start_time_instance_name:
                 return event
         return None
@@ -1027,7 +1081,9 @@ class Sequence:
             
             # Edit the time instance relative time
             temp_sequence.edit_time_instance(copied_sweep_time_instance, new_relative_time=relative_time)
-            
+            temp_sequence.sweep_values.append( {"sweep_type":"time_instance_relative_time",
+                                                "time_instance_name":sweep_time_instance.name,
+                                                "relative_time":relative_time})
             # Append the modified sequence to the list of new sequences
             new_sequences.append(temp_sequence)
 
@@ -1054,11 +1110,17 @@ class Sequence:
                 elif parameter_name == "ramp_type":
                     copied_sweep_event.behavior.edit_ramp(ramp_type=value)
             # Append the modified sequence to the list of new sequences
+            temp_sequence.sweep_values.append( {"sweep_type":"event_behavior",
+                                                "event_time_instance":sweep_event.start_time_instance.name,
+                                                "channel_name":sweep_event.channel.name,
+                                                "parameter_name":parameter_name,
+                                                "value":value})
             new_sequences.append(temp_sequence)
         return new_sequences
     
     def to_json(self,filename: Optional[str] = None) -> str:
         def serialize_TimeInstances(TimeInstance: TimeInstance) -> dict:
+            print(len(TimeInstance.events))
             return {
                 "relative_time": TimeInstance.relative_time,
                 "name": TimeInstance.name,
@@ -1073,10 +1135,22 @@ class Sequence:
         # serialize the channels
 
 
+        # use tuple_to_string to convert the sweep_dict to string
+        new_sweep_dict = {}
+        for key in self.sweep_dict:
+            if isinstance(key,tuple):
+                new_sweep_dict[tuple_to_string(key)] = self.sweep_dict[key]
+            else:
+                new_sweep_dict[key] = self.sweep_dict[key]
+
+
         data = {
             "name": self.sequence_name,
+            "sweep_dict": new_sweep_dict,
+            "sweep_values": self.sweep_values,
             "channels": [channel.get_channel_attributes() for channel in self.channels],
-            "root_time_instance": root_data
+            "root_time_instance": root_data,
+            
         }
         if filename:
             with open(filename, 'w') as file:
@@ -1109,24 +1183,48 @@ class Sequence:
             sequence.channels.append(channel)
 
         def deserialize_TimeInstances(TimeInstance_data: dict, parent: TimeInstance) -> TimeInstance:
+            
             TimeInstance_new = TimeInstance(TimeInstance_data["name"], parent, TimeInstance_data["relative_time"])
-            for child_data in TimeInstance_data["children"]:
-                deserialize_TimeInstances(child_data, TimeInstance_new)
             for event_data in TimeInstance_data["events"]:
                 channel = sequence.find_channel_by_name(event_data["channel_name"])
                 if event_data["type"] == "jump":
                     behavior = Jump(event_data["jump_target_value"])
+                elif event_data["type"] == "ramp":
+                    print(event_data["ramp_type"])
+                    print(type(event_data["func"]))
+                    behavior = Ramp(TimeInstance_new,"temp", RampType(event_data["ramp_type"]), event_data["start_value"], event_data["end_value"],event_data["func"] ,event_data["resolution"])
                 else:
-                    behavior = Ramp(TimeInstance_new,"temp", event_data["ramp_type"], event_data["start_value"], event_data["end_value"], event_data["resolution"])
+                    behavior = Digital(event_data["target_value"])
+                print(channel.name)
                 Event(channel, behavior, event_data["comment"],TimeInstance_new,"temp")
             for event_data in TimeInstance_data["ending_ramps"]:
-                event = sequence.find_event_by_time_and_channel(TimeInstance_data["name"], event_data["channel_name"])
+                event = sequence.find_event_by_time_and_channel(event_data["start_time_instance"], event_data["channel_name"])
                 event.end_time_instance = TimeInstance_new
+                event.behavior.end_time_instance = TimeInstance_new
+                if event.behavior.ramp_type != RampType.GENERIC:
+                    event.behavior._set_func()
+                TimeInstance_new.ending_ramps.append(event)
+            for child_data in TimeInstance_data["children"]:
+                deserialize_TimeInstances(child_data, TimeInstance_new)
+
 
             return TimeInstance_new
         
         root = deserialize_TimeInstances(data["root_time_instance"], None)
         sequence.root_time_instance = root
+
+        sweep_dict_temp = data["sweep_dict"]
+        # loop through the sweep_dict and convert the keys to tuple if they are strings and contain | character
+        sweep_dict = {}
+        for key in sweep_dict_temp:
+            if "|" in key:
+                sweep_dict[string_to_tuple(key)] = sweep_dict_temp[key]
+            else:
+                sweep_dict[key] = sweep_dict_temp[key]
+        sequence.sweep_dict = sweep_dict
+
+        sequence.sweep_values = data["sweep_values"]
+
         return sequence
     def find_sequence_dauation(self):
         all_events = self.get_all_events()
@@ -1259,9 +1357,140 @@ class Sequence:
         temp_original_sequence.root_time_instance.children.append(temp_new_sequence.root_time_instance)
         temp_new_sequence.root_time_instance.parent = temp_original_sequence.root_time_instance
         # add the events of the overlapping channels to the original sequence
+        # adding the sweep values and the sweep dict
+        temp_original_sequence.sweep_values+=temp_new_sequence.sweep_values
+        temp_original_sequence.sweep_dict.update(temp_new_sequence.sweep_dict)
+
 
         return temp_original_sequence
+    
+    def stack_sweep_paramter(self,target, values: List[float], parameter: str):
+        # get event to sweep from start time and channel name
+        if isinstance(target,Event):
+            key = (target.start_time_instance.name, target.channel.name,parameter)
+            if key not in self.sweep_dict:
+                self.sweep_dict[key] = values
+                target.is_sweept = True
+            else:
+                return ValueError(f"Parameter {parameter} already swept on {target.start_time_instance.name} at {target.channel.name}")
+        elif isinstance(target,TimeInstance):
+            key = target.name
+            if key not in self.sweep_dict:
+                self.sweep_dict[key] = values
+                target.is_sweept = True
+            else:
+                return ValueError(f"Parameter relative time already swept on {target.name}")
+    def unstuck_sweep_parameter(self,target,parameter:str):
+        if isinstance(target,Event):
+            key = (target.start_time_instance.name, target.channel.name,parameter)
+            if key in self.sweep_dict:
+                del self.sweep_dict[key]
+                target.is_sweept = False
+            else:
+                return ValueError(f"Parameter {parameter} not found on {target.start_time_instance.name} at {target.channel.name}")
+        elif isinstance(target,TimeInstance):
+            key = target.name
+            if key in self.sweep_dict:
+                del self.sweep_dict[key]
+                target.is_sweept = False
+            else:
+                return ValueError(f"Parameter relative time not found on {target.name}")
+    def unstuck_all_sweep_parameters(self):
+        self.sweep_dict = {}
+        for channel in self.channels:
+            for event in channel.events:
+                event.is_sweept = False
 
+        for time_instance in self.get_all_time_instances():
+            time_instance.is_sweept = False
+
+    def sweep(self) -> List['Sequence']:
+        # check if the sweep dict is empty
+        if not self.sweep_dict:
+            return ValueError("No sweep parameters found")
+        
+        # get all the keys from the sweep dict
+        first_key = list(self.sweep_dict.keys())[0]
+        if isinstance(first_key,tuple):
+            generated_sequences = self.sweep_event_behavior(self.find_event_by_time_and_channel(first_key[0], first_key[1]), self.sweep_dict[first_key],first_key[2])
+        elif isinstance(first_key,str): 
+            generated_sequences = self.sweep_time_instance_relative_time(self.find_TimeInstance_by_name(first_key), self.sweep_dict[first_key])
+        
+        for key in list(self.sweep_dict.keys())[1:]:
+            if isinstance(key,tuple):
+                temp_list = []
+                for s in generated_sequences:
+                    temp_list+=s.sweep_event_behavior(s.find_event_by_time_and_channel(key[0], key[1]), self.sweep_dict[key],key[2])
+                generated_sequences = temp_list
+            elif isinstance(key,str):
+                temp_list = []
+                for s in generated_sequences:
+                    temp_list+=s.sweep_time_instance_relative_time(s.find_TimeInstance_by_name(key), self.sweep_dict[key])
+                generated_sequences = temp_list        
+                    
+        return generated_sequences
+
+if __name__ == "__main__":
+    # test sweep 
+    seq = Sequence("test")
+    seq.add_analog_channel("ch1", 1, 1)
+    seq.add_analog_channel("ch2", 1, 2)
+    seq.add_digital_channel("ch3", 1, 3)
+    seq.add_digital_channel("ch4", 1, 4)
+    
+    root = seq.root_time_instance
+    t1 = TimeInstance("t1", root, 1)
+    t2 = TimeInstance("t2", t1, 2)
+    t3 = TimeInstance("t3", t2, 3)
+    t4 = TimeInstance("t4", t3, 4)
+
+    # add events
+    seq.add_event("ch1", Jump(1),root,comment="jump1")
+    seq.add_event("ch2", Jump(2),root,comment="jump2")
+    seq.add_event("ch3", Digital(1),root,comment="digital1")
+    seq.add_event("ch4", Digital(0),root,comment="digital2")
+
+    seq.add_event("ch1", Jump(3),t1,comment="jump3")
+    Event_ramp = seq.add_event("ch2", Ramp(t2,t4,RampType.LINEAR,1,2,resolution=0.1),t2,t4,comment="ramp1")
+    seq.add_event("ch3", Digital(0),t1,comment="digital3")
+    seq.add_event("ch4", Digital(1),t1,comment="digital4")
+
+
+    Event_Jump = seq.add_event("ch1", Jump(5),t2,comment="jump5")
+    seq.add_event("ch3", Digital(1),t2,comment="digital5")
+    seq.add_event("ch4", Digital(0),t2,comment="digital6")
+
+
+    seq.add_event("ch1", Jump(7),t3,comment="jump7")
+    seq.add_event("ch3", Digital(0),t3,comment="digital7")
+    seq.add_event("ch4", Digital(1),t3,comment="digital8")
+
+
+    seq.add_event("ch1", Jump(9),t4,comment="jump9")
+    seq.add_event("ch3", Digital(1),t4,comment="digital9")
+    seq.add_event("ch4", Digital(0),t4,comment="digital10")
+
+    seq.plot()
+    # test sweep sweeping t2 and Event_ramp start value and Event_Jump target value
+    seq.stack_sweep_paramter(t2, [2,3,4],"relative_time")
+    seq.stack_sweep_paramter(Event_ramp, [1,2,3],"start_value")
+    seq.stack_sweep_paramter(Event_Jump, [5,6,7],"target_value")
+    seq.to_json("test_sweep.json")
+
+    seq2 = Sequence.from_json("test_sweep.json")
+    seq2.to_json("test_sweep2.json")
+
+    generated_sequences = seq.sweep()
+    for x,s in enumerate(generated_sequences):
+        print(s.to_json(f"test_sweep_generated_{x}.json"))
+        
+
+
+
+
+    
+
+    exit() 
 
 from collections import OrderedDict
 from typing import Dict, Any
@@ -1269,8 +1498,9 @@ from typing import Dict, Any
 
 class SequenceManager:
     def __init__(self) -> None:
-        self.main_sequences:OrderedDict[str, OrderedDict[str,Union[Sequence,int,str]]]  = OrderedDict() 
+        self.main_sequences = OrderedDict()
         self.custom_sequence= None
+        self.view_type = "Event"
         self.to_be_swept = []
         
         
@@ -1307,6 +1537,8 @@ class SequenceManager:
                 channel_number=target_channel.channel_number,
                 reset=target_channel.reset,
                 reset_value=target_channel.reset_value,
+                card_id=target_channel.card_id,
+                bitpos=target_channel.bitpos
             )
         return new_channel
     def add_existing_channel_to_sequence(self, sequence_name, channel_name): 
@@ -1749,52 +1981,8 @@ class SequenceManager:
             
 
         return seq_manager 
+            
 
-class SequenceManager:
-    def __init__(self, sequence: Sequence):
-        self.sequence = sequence
-        self.sweep_dict = {}
-
-
-    def stack_sweep_paramter(self,target,parameter: str, values: List[float]):
-        # get event to sweep from start time and channel name
-        if isinstance(target,Event):
-            key = (target.start_time_instance.name, target.channel.name,parameter)
-            if key not in self.sweep_dict:
-                self.sweep_dict[key] = values
-            else:
-                return ValueError(f"Parameter {parameter} already swept on {target.start_time_instance.name} at {target.channel.name}")
-        elif isinstance(target,TimeInstance):
-            key = target.name
-            if key not in self.sweep_dict:
-                self.sweep_dict[key] = values
-            else:
-                return ValueError(f"Parameter relative time already swept on {target.name}")
-    def sweep(self):
-        # check if the sweep dict is empty
-        if not self.sweep_dict:
-            return ValueError("No sweep parameters found")
-        
-        # get all the keys from the sweep dict
-        first_key = list(self.sweep_dict.keys())[0]
-        if isinstance(first_key,tuple):
-            generated_sequences = self.sequence.sweep_event_behavior(self.sequence.find_event_by_time_and_channel(first_key[0], first_key[1]), self.sweep_dict[first_key],first_key[2])
-        elif isinstance(first_key,str): 
-            generated_sequences = self.sequence.sweep_time_instance_relative_time(self.sequence.find_TimeInstance_by_name(first_key), self.sweep_dict[first_key])
-        
-        for key in list(self.sweep_dict.keys())[1:]:
-            if isinstance(key,tuple):
-                temp_list = []
-                for s in generated_sequences:
-                    temp_list+=s.sweep_event_behavior(s.find_event_by_time_and_channel(key[0], key[1]), self.sweep_dict[key],key[2])
-                generated_sequences = temp_list
-            elif isinstance(key,str):
-                temp_list = []
-                for s in generated_sequences:
-                    temp_list+=s.sweep_time_instance_relative_time(s.find_TimeInstance_by_name(key), self.sweep_dict[key])
-                generated_sequences = temp_list        
-                    
-        return generated_sequences
             
 
 from sequencer.ADwin_Modules import ADwin_Driver
@@ -1907,6 +2095,9 @@ def creat_test():
     Trig_Low_IWA =DFM_ToF.add_time_instance(f"Trig_Low_IWA", Trig_High_IWA, t_exp)
 
     DFM_ToF.add_event("Camera Trigger", Jump(0), Trig_Low_IWA, comment= "Cam Trigger Low")
+
+    DFM_ToF.stack_sweep_paramter(Trig_High_IWA,"Trap FM", [0,1,2,3,4,5,6,7,8,9,10])
+
 
     return DFM_ToF
 
