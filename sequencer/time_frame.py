@@ -787,8 +787,8 @@ class Sequence:
                 edited_event.behavior.edit_ramp(ramp_type=ramp_type, func_text=func_text)
             else:
                 edited_event.behavior.edit_ramp(start_value=start_value, end_value=end_value, ramp_type=ramp_type)
-
-        edited_event.comment = comment
+        if comment:
+            edited_event.comment = comment
         return edited_event
     
 

@@ -29,7 +29,32 @@ from sequencer.GUI.Dialogs.channel_dialog import ChannelDialog, Edit_Digital_Cha
 from sequencer.GUI.Dialogs.events_dialogs import AnalogEventDialog, DigitalEventDialog
 
 import numpy as np
+color_maps = {
+        'blue_red': ([0, 0, 255], [255, 255, 255], [255, 0, 0]),  # Dark Blue, White, Dark Red
+        'viridis': ([68, 1, 84], [49, 104, 142], [221, 221, 72], [253, 231, 37]),
+        'magma': ([0, 0, 4], [80, 18, 123], [221, 52, 151], [253, 231, 37]),
+        'plasma': ([13, 8, 135], [156, 23, 158], [237, 121, 83], [240, 249, 33]),
+        'inferno': ([0, 0, 4], [87, 16, 110], [224, 88, 77], [252, 234, 37]),
+        'cividis': ([0, 32, 77], [57, 111, 114], [159, 183, 145], [253, 231, 37]),
+        'blues': ([247, 251, 255], [198, 219, 239], [107, 174, 214], [33, 113, 181]),
+        'greens': ([247, 252, 245], [199, 233, 192], [116, 196, 118], [35, 139, 69]),
+        'reds': ([255, 245, 240], [254, 224, 210], [252, 146, 114], [222, 45, 38]),
+        'purples': ([252, 251, 253], [239, 237, 245], [218, 218, 235], [188, 189, 220]),
+        'oranges': ([255, 245, 235], [254, 230, 206], [253, 174, 107], [230, 85, 13]),
+        'coolwarm': ([59, 76, 192], [180, 4, 38], [221, 221, 221], [180, 4, 38]),
+        'spectral': ([158, 1, 66], [213, 62, 79], [244, 109, 67], [253, 174, 97]),
+        'hsv': ([255, 0, 0], [255, 255, 0], [0, 255, 0], [0, 255, 255]),
+        'twilight': ([226, 217, 226], [167, 187, 230], [114, 52, 146], [58, 14, 62]),
+        'cubehelix': ([0, 0, 0], [87, 81, 124], [132, 186, 140], [201, 202, 88]),
 
+        # 'YlOrBr': ([255, 255, 212], [254, 217, 142], [254, 153, 41], [204, 76, 2]),
+        # 'YlOrRd': ([255, 255, 204], [254, 217, 118], [253, 141, 60], [227, 26, 28]),
+        # 'RdBu': ([214, 47, 39], [244, 165, 130], [146, 197, 222], [33, 102, 172]),
+        # 'PiYG': ([197, 27, 125], [247, 104, 161], [168, 222, 181], [77, 172, 38]),
+        # 'Set1': ([228, 26, 28], [55, 126, 184], [77, 175, 74], [152, 78, 163]),
+        # 'Set2': ([102, 194, 165], [252, 141, 98], [141, 160, 203], [231, 138, 195]),
+        # 'Paired': ([166, 206, 227], [31, 120, 180], [178, 223, 138], [51, 160, 44]),
+    }
 def voltage_to_color(voltage, color_scheme='blue_red'):
     """
     Convert a voltage between -10 and 10 to a color using the specified color scheme.
@@ -40,14 +65,7 @@ def voltage_to_color(voltage, color_scheme='blue_red'):
     # Normalize voltage to [0, 1] range
     normalized = (voltage + 10) / 20.0
     
-    color_maps = {
-        'viridis': ([68, 1, 84], [49, 104, 142], [221, 221, 72], [253, 231, 37]),
-        'magma': ([0, 0, 4], [80, 18, 123], [221, 52, 151], [253, 231, 37]),
-        'plasma': ([13, 8, 135], [156, 23, 158], [237, 121, 83], [240, 249, 33]),
-        'inferno': ([0, 0, 4], [87, 16, 110], [224, 88, 77], [252, 234, 37]),
-        'cividis': ([0, 32, 77], [57, 111, 114], [159, 183, 145], [253, 231, 37]),
-        'blue_red': ([0, 0, 255], [255, 255, 255], [255, 0, 0])  # Dark Blue, White, Dark Red
-    }
+    
     
     if color_scheme.lower() not in color_maps:
         raise ValueError(f"Unsupported color scheme: {color_scheme}. Supported schemes are: {', '.join(color_maps.keys())}")
@@ -80,7 +98,6 @@ def voltage_to_color(voltage, color_scheme='blue_red'):
     
     # Choose contrasting text color
     text_color = '#ffffff' if brightness < 0.5 else '#000000'
-    
     return (bg_color, text_color)
 
 class ScrollAreaWithShiftScroll(QScrollArea):
@@ -392,11 +409,10 @@ class TimeInstanceWidget(QWidget):
         self.labels = {}
         for i, time_instance in enumerate(self.time_instances):
             label_widget = TimeInstanceLabel(time_instance, self)
-            # label_widget.setFixedWidth(200)
             
 
             self.grid.addWidget(label_widget, 0, i)
-            self.grid.setColumnMinimumWidth(i,200)
+            self.grid.setColumnMinimumWidth(i,150)
             self.labels[time_instance] = (0, i)
 
         # Add the arrow widget in row 2
@@ -422,7 +438,7 @@ class ChannelButton(QPushButton):
                 background-color: { 'gray'  if isinstance(self.channel, Analog_Channel) else 'black'};
                 font-weight: bold;
                 color:  { 'white'  if isinstance(self.channel, Analog_Channel) else 'white'};
-                padding: 10px;
+                padding: 20px;
                 border-radius: 5px;
             }}
         """)
@@ -538,7 +554,7 @@ class ChannelLabelListWidget(QWidget):
             button = ChannelButton(channel, self)  # Assuming ChannelButton is a QPushButton
             self.buttons.append(button)
             self.inner_layout.addWidget(button, row, 0,alignment=Qt.AlignBottom)  # Add each button in a new row
-            self.inner_layout.setRowMinimumHeight(row,100)
+            self.inner_layout.setRowMinimumHeight(row,150)
 
         
         self.inner_widget.setLayout(self.inner_layout)
@@ -602,7 +618,8 @@ class EventButton(QWidget):
         # Initial call to set up the UI
         self.refresh_UI()
         self.setLayout(self.layout_button)
-        self.update_color()
+        
+        
     
     def update_color(self):
         # loop through the layout and update the color of the widgets
@@ -611,6 +628,8 @@ class EventButton(QWidget):
             if widget is not None:
                 # exclude the last widget which is a horizontal line
                 self.refresh_color(self.value,widget)
+                # prind widget name 
+
 
 
 
@@ -648,139 +667,142 @@ class EventButton(QWidget):
             ramp = ramp_value[0]
             self.value = ramp_value[1]
             # Add a label to display the value
-            value_label = QLabel(f'Ramp {ramp.behavior.ramp_type}: {self.value}')
+            value_label = QLabel(f'{ramp.behavior.ramp_type}: {self.value:.3f}')
             self.layout_button.addWidget(value_label)
-            self.refresh_color(self.value,value_label)
 
 
             self.no_event = True
-            return
-
-        event_time = self.channel.get_event_by_time_instance(self.time_instance)
-        if event_time is None:
-            all_events = self.channel.events
-            all_events.sort(key=lambda event: event.start_time_instance.get_absolute_time())
-            for i, event in enumerate(all_events):
-                if event.start_time_instance.get_absolute_time() > self.time_instance.get_absolute_time():
-                    break
-            else:
-                i = len(all_events)
-            if i == 0:
-                self.value = self.channel.reset_value
-            else:
-                self.value = all_events[i-1].behavior.get_value_at_time(self.time_instance.get_absolute_time())
-            value_button = QPushButton(f'Value: {self.value}')
-            value_button.clicked.connect(self.add_event)
-            # Add a button to display the value and connect to the create event when clicked 
-            self.layout_button.addWidget(value_button)
-            self.refresh_color(self.value,value_button)
-
-            self.no_event = True
+        
         else:
-            self.no_event = False
-            event = event_time[0]
-            self.event_instance = event
-            time_ref = event_time[1]
-            if isinstance(event.behavior, Ramp):
-                if time_ref == 'start':
-                    self.value = event.behavior.get_start_value()
+
+            event_time = self.channel.get_event_by_time_instance(self.time_instance)
+            if event_time is None:
+                all_events = self.channel.events
+                all_events.sort(key=lambda event: event.start_time_instance.get_absolute_time())
+                for i, event in enumerate(all_events):
+                    if event.start_time_instance.get_absolute_time() > self.time_instance.get_absolute_time():
+                        break
+                else:
+                    i = len(all_events)
+                if i == 0:
+                    self.value = self.channel.reset_value
+                else:
+                    self.value = all_events[i-1].behavior.get_value_at_time(self.time_instance.get_absolute_time())
+                value_button = QPushButton(f'Value: {self.value:.3f}')
+                value_button.clicked.connect(self.add_event)
+                # Add a button to display the value and connect to the create event when clicked 
+                self.layout_button.addWidget(value_button)
+
+                self.no_event = True
+            else:
+                self.no_event = False
+                event = event_time[0]
+                self.event_instance = event
+                time_ref = event_time[1]
+                if isinstance(event.behavior, Ramp):
+                    if time_ref == 'start':
+                        self.value = event.behavior.get_start_value()
+                        # Create a vertical layout with a label and numeric value spin box
+                        
+                        # add a combobox to select the ramp type
+                        ramp_combo = QComboBox()
+                        ramp_combo.addItems([e.value for e in RampType])
+                        preselected_ramp_type = event.behavior.ramp_type.value
+                        ramp_combo.setCurrentText(preselected_ramp_type)
+                        ramp_combo.currentIndexChanged.connect(lambda index: self.edit_ramp_type(event))
+                        self.layout_button.addWidget(ramp_combo)
+                        value_label = QLabel('Start:')
+                        value_spinbox = QDouble_NO_mouse_SpinBox(text_view=self.event_instance.comment)
+                        # make the range of the spin box between the min and max voltage of the channel
+                        value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
+                        value_spinbox.setValue(self.value)
+
+                        value_spinbox.valueChanged.connect(lambda val: self.edit_start_value(event, val))
+                        if event.behavior.ramp_type == RampType.GENERIC:
+                            value_spinbox.setEnabled(False)
+
+                        self.layout_button.addWidget(value_label)
+                        self.layout_button.addWidget(value_spinbox)
+                        value_spinbox.valueChanged.connect(self.update_color)
+
+
+                    else:
+                        self.value = event.behavior.get_end_value()
+
+
+                        # Create a vertical layout with a label and numeric value spin box
+                        
+                        value_label = QLabel('End:')
+                        value_spinbox = QDouble_NO_mouse_SpinBox(text_view=self.event_instance.comment)
+                        # make the range of the spin box between the min and max voltage of the channel
+                        value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)    
+                        value_spinbox.setValue(self.value)
+                        value_spinbox.valueChanged.connect(lambda val: self.edit_end_value(event, val))
+                        if event.behavior.ramp_type == RampType.GENERIC:
+                            value_spinbox.setEnabled(False)
+                        self.layout_button.addWidget(value_label)
+                        self.layout_button.addWidget(value_spinbox)
+                        value_spinbox.valueChanged.connect(self.update_color)
+
+
+                        # if value > event.channel.max_voltage or value < event.channel.min_voltage:
+                        #     QMessageBox.warning(self, "Warning", f"Generic Ramp will result in a value outside the channel range, please fix the ramp, the value will be set to the edge of the voltage range {value_spinbox.text()}")
+
+                elif isinstance(event.behavior, Jump):
+                    self.value = event.behavior.target_value
                     # Create a vertical layout with a label and numeric value spin box
                     
-                    # add a combobox to select the ramp type
-                    ramp_combo = QComboBox()
-                    ramp_combo.addItems([e.value for e in RampType])
-                    preselected_ramp_type = event.behavior.ramp_type.value
-                    ramp_combo.setCurrentText(preselected_ramp_type)
-                    ramp_combo.currentIndexChanged.connect(lambda index: self.edit_ramp_type(event))
-                    self.layout_button.addWidget(ramp_combo)
-                    if event.behavior.ramp_type == RampType.GENERIC:
-                        func = event.behavior.func_text
-                        func_label = QLabel(f"Function: {func}")
-                        self.layout_button.addWidget(func_label)
-                    value_label = QLabel('Start Value:')
-                    value_spinbox = QDouble_NO_mouse_SpinBox(text_view=self.event_instance.comment)
-                    # make the range of the spin box between the min and max voltage of the channel
+                    value_label = QLabel('Jump:')
+                    value_spinbox = QDouble_NO_mouse_SpinBox(self.event_instance.comment)
                     value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
                     value_spinbox.setValue(self.value)
-
-                    value_spinbox.valueChanged.connect(lambda val: self.edit_start_value(event, val))
-                    if event.behavior.ramp_type == RampType.GENERIC:
-                        value_spinbox.setEnabled(False)
-                    self.refresh_color(self.value,value_spinbox)
-
+                    value_spinbox.valueChanged.connect(lambda val: self.edit_target_value(event, val))
                     self.layout_button.addWidget(value_label)
                     self.layout_button.addWidget(value_spinbox)
-                    value_spinbox.valueChanged.connect(lambda val: self.refresh_color(val,value_spinbox))
-                    self.refresh_color(self.value,value_spinbox)
+                    value_spinbox.valueChanged.connect(self.update_color)
 
-
-                else:
-                    self.value = event.behavior.get_end_value()
-
-
-                    # Create a vertical layout with a label and numeric value spin box
+                elif isinstance(event.behavior, Digital):
                     
-                    value_label = QLabel('End Value:')
-                    value_spinbox = QDouble_NO_mouse_SpinBox(text_view=self.event_instance.comment)
-                    # make the range of the spin box between the min and max voltage of the channel
-                    value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)    
-                    value_spinbox.setValue(self.value)
-                    value_spinbox.valueChanged.connect(lambda val: self.edit_end_value(event, val))
-                    if event.behavior.ramp_type == RampType.GENERIC:
-                        value_spinbox.setEnabled(False)
-                    self.layout_button.addWidget(value_label)
-                    self.layout_button.addWidget(value_spinbox)
-                    value_spinbox.valueChanged.connect(lambda val: self.refresh_color(val,value_spinbox))
-                    self.refresh_color(self.value,value_spinbox)
+                    self.value = event.behavior.target_value
+                    combo_box = QComboBox()
+                    combo_box.addItems(['Off', 'On'])
+                    combo_box.setCurrentIndex(1 if self.value == 1 else 0)
+                    self.layout_button.addWidget(combo_box)
+                    # Create a combo box to display the value and connect to the target value (On =1 , Off = 0)
+                    # Connect it to edit target value
+                    combo_box.currentIndexChanged.connect(lambda index: self.edit_digtial_state(event))
+                    combo_box.currentIndexChanged.connect(self.update_color)
 
-
-                    # if value > event.channel.max_voltage or value < event.channel.min_voltage:
-                    #     QMessageBox.warning(self, "Warning", f"Generic Ramp will result in a value outside the channel range, please fix the ramp, the value will be set to the edge of the voltage range {value_spinbox.text()}")
-
-            elif isinstance(event.behavior, Jump):
-                self.value = event.behavior.target_value
-                # Create a vertical layout with a label and numeric value spin box
-                
-                value_label = QLabel('Target Value:')
-                value_spinbox = QDouble_NO_mouse_SpinBox(self.event_instance.comment)
-                value_spinbox.setRange(self.channel.min_voltage, self.channel.max_voltage)
-                value_spinbox.setValue(self.value)
-                value_spinbox.valueChanged.connect(lambda val: self.edit_target_value(event, val))
-                self.layout_button.addWidget(value_label)
-                self.layout_button.addWidget(value_spinbox)
-                self.refresh_color(self.value,value_spinbox)
-                value_spinbox.valueChanged.connect(lambda val: self.refresh_color(val,value_spinbox))
-
-            elif isinstance(event.behavior, Digital):
-                
-                self.value = event.behavior.target_value
-                combo_box = QComboBox()
-                combo_box.addItems(['Off', 'On'])
-                combo_box.setCurrentIndex(1 if self.value == 1 else 0)
-                self.layout_button.addWidget(combo_box)
-                # Create a combo box to display the value and connect to the target value (On =1 , Off = 0)
-                # Connect it to edit target value
-                combo_box.currentIndexChanged.connect(lambda index: self.edit_digtial_state(event))
-                self.refresh_color(self.value,combo_box)
-                combo_box.currentIndexChanged.connect(lambda val: self.refresh_color(val,combo_box))
-
-            # Connect to delete event when right clicked
-            self.setContextMenuPolicy(Qt.CustomContextMenu)
-            self.customContextMenuRequested.connect(self.context_menu)
+                # Connect to delete event when right clicked
+                self.setContextMenuPolicy(Qt.CustomContextMenu)
+                self.customContextMenuRequested.connect(self.context_menu)
                 # Add a horizontal line at the bottom
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
         self.layout_button.addWidget(line)
+        self.update_color()
 
-    
+
     def enterEvent(self,event):
         if not self.no_event:
-            text = self.event_instance.comment
+            if isinstance(self.event_instance.behavior, Ramp):
+                if self.event_instance.behavior.ramp_type == RampType.GENERIC:
+                    func = self.event_instance.behavior.func_text
+                    text = self.event_instance.comment +"\nfunc: "+func
+                else:
+                    text= self.event_instance.comment
+
+            else:
+                text = self.event_instance.comment
+
         else:
             text = "Holding Value: click to add an event"
+        print(text)
         QToolTip.showText(event.globalPos(),text , self)
         super().enterEvent(event)
+
+    
 
 
 
@@ -794,11 +816,15 @@ class EventButton(QWidget):
 
     def edit_start_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, start_value=value)
+        self.value = value
+        self.update_color()
         self.refresh_row_after_me()
         # Make a deep copy of the event behavior
 
     def edit_end_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, end_value=value)
+        self.value = value
+        self.update_color()
         self.refresh_row_after_me()
         self.refresh_row_before_me()
 
@@ -806,7 +832,8 @@ class EventButton(QWidget):
 
     def edit_target_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, target_value=value)
-        #self.refresh_UI()
+        self.value = value
+        self.update_color()
         self.refresh_row_after_me()
         # Make a deep copy of the event behavior
     def edit_digtial_state(self, event):
@@ -815,7 +842,8 @@ class EventButton(QWidget):
         else:
             value = 0
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, target_value=value)
-        # self.refresh_UI()
+        self.value = value
+        self.update_color()
         self.refresh_row_after_me()
         # Make a deep copy of the event behavior
     def edit_ramp_type(self,event):
@@ -879,15 +907,16 @@ class EventButton(QWidget):
         self.refresh_UI()
         self.refresh_row_after_me()
 
+    
     def refresh_color(self, value, widget):
         try:
-            color,text_color = voltage_to_color(value)
+            color,text_color = voltage_to_color(value,self.color_scheme)
             
             common_style = f"""
                 background-color: {color};
                 font-weight: bold;
                 color: {text_color};
-                padding: 10px;
+                padding: 3px;
                 border-radius: 5px;
             """
             
@@ -913,7 +942,7 @@ class EventButton(QWidget):
                 }}
                 """,
                 "QDoubleSpinBox": """
-                    padding: 5px;
+                    padding: 3px;
                     border: 1px solid #555;
                     border-radius: 3px;
                 """,
@@ -984,8 +1013,8 @@ class EventsWidget(QWidget):
         self.time_instances.sort(key=lambda ti: ti.get_absolute_time())
 
         channels = self.sequence.channels
-        fixed_width = 200
-        fixed_height = 100
+        fixed_width = 150
+        fixed_height = 150
         # Calculate the maximum width and height required for the buttons
         for row, channel in enumerate(channels):
             for col, time in enumerate(self.time_instances):
@@ -1208,14 +1237,19 @@ class SequenceViewerWdiget(QWidget):
         self.layout_main = QGridLayout()
         
         self.setLayout(self.layout_main)
-        self.combo_box_type = QComboBox()
 
 
         self.setup_ui()
+
+    
         
     def setup_ui(self) -> None:
         
-        
+
+        self.combo_box_type_color = QComboBox()
+        self.combo_box_type_color.addItems(list(color_maps.keys()))
+        self.combo_box_type_color.currentIndexChanged.connect(self.refresh_events_color)
+        self.refresh_events_color()
         # Create and configure widgets
         self.channel_list = ChannelLabelListWidget(self.sequence,parent_widget=self)
         self.event_table = EventsWidget(self.sequence, parent_widget=self)
@@ -1236,9 +1270,9 @@ class SequenceViewerWdiget(QWidget):
         self.scroll_bar4.valueChanged.connect(self.sync_scroll_vertical)
 
 
+        
 
-
-        self.layout_main.addWidget(self.combo_box_type, 0, 0)
+        self.layout_main.addWidget(self.combo_box_type_color, 0, 0)
         self.layout_main.addWidget(self.time_axis, 0, 1)  # Top-right slot
         self.layout_main.addWidget(self.channel_list, 1, 0)  # Bottom-left slot
         self.layout_main.addWidget(self.event_table, 1, 1)  # Bottom-right slot
@@ -1249,6 +1283,50 @@ class SequenceViewerWdiget(QWidget):
     def refresh_channels(self):
         self.channel_list.refresh_UI()
         self.time_axis.refresh_UI()
+
+    def refresh_events_color(self):
+        # refresh self color
+        color,text_color = voltage_to_color(7,self.combo_box_type_color.currentText())
+        
+        style = f"""
+            background-color: {color};
+            font-weight: bold;
+            color: {text_color};
+            padding: 3px;
+            border-radius: 5px;
+            QComboBox {{
+                border: 1px solid gray;
+                padding: 1px 18px 1px 3px;
+                min-width: 6em;
+            }}
+            QComboBox::drop-down {{
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 15px;
+                border-left-width: 1px;
+                border-left-color: darkgray;
+                border-left-style: solid;
+            }}
+            QComboBox QAbstractItemView {{
+                border: 2px solid darkgray;
+                selection-background-color: {color};
+                color: {text_color};
+            }}
+            """ 
+        
+        self.combo_box_type_color.setStyleSheet(style)
+        try:
+            # loop over the layout and update the color of the widgets
+            for i in range(self.event_table.inner_layout.rowCount()):
+                for j in range(self.event_table.inner_layout.columnCount()):
+                    item = self.event_table.inner_layout.itemAtPosition(i, j)
+                    if item is not None:
+                        widget = item.widget()
+                        if widget is not None:
+                            widget.color_scheme = self.combo_box_type_color.currentText()
+                            widget.update_color()
+        except Exception as e : 
+            pass
 
     def sync_scroll_vertical(self, value: int) -> None:
         if self.syncing:
