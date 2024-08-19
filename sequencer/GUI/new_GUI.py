@@ -3,10 +3,11 @@ import copy
 from PyQt5.QtWidgets import (
    QComboBox, QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog,QFrame
 )
+from PyQt5.QtGui import QDrag
 
 from PyQt5.QtCore import Qt, QRect, pyqtSignal,QPoint
 from sequencer.ADwin_Modules2 import calculate_time_ranges
-from sequencer.time_frame import TimeInstance,Sequence,Event , Analog_Channel, Digital_Channel, Channel, RampType,creat_test ,Jump,Ramp,Digital,exp_to_func
+from sequencer.time_frame import TimeInstance,Sequence,Event , Analog_Channel, Digital_Channel, Channel, RampType,creat_test ,Jump,Ramp,Digital,exp_to_func,creat_seq_manager
 import sys
 from typing import List, Optional
 from PyQt5.QtWidgets import (
@@ -14,6 +15,7 @@ from PyQt5.QtWidgets import (
     QMenu, QAction, QPushButton, QWidget, QLabel, QDialog, QMessageBox, QFileDialog
 )
 
+from sequencer.imaging.THORCAM.imaging_software import ThorCamControlWidget
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QGridLayout, QPushButton, QLabel, QHBoxLayout
 from sequencer.time_frame import Sequence, Event, Analog_Channel, Digital_Channel, Channel, RampType,Jump,Ramp
@@ -25,12 +27,14 @@ from PyQt5.QtCore import QPoint, Qt, QSize
 from PyQt5.QtWidgets import QWidget, QLabel, QGridLayout, QScrollArea, QVBoxLayout, QSizePolicy
 from PyQt5.QtGui import QPainter, QBrush, QPolygon
 from PyQt5.QtCore import QPoint, Qt, QSize
-from sequencer.GUI.Dialogs.channel_dialog import ChannelDialog, Edit_Digital_Channel, Edit_Analog_Channel
+from sequencer.GUI.Dialogs.channel_dialog import ChannelDialog, Edit_Digital_Channel, Edit_Analog_Channel,CustomDialog
 from sequencer.GUI.Dialogs.events_dialogs import AnalogEventDialog, DigitalEventDialog
+from sequencer.GUI.Dialogs.sweep_dialog import SweepEventDialog
 
+from sequencer.time_frame import TimeInstance,SequenceManager
 import numpy as np
 color_maps = {
-        'blue_red': ([0, 0, 255], [255, 255, 255], [255, 0, 0]),  # Dark Blue, White, Dark Red
+        'blue red': ([0, 0, 255], [255, 255, 255], [255, 0, 0]),  # Dark Blue, White, Dark Red
         'viridis': ([68, 1, 84], [49, 104, 142], [221, 221, 72], [253, 231, 37]),
         'magma': ([0, 0, 4], [80, 18, 123], [221, 52, 151], [253, 231, 37]),
         'plasma': ([13, 8, 135], [156, 23, 158], [237, 121, 83], [240, 249, 33]),
@@ -45,17 +49,9 @@ color_maps = {
         'spectral': ([158, 1, 66], [213, 62, 79], [244, 109, 67], [253, 174, 97]),
         'hsv': ([255, 0, 0], [255, 255, 0], [0, 255, 0], [0, 255, 255]),
         'twilight': ([226, 217, 226], [167, 187, 230], [114, 52, 146], [58, 14, 62]),
-        'cubehelix': ([0, 0, 0], [87, 81, 124], [132, 186, 140], [201, 202, 88]),
-
-        # 'YlOrBr': ([255, 255, 212], [254, 217, 142], [254, 153, 41], [204, 76, 2]),
-        # 'YlOrRd': ([255, 255, 204], [254, 217, 118], [253, 141, 60], [227, 26, 28]),
-        # 'RdBu': ([214, 47, 39], [244, 165, 130], [146, 197, 222], [33, 102, 172]),
-        # 'PiYG': ([197, 27, 125], [247, 104, 161], [168, 222, 181], [77, 172, 38]),
-        # 'Set1': ([228, 26, 28], [55, 126, 184], [77, 175, 74], [152, 78, 163]),
-        # 'Set2': ([102, 194, 165], [252, 141, 98], [141, 160, 203], [231, 138, 195]),
-        # 'Paired': ([166, 206, 227], [31, 120, 180], [178, 223, 138], [51, 160, 44]),
+        'cubehelix': ([0, 0, 0], [87, 81, 124], [132, 186, 140], [201, 202, 88])
     }
-def voltage_to_color(voltage, color_scheme='blue_red'):
+def voltage_to_color(voltage, color_scheme='blue red'):
     """
     Convert a voltage between -10 and 10 to a color using the specified color scheme.
     Returns a tuple of (background_color, text_color)
@@ -70,8 +66,8 @@ def voltage_to_color(voltage, color_scheme='blue_red'):
     if color_scheme.lower() not in color_maps:
         raise ValueError(f"Unsupported color scheme: {color_scheme}. Supported schemes are: {', '.join(color_maps.keys())}")
     
-    if color_scheme.lower() == 'blue_red':
-        # Special handling for blue_red scheme
+    if color_scheme.lower() == 'blue red':
+        # Special handling for blue red scheme
         if voltage < 0:
             # Dark Blue to White
             intensity = int(255 * ((1 + voltage / 10) ** 0.5))
@@ -555,12 +551,36 @@ class ChannelLabelListWidget(QWidget):
             self.buttons.append(button)
             self.inner_layout.addWidget(button, row, 0,alignment=Qt.AlignBottom)  # Add each button in a new row
             self.inner_layout.setRowMinimumHeight(row,150)
-
+        # Add a button to add a new channel
+        if len(self.sequence.channels) < 1:
+            button = QPushButton("Add Channel")
+            button.clicked.connect(self.add_channel)
+            self.inner_layout.addWidget(button, 0, 0,alignment=Qt.AlignTop)  # Add the button in the first row
+            self.inner_layout.setRowMinimumHeight(0,150)
+            self.buttons.append(button)
         
         self.inner_widget.setLayout(self.inner_layout)
-
+    def add_channel(self):
+        # open the add channel dialog
+        dialog = ChannelDialog()
+        if dialog.exec_() == QDialog.Accepted:
+            data= dialog.get_data()
+            if data['type'] == 'Analog':
+                self.sequence.add_analog_channel(name=data['name'], card_number=data['card_number'], channel_number=data['channel_number'], reset_value=data['reset_value'], max_voltage=data['max_voltage'], min_voltage=data['min_voltage'])
+            else:
+                self.sequence.add_digital_channel(name=data['name'], card_number=data['card_number'], channel_number=data['channel_number'])
+            new_channel = self.sequence.find_channel_by_name(data['name'])
+            self.refresh_UI()
+            self.parent_widget.event_table.add_channel(new_channel)
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QComboBox, QDoubleSpinBox, QDialog
+
+class QComboBox_NO_mouse(QComboBox):
+    def __init__(self) -> None:
+        super().__init__()
+
+    def wheelEvent(self, event):
+        event.ignore()
 
 class QDouble_NO_mouse_SpinBox(QDoubleSpinBox):
     def __init__(self, text_view="") -> None:
@@ -604,7 +624,7 @@ class QDouble_NO_mouse_SpinBox(QDoubleSpinBox):
         super().enterEvent(event)
 
 class EventButton(QWidget):
-    def __init__(self, channel: Channel, time_instance: TimeInstance, parent_widget: 'EventsWidget',color_scheme='blue_red'):
+    def __init__(self, channel: Channel, time_instance: TimeInstance, parent_widget: 'EventsWidget',color_scheme='blue red'):
         super().__init__(parent_widget)
         self.parent_widget = parent_widget
         self.channel = channel
@@ -627,7 +647,13 @@ class EventButton(QWidget):
             widget = self.layout_button.itemAt(i).widget()
             if widget is not None:
                 # exclude the last widget which is a horizontal line
-                self.refresh_color(self.value,widget)
+                if isinstance(self.channel, Digital_Channel):
+                    if self.value == 1:
+                        self.refresh_color(10,widget)
+                    else:  
+                        self.refresh_color(0,widget)
+                else:
+                    self.refresh_color(self.value,widget)
                 # prind widget name 
 
 
@@ -688,7 +714,10 @@ class EventButton(QWidget):
                     self.value = self.channel.reset_value
                 else:
                     self.value = all_events[i-1].behavior.get_value_at_time(self.time_instance.get_absolute_time())
-                value_button = QPushButton(f'Value: {self.value:.3f}')
+                if isinstance(self.channel, Digital_Channel):
+                    value_button = QPushButton(f'Value: {"High" if self.value == 1 else "Low"}')
+                else:
+                    value_button = QPushButton(f'Value: {self.value:.3f}')
                 value_button.clicked.connect(self.add_event)
                 # Add a button to display the value and connect to the create event when clicked 
                 self.layout_button.addWidget(value_button)
@@ -705,7 +734,7 @@ class EventButton(QWidget):
                         # Create a vertical layout with a label and numeric value spin box
                         
                         # add a combobox to select the ramp type
-                        ramp_combo = QComboBox()
+                        ramp_combo = QComboBox_NO_mouse()
                         ramp_combo.addItems([e.value for e in RampType])
                         preselected_ramp_type = event.behavior.ramp_type.value
                         ramp_combo.setCurrentText(preselected_ramp_type)
@@ -762,10 +791,11 @@ class EventButton(QWidget):
                     value_spinbox.valueChanged.connect(self.update_color)
 
                 elif isinstance(event.behavior, Digital):
+                    self.event_instance = event
                     
                     self.value = event.behavior.target_value
-                    combo_box = QComboBox()
-                    combo_box.addItems(['Off', 'On'])
+                    combo_box = QComboBox_NO_mouse()
+                    combo_box.addItems([ 'Low','High'])
                     combo_box.setCurrentIndex(1 if self.value == 1 else 0)
                     self.layout_button.addWidget(combo_box)
                     # Create a combo box to display the value and connect to the target value (On =1 , Off = 0)
@@ -809,8 +839,22 @@ class EventButton(QWidget):
         context_menu = QMenu(self)
         delete_action = context_menu.addAction("Delete Event")
         delete_action.triggered.connect(self.delete_event)
+        sweep_action = context_menu.addAction("Sweep")
+        sweep_action.triggered.connect(self.sweep)
         context_menu.exec_(self.mapToGlobal(position))
+        
 
+    def sweep(self):
+        # open the sweep dialog
+        dialog = SweepDialog(self.event_instance)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            self.parent_widget.sequence.sweep_event(self.event_instance, data['start'], data['stop'], data['step'])
+            self.refresh_UI()
+            self.refresh_row_after_me()
+            self.refresh_row_before_me()
+
+        
     
 
     def edit_start_value(self, event, value):
@@ -836,7 +880,7 @@ class EventButton(QWidget):
         self.refresh_row_after_me()
         # Make a deep copy of the event behavior
     def edit_digtial_state(self, event):
-        if self.sender().currentText() == 'On':
+        if self.sender().currentText() == 'High':
             value = 1
         else:
             value = 0
@@ -1228,9 +1272,11 @@ class EventsWidget(QWidget):
                     self.inner_layout.addWidget(widget, j, i,alignment=Qt.AlignBottom)
 
 class SequenceViewerWdiget(QWidget):
-    def __init__(self, sequence:Sequence, parent_widget=None):
+    def __init__(self, sequence:Sequence=None, parent_widget:'SequenceManagerWidget'=None):
         super().__init__()
         self.parent_widget = parent_widget
+        if sequence is None:
+            sequence = Sequence("unnamed")
         self.sequence = sequence
         self.syncing = False  # Flag to prevent multiple updates
         self.layout_main = QGridLayout()
@@ -1245,7 +1291,7 @@ class SequenceViewerWdiget(QWidget):
     def setup_ui(self) -> None:
         
 
-        self.combo_box_type_color = QComboBox()
+        self.combo_box_type_color = QComboBox_NO_mouse()
         self.combo_box_type_color.addItems(list(color_maps.keys()))
         self.combo_box_type_color.currentIndexChanged.connect(self.refresh_events_color)
         self.refresh_events_color()
@@ -1361,13 +1407,449 @@ class SequenceViewerWdiget(QWidget):
             layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
         self.setup_ui()
+from PyQt5.QtCore import Qt,QMimeData
+
+class DraggableButton(QPushButton):
+    save_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+    save_sequence_signal_csv = pyqtSignal(str)  # Signal to emit a number
+    delete_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+    edit_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+    plot_sequence_signal = pyqtSignal(str)  # Signal to emit a numbero
+    print_sequence_signal = pyqtSignal(str)  # Signal to emit a number
+
+
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.text_to_emit = text 
+        self.parent = parent
+        self.setAcceptDrops(True)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() != Qt.LeftButton:
+            return
+        drag = QDrag(self)
+        mime_data = QMimeData()
+        mime_data.setText(self.text())
+        drag.setMimeData(mime_data)
+        drag.exec_(Qt.MoveAction)
+
+    def dragEnterEvent(self, event):
+        event.accept()
+
+    def dropEvent(self, event):
+        if event.source() != self:
+            self.parent.move_button(self, event.source())
+
+    def show_context_menu(self, position):
+        context_menu = QMenu(self)
+        save_sequence_action = QAction('Save Sequence', self)
+        save_sequence_action.triggered.connect(self.save_sequence)
+        context_menu.addAction(save_sequence_action)
+
+        save_sequence_action_csv = QAction('Save Sequence as CSV', self)
+        save_sequence_action_csv.triggered.connect(self.save_sequence_csv)
+        context_menu.addAction(save_sequence_action_csv)
+
+
+        delete_sequence_action = QAction('delete Sequence', self)
+        delete_sequence_action.triggered.connect(self.delete_sequence)
+        context_menu.addAction(delete_sequence_action)
+        
+        edit_sequence_action = QAction('edit Sequence', self)
+        edit_sequence_action.triggered.connect(self.edit_sequence)
+        context_menu.addAction(edit_sequence_action)
+        
+        plot_sequence_action = QAction('plot Sequence', self)
+        plot_sequence_action.triggered.connect(self.plot_sequence)
+        context_menu.addAction(plot_sequence_action)
+
+        print_sequence_action = QAction('print Sequence', self)
+        print_sequence_action.triggered.connect(self.print_sequence)
+        context_menu.addAction(print_sequence_action)
+
+        
+        
+        context_menu.exec_(self.mapToGlobal(position))
+        
+
+    def save_sequence(self):
+
+        self.save_sequence_signal.emit(self.text_to_emit)
+
+    def save_sequence_csv(self):            
+            self.save_sequence_signal_csv.emit(self.text_to_emit)
+
+    def edit_sequence(self):
+
+        self.edit_sequence_signal.emit(self.text_to_emit)
+    def delete_sequence(self):
+
+        self.delete_sequence_signal.emit(self.text_to_emit)
+    def plot_sequence(self):
+
+        self.plot_sequence_signal.emit(self.text_to_emit)
+
+    def print_sequence(self):
+
+        self.print_sequence_signal.emit(self.text_to_emit)  
+
+
+class SequenceManagerWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.sequence_manager = SequenceManager()
+        self.selected_sequence_button = None
+        self.setWindowTitle("Sequence Manager")
+
+        self.initUI()
+
+    def initUI(self):
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+        
+
+        self.menu_bar = self.create_menu_bar()
+        self.layout.addWidget(self.menu_bar)
+
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.button_container = QWidget()
+        self.seq_buttons_layout = QHBoxLayout(self.button_container)
+        self.scroll_area.setWidget(self.button_container)
+
+        self.layout.addWidget(self.scroll_area)
+
+        self.sequence_view_area = QWidget()
+        self.sequence_view_layout = QVBoxLayout(self.sequence_view_area)
+        self.layout.addWidget(self.sequence_view_area, 2)
+
+        self.update_buttons()
+
+    def create_menu_bar(self):
+        menu_bar = QMenuBar(self)
+        file_menu = QMenu("File", self)
+        tools_menu = QMenu("tools", self)
+
+        load_action = QAction("Load Sequence Manager", self)
+        load_action.triggered.connect(self.load_sequence_manager)
+        file_menu.addAction(load_action)
+
+        save_action = QAction("Save Sequence Manager", self)
+        save_action.triggered.connect(self.save_sequence_manager)
+        file_menu.addAction(save_action)
+
+        open_runner_action = QAction("Open Runner", self)
+        open_runner_action.triggered.connect(self.open_runner)
+        tools_menu.addAction(open_runner_action)
+
+
+        
+        open_camera_action = QAction("Open Camera", self)
+        open_camera_action.triggered.connect(self.open_camera)
+        tools_menu.addAction(open_camera_action)
+
+
+
+
+        menu_bar.addMenu(file_menu)
+        menu_bar.addMenu(tools_menu)
+        
+        return menu_bar
+
+
+    def open_runner(self):
+        try:
+            self.runner_widget = Runner(self.sequence_manager)
+            self.runner_widget.show()
+        except Exception as e:
+            error_message = f"Can not Open Runner, An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+    def open_camera(self):
+        try:
+            self.camera_widget = ThorCamControlWidget()
+            self.camera_widget.show()
+        except Exception as e:
+            error_message = f"Can not Open Camera, An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+            
+            
+
+    def save_sequence_manager(self):
+        try:
+            file_dialog = QFileDialog(self)
+            file_name, _ = file_dialog.getSaveFileName(self, "Save Sequence Manager", "", "JSON Files (*.json)")
+            if file_name:
+                self.sequence_manager.to_json(file_name=file_name)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
+    def load_sequence_manager(self):
+        try:
+            file_dialog = QFileDialog(self)
+            file_name, _ = file_dialog.getOpenFileName(self, "Open Sequence Manager", "", "JSON Files (*.json)")
+            if file_name:
+                self.sequence_manager = SequenceManager.from_json(file_name=file_name)
+                self.update_buttons()
+                self.display_sequence(flag=True)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
+    def save_sequence(self, sequence_name):
+        try:
+            file_dialog = QFileDialog(self)
+            file_name, _ = file_dialog.getSaveFileName(self, "Save Singel Sequence", "", "JSON Files (*.json)")
+            if file_name:
+                self.sequence_manager.find_sequence_by_name(sequence_name).to_json(file_name)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+            
+        # self.sequence_manager.find_sequence_by_name(sequence_name).to_json(file_name+".json")
+    def save_sequence_CSV(self, sequence_name): 
+        try:
+            file_dialog = QFileDialog(self)
+            file_name, _ = file_dialog.getSaveFileName(self, "Save Singel Sequence", "", "CSV Files (*.csv)")
+            if file_name:
+                self.sequence_manager.find_sequence_by_name(sequence_name).to_csv(file_name+".csv")
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
+    def delete_sequence(self, sequence_name):
+        try:
+            self.sequence_manager.delete_sequence(sequence_name)
+            self.update_buttons()
+            self.display_sequence(flag=True)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
+    def edit_sequence(self, sequence_name):
+        # ask user for new name
+        try:
+            new_sequence_name, ok = QInputDialog.getText(self, "Edit Sequence Name", "Enter new sequence name:")
+            if ok and new_sequence_name:
+                    
+                self.sequence_manager.change_sequence_name(old_name=sequence_name, new_name=new_sequence_name)
+                self.update_buttons()
+                self.display_sequence(flag=True)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
+    def print_sequence(self, sequence_name):
+        try:
+            seq = self.sequence_manager.find_sequence_by_name(sequence_name)
+            text = seq.get_event_tree()
+
+            # make a message to print the text
+            msg = QMessageBox()
+            msg.setWindowTitle("Sequence Tree")
+            msg.setText(text)
+            msg.exec_()
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
+        
+         
+        
+
+    def plot_sequence(self, sequence_name):
+        try:
+            #makZe a dialog to ask for channel name with a combobox
+            channels =["All Channels"]+ [ch.name for ch in self.sequence_manager.find_sequence_by_name(sequence_name).channels] 
+            types = ["Normal","With Relations"]
+            dialog = CustomDialog(channels, types)
+            if dialog.exec_() == QDialog.Accepted:
+                channel_name, channel_type,resolution = dialog.get_values()
+                print(f"Selected Channel: {channel_name}, Type: {channel_type}")
+
+                if channel_name != "All Channels":
+                    if channel_type == "Normal":
+                        self.sequence_manager.find_sequence_by_name(sequence_name).plot([channel_name],resolution=resolution)
+                    else :
+                        self.sequence_manager.find_sequence_by_name(sequence_name).plot_all([channel_name],resolution=resolution)
+
+                else:  
+                    if channel_type == "Normal":
+                        self.sequence_manager.find_sequence_by_name(sequence_name).plot(resolution=resolution)
+                    else :
+                        self.sequence_manager.find_sequence_by_name(sequence_name).plot_all(resolution=resolution)
+        except Exception as e:
+            error_message = f"An error occurred: {str(e)}"
+            QMessageBox.critical(self, "Error", error_message)
+
+
+    def update_buttons(self):
+        for i in reversed(range(self.seq_buttons_layout.count())):
+            self.seq_buttons_layout.itemAt(i).widget().setParent(None)
+
+        for seq in self.sequence_manager.main_sequences.values():
+            button = DraggableButton(seq.sequence_name, self)
+            button.clicked.connect(self.display_sequence)
+            button.save_sequence_signal.connect(self.save_sequence)
+            button.save_sequence_signal_csv.connect(self.save_sequence_CSV)
+            button.delete_sequence_signal.connect(self.delete_sequence)
+            button.edit_sequence_signal.connect(self.edit_sequence)
+            button.plot_sequence_signal.connect(self.plot_sequence)
+            button.print_sequence_signal.connect(self.print_sequence)
+
+
+            button.setStyleSheet(self.get_button_style(False))
+            self.seq_buttons_layout.addWidget(button)
+
+        add_button = DraggableButton("+", self)
+        add_button.clicked.connect(self.add_new_sequence)
+        add_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: 2px solid #4CAF50;
+                border-radius: 10px;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:pressed {
+                background-color: #3e8e41;
+            }
+        """)
+        self.seq_buttons_layout.addWidget(add_button, alignment=Qt.AlignLeft)
+
+    def move_button(self, target, source):
+        source_index = self.seq_buttons_layout.indexOf(source)
+        target_index = self.seq_buttons_layout.indexOf(target)
+
+        #rearrange the sequences in the sequence manager
+        # target_index_manager = self.sequence_manager.main_sequences[target.text()]["index"]
+
+
+        self.sequence_manager.move_sequence_to_index(source.text(),target_index )
+
+
+        self.seq_buttons_layout.insertWidget(target_index, source)
+
+
+
+    def get_button_style(self, selected):
+        if selected:
+            return """
+                QPushButton {
+                    background-color: #FFC300; /* Bright Yellow */
+                    color: black; 
+                    font-weight: bold;
+                    border: 2px solid #C70039;
+                    border-radius: 5px;
+                    padding: 5x;
+                }
+                QPushButton:hover {
+                    background-color: #FFB200; /* Slightly Darker Yellow */
+                }
+                QPushButton:pressed {
+                    background-color: #FFA200; /* Even Darker Yellow */
+                }
+            """
+        else:
+            return """
+                QPushButton {
+                    background-color: #2196F3;
+                    color: black; 
+                    font-weight: bold;
+
+                    border: 2px solid #1976D2;
+                    border-radius: 5px;
+                    padding: 5x;
+                }
+                QPushButton:hover {
+                    background-color: #1E88E5;
+                }
+                QPushButton:pressed {
+                    background-color: #1565C0;
+                }
+            """
+
+    def add_new_sequence(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Add New Sequence")
+
+        layout = QVBoxLayout(dialog)
+
+        new_sequence_button = QPushButton("Create New Sequence", dialog)
+        load_sequence_button = QPushButton("Load Sequence from File", dialog)
+
+        layout.addWidget(new_sequence_button)
+        layout.addWidget(load_sequence_button)
+
+        new_sequence_button.clicked.connect(lambda: self.create_new_sequence(dialog))
+        load_sequence_button.clicked.connect(lambda: self.load_sequence_from_file(dialog))
+
+        dialog.setLayout(layout)
+        dialog.exec_()
+
+    def create_new_sequence(self, dialog):
+        sequence_name, ok = QInputDialog.getText(dialog, "Add New Sequence", "Enter sequence name:")
+        if ok and sequence_name:
+            try:
+                self.sequence_manager.add_new_sequence(sequence_name)
+                self.update_buttons()
+                self.display_sequence(flag=True)
+            except Exception as e:
+                QMessageBox.critical(dialog, "Error", str(e))
+        dialog.accept()
+
+    def load_sequence_from_file(self, dialog):
+        file_dialog = QFileDialog(self)
+        file_name, _ = file_dialog.getOpenFileName(self, "Load Sequence from JSON", "", "JSON Files (*.json)")
+        if file_name:
+            try:
+                sequence = Sequence.from_json(file_name)
+                self.sequence_manager.load_sequence(sequence)
+                self.update_buttons()
+                self.display_sequence(flag=True)
+            except Exception as e:
+                QMessageBox.critical(dialog, "Error, File is corrupt due to ", str(e))
+        dialog.accept()
+
+    def display_sequence(self, flag=False):
+        button = self.sender()
+        if not flag:
+            sequence_name = button.text()
+            sequence = self.sequence_manager.find_sequence_by_name(sequence_name)
+        else:
+            if len(self.sequence_manager.main_sequences.items() )== 0 :
+                return
+            sequence = list(self.sequence_manager.main_sequences.values())[-1]
+            sequence_name = sequence.sequence_name
+
+        for i in reversed(range(self.sequence_view_layout.count())):
+            widget_to_remove = self.sequence_view_layout.itemAt(i).widget()
+            self.sequence_view_layout.removeWidget(widget_to_remove)
+            widget_to_remove.setParent(None)
+        
+        synced_table_widget = SequenceViewerWdiget(sequence,self)
+        self.sequence_view_layout.addWidget(synced_table_widget)
+
+        if self.selected_sequence_button:
+            self.selected_sequence_button.setStyleSheet(self.get_button_style(False))
+        if not flag:
+            self.selected_sequence_button = button
+            self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
+        else:
+            button = self.seq_buttons_layout.itemAt(self.seq_buttons_layout.count()-2).widget()
+            self.selected_sequence_button = button
+            self.selected_sequence_button.setStyleSheet(self.get_button_style(True))
+
+
 
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    # Create the main window
-    DFM_ToF = creat_test()
-    window = SequenceViewerWdiget(DFM_ToF)
+    window = SequenceManagerWidget()
     window.show()
     sys.exit(app.exec_())
-
