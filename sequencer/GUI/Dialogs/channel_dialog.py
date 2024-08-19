@@ -73,6 +73,49 @@ class ChannelDialog(QDialog):
             data['reset_value'] = float(self.reset_value_edit.text())
         return data
 
+class CustomDialog(QDialog):
+    def __init__(self, channels, types, parent=None):
+        super().__init__(parent)
+        
+        self.setWindowTitle("Select Channel and Type")
+        
+        layout = QVBoxLayout(self)
+        
+        # Channel selection
+        self.channel_label = QLabel("Channels:")
+        self.channel_combo = QComboBox()
+        self.channel_combo.addItems(channels)
+        
+        layout.addWidget(self.channel_label)
+        layout.addWidget(self.channel_combo)
+        
+        # Type selection
+        self.type_label = QLabel("Type:")
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(types)
+
+        # add numeric input for resolution and assert it's numberic 
+        self.resolution_label = QLabel("Resolution:")
+        self.resolution_edit = QLineEdit(self)
+        self.resolution_edit.setValidator(QDoubleValidator())
+        layout.addWidget(self.resolution_label)
+        layout.addWidget(self.resolution_edit)
+
+        
+        layout.addWidget(self.type_label)
+        layout.addWidget(self.type_combo)
+        
+        # OK and Cancel buttons
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        
+        layout.addWidget(self.button_box)
+    
+    def get_values(self):
+        return self.channel_combo.currentText(), self.type_combo.currentText(), float(self.resolution_edit.text()) if self.resolution_edit.text() else 0.1
+
+
 
 
 # Edit Analog Channel dialog
