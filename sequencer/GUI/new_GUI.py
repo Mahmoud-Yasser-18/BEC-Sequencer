@@ -851,8 +851,11 @@ class EventButton(QWidget):
     
     def delete_sweep(self):
         self.parent_widget.sequence.unstack_sweep_parameter(self.event_instance)
+        print(self.parent_widget.sequence.sweep_dict)
         self.refresh_UI()
-        
+        self.refresh_row_after_me()
+        self.refresh_row_before_me()
+
 
     def sweep(self):
         # open the sweep dialog
@@ -962,8 +965,6 @@ class EventButton(QWidget):
         self.parent_widget.sequence.delete_event(self.time_instance.name,self.channel.name)
         self.refresh_UI()
         self.refresh_row_after_me()
-
-    
     def refresh_color(self, value, widget):
         try:
             color,text_color = voltage_to_color(value,self.color_scheme)
@@ -975,27 +976,9 @@ class EventButton(QWidget):
                 padding: 3px;
                 border-radius: 5px;
             """
-            
+
             specific_styles = {
                 "QComboBox": f"""
-                QComboBox {{
-                    border: 1px solid gray;
-                    padding: 1px 18px 1px 3px;
-                    min-width: 6em;
-                }}
-                QComboBox::drop-down {{
-                    subcontrol-origin: padding;
-                    subcontrol-position: top right;
-                    width: 15px;
-                    border-left-width: 1px;
-                    border-left-color: darkgray;
-                    border-left-style: solid;
-                }}
-                QComboBox QAbstractItemView {{
-                    border: 2px solid darkgray;
-                    selection-background-color: {color};
-                    color: {text_color};
-                }}
                 """,
                 "QDoubleSpinBox": """
                     padding: 3px;
@@ -1009,19 +992,22 @@ class EventButton(QWidget):
             }
             try:
                 if self.event_instance.is_sweept:
-                    print("sweep")
                     specific_styles["QLabel"] = """
                             border: 3px solid black;
                         """
+                    specific_styles['QComboBox_NO_mouse'] = """
+                            border: 3px solid black; 
+                        """
+                    
                 else:
                     specific_styles["QLabel"] = """
                             border: 1px solid gray;
                         """
-            except:
-                print("no Event instance")   
-                specific_styles["QLabel"] = """
-                            border: 0.1px solid gray;
+                    specific_styles['QComboBox_NO_mouse'] = """
+                            border: 1px solid gray; 
                         """
+            except:
+                pass
                 
             widget_type = widget.__class__.__name__
             style = common_style + specific_styles.get(widget_type, "")

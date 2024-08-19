@@ -1388,6 +1388,7 @@ class Sequence:
         if isinstance(target,Event):
             for key in list(self.sweep_dict.keys()):
                 if key[0] == target.start_time_instance.name and key[1] == target.channel.name:
+                    print("deleting")
                     del self.sweep_dict[key]
                     target.is_sweept = False
                     break
