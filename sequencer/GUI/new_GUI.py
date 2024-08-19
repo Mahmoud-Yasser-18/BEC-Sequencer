@@ -291,6 +291,8 @@ class TimeInstanceLabel(QWidget):
         self.name_edit = QLineEdit(self.time_instance.name)
         self.name_edit.setContextMenuPolicy(Qt.CustomContextMenu)
         self.name_edit.customContextMenuRequested.connect(self.show_context_menu)
+        if self.time_instance.is_sweept:
+            self.name_edit.setStyleSheet("background-color: yellow")
         layout.addWidget(self.name_edit)
 
         # Editable relative time with numeric validation
@@ -328,11 +330,30 @@ class TimeInstanceLabel(QWidget):
         edit_parent_action.triggered.connect(self.edit_parent_time_instance)
         context_menu.addAction(edit_parent_action)
         
-        delete_action = QAction("Delete Time Instance", self)
+        delete_action = QAction("Delete", self)
         delete_action.triggered.connect(self.delete_time_instance)
         context_menu.addAction(delete_action)
+        sweep_action = QAction("Sweep", self)
+        sweep_action.triggered.connect(self.sweep)
+        delete_sweep = QAction("Delete Sweep", self)
+        delete_sweep.triggered.connect(self.delete_sweep)
+        context_menu.addAction(delete_sweep)
+        context_menu.addAction(sweep_action)
+
         
         context_menu.exec_(self.name_edit.mapToGlobal(position))
+
+
+    def sweep(self):
+        dialog = SweepEventDialog()
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_result()
+            self.parent_widget.parent_widget.sequence.stack_sweep_paramter(self.time_instance, data,"relative_time")
+            self.parent_widget.refresh_UI()
+
+    def delete_sweep(self):
+        self.parent_widget.parent_widget.sequence.unstack_sweep_parameter(self.time_instance)
+        self.parent_widget.refresh_UI()
 
     def add_child_time_instance(self):
         dialog = AddChildTimeInstanceDialog(self)
@@ -835,10 +856,6 @@ class EventButton(QWidget):
         QToolTip.showText(event.globalPos(),text , self)
         super().enterEvent(event)
 
-    
-
-
-
     def context_menu(self, position):
         context_menu = QMenu(self)
         delete_action = context_menu.addAction("Delete Event")
@@ -870,9 +887,6 @@ class EventButton(QWidget):
             self.parent_widget.sequence.stack_sweep_paramter(self.event_instance,data,parameter=self.paramter_label)
             self.refresh_UI()
             
-        
-    
-
     def edit_start_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, start_value=value)
         self.value = value
@@ -887,7 +901,6 @@ class EventButton(QWidget):
         self.refresh_row_after_me()
         self.refresh_row_before_me()
 
-        # Make a deep copy of the event behavior
 
     def edit_target_value(self, event, value):
         self.parent_widget.sequence.edit_event_behavior(edited_event=event, target_value=value)
@@ -912,7 +925,6 @@ class EventButton(QWidget):
                 # open a dialog to get the function
                 func_text, ok = QInputDialog.getText(self, "Generic Function", "Enter the generic function as a function of time (t):")
                 if ok:
-                    
                     self.parent_widget.sequence.edit_event_behavior(edited_event=event, ramp_type=value, func_text=func_text)
                     self.refresh_row_after_me()
                     self.refresh_UI()
@@ -959,12 +971,12 @@ class EventButton(QWidget):
         except Exception as e:
                 QMessageBox.critical(self, "Error", f"An error occurred while adding the event: {str(e)}")
 
-
     def delete_event(self):
         # Delete the event from the time instance and channel
         self.parent_widget.sequence.delete_event(self.time_instance.name,self.channel.name)
         self.refresh_UI()
         self.refresh_row_after_me()
+
     def refresh_color(self, value, widget):
         try:
             color,text_color = voltage_to_color(value,self.color_scheme)
@@ -998,7 +1010,6 @@ class EventButton(QWidget):
                     specific_styles['QComboBox_NO_mouse'] = """
                             border: 3px solid black; 
                         """
-                    
                 else:
                     specific_styles["QLabel"] = """
                             border: 1px solid gray;
@@ -1008,7 +1019,6 @@ class EventButton(QWidget):
                         """
             except:
                 pass
-                
             widget_type = widget.__class__.__name__
             style = common_style + specific_styles.get(widget_type, "")
             

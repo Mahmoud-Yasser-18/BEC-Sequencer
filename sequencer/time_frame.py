@@ -1128,6 +1128,7 @@ class Sequence:
         def serialize_TimeInstances(TimeInstance: TimeInstance) -> dict:
             return {
                 "relative_time": TimeInstance.relative_time,
+                "is_sweept": TimeInstance.is_sweept,
                 "name": TimeInstance.name,
                 "events": [event.get_event_attributes() for event in TimeInstance.events],
                 "ending_ramps": [event.get_event_attributes() for event in TimeInstance.ending_ramps],
@@ -1189,6 +1190,7 @@ class Sequence:
         def deserialize_TimeInstances(TimeInstance_data: dict, parent: TimeInstance) -> TimeInstance:
             
             TimeInstance_new = TimeInstance(TimeInstance_data["name"], parent, TimeInstance_data["relative_time"])
+            TimeInstance_new.is_sweept = TimeInstance_data["is_sweept"]
             for event_data in TimeInstance_data["events"]:
                 channel = sequence.find_channel_by_name(event_data["channel_name"])
                 if event_data["type"] == "jump":
