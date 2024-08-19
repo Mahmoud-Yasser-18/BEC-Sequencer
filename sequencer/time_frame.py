@@ -1106,6 +1106,8 @@ class Sequence:
                     copied_sweep_event.behavior.edit_ramp(resolution=value)
                 elif parameter_name == "ramp_type":
                     copied_sweep_event.behavior.edit_ramp(ramp_type=value)
+            elif isinstance(copied_sweep_event.behavior, Digital):
+                copied_sweep_event.behavior.edit_digital(value)
             # Append the modified sequence to the list of new sequences
             temp_sequence.sweep_values.append( {"sweep_type":"event_behavior",
                                                 "event_time_instance":sweep_event.start_time_instance.name,
@@ -1371,7 +1373,7 @@ class Sequence:
                 target.is_sweept = True
             else:
                 return ValueError(f"Parameter relative time already swept on {target.name}")
-    def unstuck_sweep_parameter(self,target,parameter:str):
+    def unstack_sweep_parameter(self,target,parameter:str):
         if isinstance(target,Event):
             key = (target.start_time_instance.name, target.channel.name,parameter)
             if key in self.sweep_dict:
@@ -1386,7 +1388,7 @@ class Sequence:
                 target.is_sweept = False
             else:
                 return ValueError(f"Parameter relative time not found on {target.name}")
-    def unstuck_all_sweep_parameters(self):
+    def unstack_all_sweep_parameters(self):
         self.sweep_dict = {}
         for channel in self.channels:
             for event in channel.events:

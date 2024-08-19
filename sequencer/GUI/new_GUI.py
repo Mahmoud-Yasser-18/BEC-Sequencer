@@ -30,7 +30,7 @@ from PyQt5.QtCore import QPoint, Qt, QSize
 from sequencer.GUI.Dialogs.channel_dialog import ChannelDialog, Edit_Digital_Channel, Edit_Analog_Channel,CustomDialog
 from sequencer.GUI.Dialogs.events_dialogs import AnalogEventDialog, DigitalEventDialog
 from sequencer.GUI.Dialogs.sweep_dialog import SweepEventDialog
-
+from sequencer.GUI.Runner_widget import Runner
 from sequencer.time_frame import TimeInstance,SequenceManager
 import numpy as np
 color_maps = {
@@ -687,6 +687,7 @@ class EventButton(QWidget):
     def refresh_UI(self):
         # Clear the current layout
         self.clear_layout()
+        self.paramter_label = None
         # Check if the time instance contains any events in the channel
         ramp_value = self.channel.detect_a_ramp(self.time_instance)
         if ramp_value is not None:
@@ -732,7 +733,7 @@ class EventButton(QWidget):
                     if time_ref == 'start':
                         self.value = event.behavior.get_start_value()
                         # Create a vertical layout with a label and numeric value spin box
-                        
+                        self.paramter_label= "start_value"                        
                         # add a combobox to select the ramp type
                         ramp_combo = QComboBox_NO_mouse()
                         ramp_combo.addItems([e.value for e in RampType])
@@ -757,6 +758,7 @@ class EventButton(QWidget):
 
                     else:
                         self.value = event.behavior.get_end_value()
+                        self.paramter_label= "end_value" 
 
 
                         # Create a vertical layout with a label and numeric value spin box
@@ -779,6 +781,7 @@ class EventButton(QWidget):
 
                 elif isinstance(event.behavior, Jump):
                     self.value = event.behavior.target_value
+                    self.paramter_label= "target_value"
                     # Create a vertical layout with a label and numeric value spin box
                     
                     value_label = QLabel('Jump:')
@@ -792,6 +795,7 @@ class EventButton(QWidget):
 
                 elif isinstance(event.behavior, Digital):
                     self.event_instance = event
+                    self.paramter_label= "digital_state"
                     
                     self.value = event.behavior.target_value
                     combo_box = QComboBox_NO_mouse()
@@ -846,14 +850,17 @@ class EventButton(QWidget):
 
     def sweep(self):
         # open the sweep dialog
-        dialog = SweepDialog(self.event_instance)
-        if dialog.exec_() == QDialog.Accepted:
-            data = dialog.get_data()
-            self.parent_widget.sequence.sweep_event(self.event_instance, data['start'], data['stop'], data['step'])
+        if isinstance(self.channel, Digital_Channel):
+            self.parent_widget.sequence.stack_sweep_paramter(self.event_instance,[0,1],parameter=self.paramter_label)
+            print(self.parent_widget.sequence.sweep_dict)
             self.refresh_UI()
-            self.refresh_row_after_me()
-            self.refresh_row_before_me()
-
+            return
+        dialog = SweepEventDialog()
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_result()
+            self.parent_widget.sequence.stack_sweep_paramter(self.event_instance,data,parameter=self.paramter_label)
+            self.refresh_UI()
+            
         
     
 

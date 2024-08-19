@@ -11,7 +11,7 @@ import numpy as np
 import sys
 
 class SweepEventDialog(QDialog):
-    def __init__(self, event):
+    def __init__(self):
         super().__init__()
 
         self.setWindowTitle('Parameter Sweep Dialog')
