@@ -730,7 +730,18 @@ class Sequence:
         
         # list of all channels in the sequence 
         self.channels: List[Channel] = []
+    def get_parameter_dict(self):
+        # format sweep values to a dictionary
+        new_dict = {}
+        for v in self.sweep_values:
+            if v["sweep_type"] == "event_behavior":
+                s = "_".join([v["event_time_instance"],v["channel_name"],v["parameter_name"]])
+                new_dict[s] = v["value"]
+            elif v["sweep_type"] == "time_instance_relative_time":
+                new_dict[v["time_instance_name"]] = v["relative_time"]
 
+        return new_dict
+        
     # adding a time instance to the sequence 
     def add_time_instance(self, name: str, parent: TimeInstance, relative_time: int) -> TimeInstance:
         return parent.add_child_time_instance(name, relative_time)
@@ -1756,6 +1767,10 @@ class SequenceManager:
             seq_manager.main_sequences[int(index)] = sequence
             
         return seq_manager 
+    
+
+
+
 def create_test_e(n=1,t="t",ch="ch",c=4):
     seq = Sequence(f"test{n}")
     seq.add_analog_channel("ch1", 1, 1)
@@ -1801,6 +1816,10 @@ def create_test_e(n=1,t="t",ch="ch",c=4):
     seq.stack_sweep_paramter(Event_Jump, [5,6,7],"target_value")  
     return seq
 
+if __name__ == "__main__":
+    seq = create_test_e()
+    values = seq.sweep()[0].sweep_values
+    exit()
 
 def creat_seq_manager():
     seq1 = create_test_e("t")

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QDrag
 
 from PyQt5.QtCore import Qt, QRect, pyqtSignal,QPoint
-from sequencer.ADwin_Modules2 import calculate_time_ranges
+from sequencer.ADwin_Modules import calculate_time_ranges
 from sequencer.time_frame import TimeInstance,Sequence,Event , Analog_Channel, Digital_Channel, Channel, RampType,creat_test ,Jump,Ramp,Digital,exp_to_func,creat_seq_manager
 import sys
 from typing import List, Optional
