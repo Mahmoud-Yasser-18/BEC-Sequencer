@@ -1782,40 +1782,17 @@ def create_test_e(n=1,t="t",ch="ch",c=4):
     seq.stack_sweep_paramter(Event_Jump, [5,6,7],"target_value")  
     return seq
 
-if __name__ == "__main__":
-    # test sweep 
-    
-    # seq.to_json("test_sweep.json")
-
-    # seq2 = Sequence.from_json("test_sweep.json")
-    # seq2.to_json("test_sweep2.json")
-
-    # generated_sequences = seq.sweep()
-    # for x,s in enumerate(generated_sequences):
-    #     print(s.to_json(f"test_sweep_generated_{x}.json"))
+def creat_seq_manager():
     seq1 = create_test_e("t")
     seq2 = create_test_e(n=2,t="k",ch="cx",c=5)
     
     seq_manager = SequenceManager()
     seq_manager.load_sequence(seq1,0)
     seq_manager.load_sequence(seq2,1)
-
-    seq_manager.to_json("test_sweep_Seq_manager.json")
-    seq_manager2 = SequenceManager.from_json(file_name="test_sweep_Seq_manager.json")
-    seq_manager2.to_json("test_sweep_Seq_manager2.json")
-    seq_manager2.get_main_sequence().plot()
-    for s in seq_manager2.get_sweep_sequences_main()[:3]:
-        print(s.sweep_dict)
-        print(s.sweep_values)
-
-        
+    return seq_manager
 
 
 
-
-    
-
-    exit() 
 
 
 
