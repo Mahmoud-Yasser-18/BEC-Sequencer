@@ -423,8 +423,6 @@ class Event:
         self.behavior = behavior
         self.comment= comment
         self.is_sweept = False
-        self.sweep_type = None
-        self.sweep_settings = dict()
         self.reference_original_event = self
         self.associated_parameters = []
         # check if the start_time_instance and channels already have events, raise an error if there is already an event at the same time and channel
@@ -505,6 +503,7 @@ class Event:
                 "channel_name": self.channel.name,
                 "comment":self.comment,
                 "start_time_instance":self.start_time_instance.name,
+                "is_sweept":self.is_sweept
                 }
 
         elif isinstance(self.behavior, Ramp):
@@ -518,7 +517,8 @@ class Event:
                 "channel_name": self.channel.name,
                 "comment":self.comment,
                 "start_time_instance":self.start_time_instance.name,
-                "end_time_instance":self.end_time_instance.name
+                "end_time_instance":self.end_time_instance.name,
+                "is_sweept":self.is_sweept
                 }   
         elif isinstance(self.behavior, Digital):
             return {
@@ -528,6 +528,7 @@ class Event:
                 "channel_name": self.channel.name,
                 "comment":self.comment,
                 "start_time_instance":self.start_time_instance.name,
+                "is_sweept":self.is_sweept,
                 }
 
 
@@ -786,10 +787,16 @@ class Sequence:
         event = self.find_event_by_time_and_channel(time_instance_name, channel_name)
         if event is None:
             raise ValueError(f"Event at time instance {time_instance_name} not found on channel {channel_name}")
+        # unstack the event from the sweep 
+        if event.is_sweept:
+            event.reference_original_event.is_sweept = False
+            self.unstack_sweep_parameter(event)
+        # remove the event from the channel
         event.channel.events.remove(event)
         if event.end_time_instance != event.start_time_instance:
             event.end_time_instance.ending_ramps.remove(event)
         event.start_time_instance.events.remove(event)
+        
         
         
     def find_event_by_time_and_channel(self, start_time_instance_name: str, channel_name: str) -> Optional[Event]:
@@ -1190,7 +1197,11 @@ class Sequence:
                     behavior = Ramp(TimeInstance_new,"temp", RampType(event_data["ramp_type"]), event_data["start_value"], event_data["end_value"],event_data["func"] ,event_data["resolution"])
                 else:
                     behavior = Digital(event_data["target_value"])
-                Event(channel, behavior, event_data["comment"],TimeInstance_new,"temp")
+                event_temp = Event(channel, behavior, event_data["comment"],TimeInstance_new,"temp")
+                if event_data["is_sweept"]:
+                    event_temp.is_sweept = True
+                else:
+                    event_temp.is_sweept = False
             for event_data in TimeInstance_data["ending_ramps"]:
                 event = sequence.find_event_by_time_and_channel(event_data["start_time_instance"], event_data["channel_name"])
                 event.end_time_instance = TimeInstance_new
@@ -1373,19 +1384,22 @@ class Sequence:
                 target.is_sweept = True
             else:
                 return ValueError(f"Parameter relative time already swept on {target.name}")
-    def unstack_sweep_parameter(self,target,parameter:str):
+    def unstack_sweep_parameter(self,target):
         if isinstance(target,Event):
-            key = (target.start_time_instance.name, target.channel.name,parameter)
-            if key in self.sweep_dict:
-                del self.sweep_dict[key]
-                target.is_sweept = False
+            for key in list(self.sweep_dict.keys()):
+                if key[0] == target.start_time_instance.name and key[1] == target.channel.name:
+                    del self.sweep_dict[key]
+                    target.is_sweept = False
+                    break
             else:
-                return ValueError(f"Parameter {parameter} not found on {target.start_time_instance.name} at {target.channel.name}")
+                return ValueError(f"Parameter not found on {target.start_time_instance.name} at {target.channel.name}")
         elif isinstance(target,TimeInstance):
             key = target.name
-            if key in self.sweep_dict:
-                del self.sweep_dict[key]
-                target.is_sweept = False
+            for key in list(self.sweep_dict.keys()):
+                if key == target.name:
+                    del self.sweep_dict[key]
+                    target.is_sweept = False
+                    break
             else:
                 return ValueError(f"Parameter relative time not found on {target.name}")
     def unstack_all_sweep_parameters(self):
@@ -1784,6 +1798,7 @@ def create_test_e(n=1,t="t",ch="ch",c=4):
     seq.stack_sweep_paramter(Event_Jump, [5,6,7],"target_value")  
     return seq
 
+
 def creat_seq_manager():
     seq1 = create_test_e("t")
     seq2 = create_test_e(n=2,t="k",ch="cx",c=5)
@@ -1795,7 +1810,10 @@ def creat_seq_manager():
 
 
 
-
+if __name__ == "__main__":
+    seq_manager = creat_seq_manager()
+    seq_manager.to_json("test_sweep_Seq_manager.json")
+    exit()
 
 
 def creat_test():

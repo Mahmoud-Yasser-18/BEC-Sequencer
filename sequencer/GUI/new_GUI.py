@@ -845,7 +845,13 @@ class EventButton(QWidget):
         delete_action.triggered.connect(self.delete_event)
         sweep_action = context_menu.addAction("Sweep")
         sweep_action.triggered.connect(self.sweep)
+        delete_sweep_action = context_menu.addAction("Delete Sweep")
+        delete_sweep_action.triggered.connect(self.delete_sweep)
         context_menu.exec_(self.mapToGlobal(position))
+    
+    def delete_sweep(self):
+        self.parent_widget.sequence.unstack_sweep_parameter(self.event_instance)
+        self.refresh_UI()
         
 
     def sweep(self):
@@ -997,13 +1003,26 @@ class EventButton(QWidget):
                     border-radius: 3px;
                 """,
                 "QPushButton": """
-                    border: 1px solid gray;
-                """,
-                "QLabel": """
                     border: 2px solid gray;
-                """
+                """,
+
             }
-            
+            try:
+                if self.event_instance.is_sweept:
+                    print("sweep")
+                    specific_styles["QLabel"] = """
+                            border: 3px solid black;
+                        """
+                else:
+                    specific_styles["QLabel"] = """
+                            border: 1px solid gray;
+                        """
+            except:
+                print("no Event instance")   
+                specific_styles["QLabel"] = """
+                            border: 0.1px solid gray;
+                        """
+                
             widget_type = widget.__class__.__name__
             style = common_style + specific_styles.get(widget_type, "")
             
