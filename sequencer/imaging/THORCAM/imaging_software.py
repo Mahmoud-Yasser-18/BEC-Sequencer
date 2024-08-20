@@ -13,7 +13,8 @@ from thorlabs_tsi_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
 import copy
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QFontMetrics
 import numpy as np
-from sequencer.time_frame import Sequence
+from sequencer.Sequence.sequence import Sequence
+
 try:
     # if on Windows, use the provided setup script to add the DLLs folder to the PATH
     from sequencer.imaging.THORCAM.windows_setup import configure_path

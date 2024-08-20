@@ -1,4 +1,4 @@
-from sequencer.time_frame import Event, Jump, Ramp, Sequence, SequenceManager,creat_test 
+from sequencer.Sequence.sequence import creat_test
 
 
 from PyQt5.QtWidgets import (

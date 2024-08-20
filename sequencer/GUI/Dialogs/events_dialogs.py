@@ -4,10 +4,13 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
    QComboBox, QApplication, QTextEdit,QHBoxLayout,QToolTip,QDialogButtonBox,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
 )
-from sequencer.time_frame import Event, Channel, TimeInstance,exp_to_func
+from sequencer.Sequence.channel import Channel
+from sequencer.Sequence.time_frame import TimeInstance
+from PyQt5.QtWidgets import QDialog
+
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel
 from PyQt5.QtGui import QPainter, QPolygon, QBrush,QDoubleValidator
-from sequencer.time_frame import RampType
+from sequencer.Sequence.event import RampType
 
 
 
@@ -89,13 +92,15 @@ class AnalogEventDialog(QDialog):
         self.layout.addWidget(self.resoltion_label)
         self.layout.addWidget(self.resoltion_input)
 
-
+        self.update_behavior_fields()
         self.behavior_combo.currentIndexChanged.connect(self.update_behavior_fields)
         self.ramp_type_combo.currentIndexChanged.connect(self.update_ramp_fields)
 
         self.setLayout(self.layout)
         self.update_behavior_fields()
         self.update_ramp_fields()
+        self.update_behavior_fields()
+
 
 
     def add_ok_cancel_buttons(self):

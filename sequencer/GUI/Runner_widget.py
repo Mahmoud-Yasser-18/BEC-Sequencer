@@ -10,8 +10,9 @@ from typing import List, Optional
 from PyQt5.QtCore import QTimer
 
 
-from sequencer.time_frame import SequenceManager,Sequence, creat_seq_manager
-from sequencer.ADwin_Modules import ADwin_Driver
+from sequencer.Sequence.sequence import Sequence,SequenceManager,creat_seq_manager
+
+from sequencer.Drivers.ADwin_Modules import ADwin_Driver
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView, QMessageBox
 from PyQt5.QtCore import Qt
@@ -158,7 +159,9 @@ class Runner(QWidget):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
 
-        
+        self.main_sweep_queue = []
+        self.custom_sweep_queue = []
+
         
         
         self.refreash_sweep_queue()
@@ -320,6 +323,8 @@ class Runner(QWidget):
             else:
                 self.sweep_viewer.populate_table(self.custom_sweep_queue)
         except Exception as e:
+            self.main_sweep_queue = []
+            self.custom_sweep_queue = []
             QMessageBox.critical(self, "Error", str(e))
             
         

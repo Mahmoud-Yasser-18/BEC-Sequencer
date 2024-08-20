@@ -4,7 +4,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 import sys 
 
-from sequencer.time_frame import Event, Channel,Digital_Channel  ,Analog_Channel,Sequence
+from sequencer.Sequence.channel import Analog_Channel, Digital_Channel
+
 from PyQt5.QtWidgets import (
    QComboBox, QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
 )

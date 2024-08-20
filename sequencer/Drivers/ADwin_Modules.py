@@ -8,7 +8,10 @@ import os
 import sys 
 from copy import deepcopy 
 import numpy as np
-from sequencer.time_frame import TimeInstance, Sequence, Event, Analog_Channel, Digital_Channel, Jump, Ramp
+from sequencer.Sequence.sequence import Sequence
+from sequencer.Sequence.channel import Digital_Channel, Analog_Channel
+from sequencer.Sequence.event import  Jump, Ramp
+
 import time
 
 
