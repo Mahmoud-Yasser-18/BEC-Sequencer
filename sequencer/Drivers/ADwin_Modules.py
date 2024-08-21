@@ -424,15 +424,7 @@ if __name__ == "__main__":
 
     
     
-    # target = list(np.arange(-2.5,2.5, 0.5))
-    # list_of_seq = main_seq.sweep_event_parameters("jump_target_value", target, event_to_sweep=sweep_D1)
     
-    
-    
-
-    # for seq in list_of_seq.values():
-    #     # seq.print_sequence("Trap FM")
-    #     adwin_driver.add_to_queue(seq)
 
     adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
 #     # adwin_driver.repeat_process(process_number=1, repeat=1000,poll_interval=0.1)

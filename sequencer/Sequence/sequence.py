@@ -729,7 +729,7 @@ class Sequence:
         for time_instance in self.get_all_time_instances():
             time_instance.is_sweept = False
 
-    def sweep(self) -> List['Sequence']:
+    def sweep(self,repeat: int = 1) -> List['Sequence']:
         # check if the sweep dict is empty
         if not self.sweep_dict:
             return [self]
@@ -753,7 +753,7 @@ class Sequence:
                     temp_list+=s.sweep_time_instance_relative_time(s.find_TimeInstance_by_name(key), self.sweep_dict[key])
                 generated_sequences = temp_list        
                     
-        return generated_sequences
+        return generated_sequences*repeat
 
 
 from collections import OrderedDict
@@ -961,11 +961,11 @@ class SequenceManager:
 
         return main_sequence
 
-    def get_sweep_sequences_main(self) -> List[Sequence]:
+    def get_sweep_sequences_main(self,repeat=1) -> List[Sequence]:
         # put all sequences in a list and sort them by the index
     
         self.sort_sequences()
-        seq_list = [[s for s in  seq.sweep()] for seq in self.main_sequences.values()]
+        seq_list = [[s for s in  seq.sweep(repeat=repeat)] for seq in self.main_sequences.values()]
 
         sweep_sequences = [[s] for s in seq_list[0]]
 
@@ -1120,10 +1120,10 @@ def create_test_e(n=1,t="t",ch="ch",c=4):
     seq.stack_sweep_paramter(Event_Jump, [5,6,7],"target_value")  
     return seq
 
-if __name__ == "__main__":
-    seq = create_test_e()
-    values = seq.sweep()[0].sweep_values
-    exit()
+# if __name__ == "__main__":
+#     seq = create_test_e()
+#     values = seq.sweep()[0].sweep_values
+#     exit()
 
 def creat_seq_manager():
     seq1 = create_test_e("t")
@@ -1136,10 +1136,10 @@ def creat_seq_manager():
 
 
 
-if __name__ == "__main__":
-    seq_manager = creat_seq_manager()
-    seq_manager.to_json("test_sweep_Seq_manager.json")
-    exit()
+# if __name__ == "__main__":
+#     seq_manager = creat_seq_manager()
+#     seq_manager.to_json("test_sweep_Seq_manager.json")
+#     exit()
 
 
 def creat_test():
@@ -1249,10 +1249,15 @@ def creat_test():
 
     DFM_ToF.add_event("Camera Trigger", Jump(0), Trig_Low_IWA, comment= "Cam Trigger Low")
 
-    DFM_ToF.stack_sweep_paramter(Trig_High_IWA,"Trap FM", [0,1,2,3,4,5,6,7,8,9,10])
+    # DFM_ToF.stack_sweep_paramter(Trig_High_IWA, [0,1,2,3,4,5,6,7,8,9,10],"relative_time")
 
 
     return DFM_ToF
+
+if __name__ == "__main__":
+    test    = creat_test()
+    test.to_json("test.json")
+    exit()
 
 def create_test_time_instance():
     root = TimeInstance("root", relative_time=0)

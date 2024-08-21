@@ -86,7 +86,7 @@ class AnalogEventDialog(QDialog):
         self.layout.addWidget(self.generic_function_label)
         self.layout.addWidget(self.generic_function_input)
 
-        self.resoltion_label = QLabel("Resolution (for Ramp):")
+        self.resoltion_label = QLabel("Resolution (for Ramp) in ms:")
         self.resoltion_input = QLineEdit()
         self.resoltion_input.setValidator(QDoubleValidator())
         self.layout.addWidget(self.resoltion_label)

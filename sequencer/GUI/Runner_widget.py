@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout,QFileDialog, QHBoxLayout, QPushButton, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout,QFileDialog, QHBoxLayout, QPushButton, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView, QMessageBox,QTextEdit,QSpinBox
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QListWidget, QTableWidget,
@@ -261,12 +261,16 @@ class Runner(QWidget):
         self.refreash_queue_button.clicked.connect(self.refreash_queue)
 
 
+        self.repeat_sweep_text = QSpinBox()
+
+
+
         self.sweep_runner_layout = QHBoxLayout()
         self.sweep_runner_layout.addWidget(self.run_sweep_button)
         self.sweep_runner_layout.addWidget(self.combo_sweep)
         self.sweep_runner_layout.addWidget(self.randomize_queue_button)
         self.sweep_runner_layout.addWidget(self.refreash_queue_button)
-
+        self.sweep_runner_layout.addWidget(self.repeat_sweep_text)
 
 
         main_layout.addLayout(self.sweep_runner_layout)
@@ -299,8 +303,14 @@ class Runner(QWidget):
         pass 
 
     def refreash_sweep_queue(self):
+        # FIX : Display an error message if the channels on different sequences overlap
         try:
-            self.main_sweep_queue =self.sequence_manager.get_sweep_sequences_main()
+            try:
+                repeat = int(self.repeat_sweep_text.value())
+            except Exception as e:
+                repeat = 1
+                print(e)
+            self.main_sweep_queue =self.sequence_manager.get_sweep_sequences_main(repeat=repeat)
         except Exception as e:
             print("No sweeps there")
             print   (e)

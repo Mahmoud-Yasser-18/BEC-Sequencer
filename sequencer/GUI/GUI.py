@@ -492,7 +492,7 @@ class ChannelButton(QPushButton):
 
     def delete_channel(self):
         self.parent_widget.sequence.delete_channel(self.channel.name)
-        self.parent_widget.refresh_UI()
+        self.parent_widget.refresh_UI() # Flag For fix 
         self.parent_widget.parent_widget.event_table.delete_channel(self.channel)
     def add_channel(self):
         # open the add channel dialog
