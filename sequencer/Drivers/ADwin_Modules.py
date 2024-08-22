@@ -8,7 +8,10 @@ import os
 import sys 
 from copy import deepcopy 
 import numpy as np
-from sequencer.event import Sequence,Digital_Channel, Analog_Channel, Jump, Ramp, Event, RampType, SequenceManager
+from sequencer.Sequence.sequence import Sequence
+from sequencer.Sequence.channel import Digital_Channel, Analog_Channel
+from sequencer.Sequence.event import  Jump, Ramp
+
 import time
 
 
@@ -28,10 +31,6 @@ def encode_channel(type: int, channel: int, card: int) -> int:
 
 
 
-# def encode_channel(type, channel,card ):
-#     return type * 10000 +   channel* 100 +card
-
-
 def calculate_time_ranges(all_events):
 
     time_ranges = []
@@ -41,7 +40,7 @@ def calculate_time_ranges(all_events):
     # Initialize variables
     current_time = 0
     active_events = []
-    all_times = sorted(set([event.start_time for event in all_events] + [event.end_time for event in all_events]))
+    all_times = sorted(set([event.get_start_time() for event in all_events] + [event.get_end_time() for event in all_events]))
 
     # Iterate over all significant times
     for time in all_times:
@@ -50,14 +49,14 @@ def calculate_time_ranges(all_events):
             time_ranges.append(((current_time, time), active_events.copy()))
         
         # Remove events that have ended at or before the current time
-        active_events = [event for event in active_events if event.end_time > time]
+        active_events = [event for event in active_events if event.get_end_time() > time]
 
         # Add events that are starting at the current time
-        starting_events = [event for event in all_events if event.start_time == time and event.end_time != time]
+        starting_events = [event for event in all_events if event.get_start_time() == time and event.get_end_time() != time]
         active_events.extend(starting_events)
 
         # Handle instantaneous events
-        instant_events = [event for event in all_events if event.start_time == event.end_time == time]
+        instant_events = [event for event in all_events if event.get_start_time() == event.get_end_time() == time]
         if instant_events:
             time_ranges.append(((time, time), active_events + instant_events))
 
@@ -84,7 +83,7 @@ def calculate_sequence_data_eff(sequence: Sequence,adwin_driver) -> None:
     processdelay_times = []    
     processdelay_value_list = []    
 
-    all_events = deepcopy(sequence.all_events)
+    all_events = deepcopy(sequence.get_all_events())
     time_ranges=calculate_time_ranges(all_events)
 
     start_time2 = time.time()
@@ -320,18 +319,6 @@ class ADwin_Driver:
 
 import matplotlib.pyplot as plt
 
-def test_camera_trigger():
-    main_seq = Sequence("Camera Trigger")
-    main_seq.add_analog_channel("Camera Trigger", 2, 2)
-    t = 0
-    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
-    t = 1
-    main_seq.add_event("Camera Trigger", Jump(3.3), start_time=t)
-    t = 2
-    main_seq.add_event("Camera Trigger", Jump(0), start_time=t)
-    seq_manager = SequenceManager()
-    seq_manager.load_sequence(main_seq)
-    return seq_manager
 
 def test_camera_trigger_seq(r=0):
     main_seq = Sequence("Camera Trigger")
@@ -437,15 +424,7 @@ if __name__ == "__main__":
 
     
     
-    # target = list(np.arange(-2.5,2.5, 0.5))
-    # list_of_seq = main_seq.sweep_event_parameters("jump_target_value", target, event_to_sweep=sweep_D1)
     
-    
-    
-
-    # for seq in list_of_seq.values():
-    #     # seq.print_sequence("Trap FM")
-    #     adwin_driver.add_to_queue(seq)
 
     adwin_driver.initiate_all_experiments(process_number=1,repeat=1)
 #     # adwin_driver.repeat_process(process_number=1, repeat=1000,poll_interval=0.1)

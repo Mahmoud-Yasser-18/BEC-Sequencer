@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout,QFileDialog, QHBoxLayout, QPushButton, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView, QMessageBox
+from PyQt5.QtWidgets import QWidget, QVBoxLayout,QFileDialog, QHBoxLayout, QPushButton, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView, QMessageBox,QTextEdit,QSpinBox
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QListWidget, QTableWidget,
@@ -10,8 +10,9 @@ from typing import List, Optional
 from PyQt5.QtCore import QTimer
 
 
-from sequencer.event import SequenceManager,Sequence,test_camera_trigger
-from sequencer.ADwin_Modules import ADwin_Driver
+from sequencer.Sequence.sequence import Sequence,SequenceManager,creat_seq_manager
+
+from sequencer.Drivers.ADwin_Modules import ADwin_Driver
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView, QMessageBox
 from PyQt5.QtCore import Qt
@@ -19,43 +20,57 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QListWidget, QListWidgetItem, QAbstractItemView, QMessageBox, QApplication, QMenu
 from PyQt5.QtCore import Qt, QPoint
 class ParameterListWidget(QWidget):
-    def __init__(self, parameters=None, parent=None):
+    def __init__(self, sequences:List[Sequence]=None, parent=None):
         super(ParameterListWidget, self).__init__(parent)
-        if parameters is None:
-            parameters = dict()
+        if sequences is None:
+            sequences = dict()
         # Create the main layout
         self.layout = QVBoxLayout()
 
         # Create the QTableWidget
         self.table_widget = QTableWidget()
-        self.table_widget.setColumnCount(2)
-        self.table_widget.setHorizontalHeaderLabels(["Parameter", "Value"])
 
         # Populate the table with parameter names and values
-        self.populate_table(parameters)
+        self.populate_table(sequences)
 
         # Add the QTableWidget to the layout
         self.layout.addWidget(self.table_widget)
 
-        # Add a button to demonstrate updating parameters
+        # Add a button to demonstrate updating sequences
 
         # Set the layout for the widget
         self.setLayout(self.layout)
 
-    def populate_table(self, parameters):
+    def populate_table(self, sequences:List[Sequence]):
         """Populates the QTableWidget with parameter names and values."""
         try:
+            self.table_widget.setColumnCount(len(sequences[0].sweep_dict.keys()))
+            list_of_keys=[]
+            for key in sequences[0].sweep_dict.keys():
+                if isinstance(key, str):
+                    list_of_keys.append(key)
+                else:
+                    list_of_keys.append("_".join([str(i) for i in key]))
+                
+            self.table_widget.setHorizontalHeaderLabels(list_of_keys)
+
             
-            self.table_widget.setRowCount(len(parameters.items()))
-            for row, (name, value) in enumerate(parameters.items()):
-                self.table_widget.setItem(row, 0, QTableWidgetItem(str(name)))
-                self.table_widget.setItem(row, 1, QTableWidgetItem(str(0)))
+
+                
+            self.table_widget.setRowCount(len(sequences))
+            for row, sequence in enumerate(sequences):
+                for col, dict_value in enumerate(sequence.sweep_values):
+                    # check if the dict_value dictionaary contains the key "value" or "relative time"
+                    if "value" in dict_value.keys():
+                        self.table_widget.setItem(row, col, QTableWidgetItem(str(dict_value["value"])))
+                    else:
+                        self.table_widget.setItem(row, col, QTableWidgetItem(str(dict_value["relative_time"])))
         except Exception as e:
             print(e)
             print("No sweeps there")
-    def update_parameters(self, new_parameters):
-        """Updates the QTableWidget with new parameters."""
-        self.populate_table(new_parameters)
+    def update_sequences(self, new_sequences):
+        """Updates the QTableWidget with new sequences."""
+        self.populate_table(new_sequences)
 
 
 
@@ -75,11 +90,11 @@ class CustomSequenceWidget(QWidget):
 
         # ComboBox for sequence names
         self.sequence_combo_box = QComboBox()
-        for sequence_name in self.sequence_manager.main_sequences.keys():
-            self.sequence_combo_box.addItem(sequence_name)
+        for sequence in self.sequence_manager.main_sequences.values():
+            self.sequence_combo_box.addItem(sequence.sequence_name)
         layout.addWidget(self.sequence_combo_box)
 
-        # Button to add sequences to the list
+        # Button.sequence_name to add sequences to the list
         self.add_sequence_button = QPushButton("Add Sequence")
         self.add_sequence_button.clicked.connect(self.add_sequence_to_list)
         layout.addWidget(self.add_sequence_button)
@@ -91,43 +106,9 @@ class CustomSequenceWidget(QWidget):
         layout.addWidget(self.selected_sequences_list)
 
 
-
-        # Button to run selected sequences
-
-
-
         self.setLayout(layout)
 
-        # self.setStyleSheet("""
-        #     QWidget {
-        #         background-color: #2e2e2e;
-        #         color: #f0f0f0;
-        #         font-family: Arial, sans-serif;
-        #         font-size: 14px;
-        #     }
-        #     QComboBox, QListWidget, QPushButton {
-        #         background-color: #3e3e3e;
-        #         border: 1px solid #f0f0f0;
-        #         border-radius: 5px;
-        #         padding: 5px;
-        #     }
-        #     QPushButton:hover {
-        #         background-color: #505050;
-        #     }
-        #     QPushButton:pressed {
-        #         background-color: #606060;
-        #     }
-        #     QListWidget::item {
-        #         border: 1px solid #f0f0f0;
-        #         border-radius: 3px;
-        #         margin: 3px;
-        #         padding: 5px;
-        #     }
-        #     QListWidget::item:selected {
-        #         background-color: #505050;
-        #         color: #ffffff;
-        #     }
-        # """)
+       
 
     def add_sequence_to_list(self):
         sequence_name = self.sequence_combo_box.currentText()
@@ -178,18 +159,20 @@ class Runner(QWidget):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
 
-        
+        self.main_sweep_queue = []
+        self.custom_sweep_queue = []
+
         
         
         self.refreash_sweep_queue()
-        self.boot_ADwin()
+        # self.boot_ADwin()
         # print("Here")
-        # print(self.main_sweep_queue.keys())
+
         
         
         # create the folder if it does not exist 
-        if not os.path.exists(self.save_path):
-            os.makedirs(self.save_path)
+        # if not os.path.exists(self.save_path):
+        #     os.makedirs(self.save_path)
         self.initUI()
     def save_as_default_settings(self):
         # Define the default settings
@@ -278,12 +261,16 @@ class Runner(QWidget):
         self.refreash_queue_button.clicked.connect(self.refreash_queue)
 
 
+        self.repeat_sweep_text = QSpinBox()
+
+
+
         self.sweep_runner_layout = QHBoxLayout()
         self.sweep_runner_layout.addWidget(self.run_sweep_button)
         self.sweep_runner_layout.addWidget(self.combo_sweep)
         self.sweep_runner_layout.addWidget(self.randomize_queue_button)
         self.sweep_runner_layout.addWidget(self.refreash_queue_button)
-
+        self.sweep_runner_layout.addWidget(self.repeat_sweep_text)
 
 
         main_layout.addLayout(self.sweep_runner_layout)
@@ -302,6 +289,7 @@ class Runner(QWidget):
         self.setWindowTitle('Runner Widget')
         self.setWindowIcon(QIcon('path_to_icon.png'))  # Add path to your icon
         try: 
+            self.refreash_queue()
             self.refreash_custom_sweep_queue()
         except:
             pass
@@ -315,12 +303,17 @@ class Runner(QWidget):
         pass 
 
     def refreash_sweep_queue(self):
+        # FIX : Display an error message if the channels on different sequences overlap
         try:
-            self.main_sweep_queue =self.sequence_manager.get_sweep_sequences_main()
+            try:
+                repeat = int(self.repeat_sweep_text.value())
+            except Exception as e:
+                repeat = 1
+                print(e)
+            self.main_sweep_queue =self.sequence_manager.get_sweep_sequences_main(repeat=repeat)
         except Exception as e:
             print("No sweeps there")
             print   (e)
-        # print(self.main_sweep_queue[0])
     
     def refreash_custom_sweep_queue(self):
         try:
@@ -340,6 +333,8 @@ class Runner(QWidget):
             else:
                 self.sweep_viewer.populate_table(self.custom_sweep_queue)
         except Exception as e:
+            self.main_sweep_queue = []
+            self.custom_sweep_queue = []
             QMessageBox.critical(self, "Error", str(e))
             
         
@@ -356,16 +351,12 @@ class Runner(QWidget):
 
     def randomize_queue(self):
         try:
-            #randomize the dictionary order 
-            items = list(self.main_sweep_queue.items())
-            print(items[0])
-            random.shuffle(items)
-            # Create a new dictionary from the shuffled list
-            self.main_sweep_queue = dict(items)
-
+            
+            random.shuffle(self.main_sweep_queue)
+            
 
             try:
-                items = list(self.custom_sweep_queue.items())
+                items = list(self.custom_sweep_queue)
                 random.shuffle(items)
                 # Create a new dictionary from the shuffled list
                 self.custom_sweep_queue = dict(items)
@@ -403,10 +394,8 @@ class Runner(QWidget):
             if self.combo_sweep.currentText() == "main":
                 self.main_sweep_queue 
                 # run the first sequence in the queue and pop it out untill there is not element and refreash UI 
-                for key in self.main_sweep_queue.keys():
-                    sequence = self.main_sweep_queue[key]
+                for sequence in self.main_sweep_queue:
                     self.run_sequence(sequence)
-                    # self.main_sweep_queue.pop(key)
                     self.refreash_queue(Working=True)
 
 
@@ -415,7 +404,7 @@ class Runner(QWidget):
                 for key in self.custom_sequence_widget.keys():
                     sequence = self.custom_sweep_queue[key]
                     self.run_sequence(sequence)
-                    # self.main_sweep_queue.pop(key)
+
                     self.refreash_queue(Working=True)
 
 
@@ -452,12 +441,11 @@ class Runner(QWidget):
     
 
 
-from sequencer.event import create_test_seq_manager
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     # sequence_manager = create_test_seq_manager()
-    sequence_manager= test_camera_trigger()
-    sequence_manager.to_json(file_name="test_camera.json")
+    sequence_manager= creat_seq_manager()
+    # sequence_manager.to_json(file_name="test_camera.json")
     # sequence_manager.add_new_sequence("Seq1")
     # sequence_manager.add_new_sequence("Seq2")
     # sequence_manager.add_new_sequence("Seq3")

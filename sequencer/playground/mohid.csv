@@ -1,7 +1,0 @@
-channel_name,start_time,end_time,behavior_type,target_value,duration,ramp_type,start_value,end_value
-Analog1,0,0,Jump,1.0,,,,
-Digital1,3,3,Jump,1,,,,
-Digital1,5,5,Jump,0,,,,
-Analog1,10,13,Ramp,,3,quadratic,2.0,6.0
-Analog1,14,16,Ramp,,2,exponential,5,10
-Analog1,18,18,Jump,0.0,,,,

@@ -4,32 +4,11 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIntValidator, QDoubleValidator
 import sys 
 
-from sequencer.event import Event, Channel,Digital_Channel  ,Analog_Channel,Sequence,SequenceManager
+from sequencer.Sequence.channel import Analog_Channel, Digital_Channel
 
-class ExistingChannelDialog(QDialog):
-    def __init__(self, sequence_manager:SequenceManager,sequence:Sequence, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle('Add Existing Channel')
-        self.layout = QFormLayout(self)
-
-        self.sequence_manager = sequence_manager
-
-        self.sequence = sequence
-        all_channels_names ,all_channels_references = self.sequence_manager.get_all_channels_names()
-        seq_channel_names = [channel.name for channel in self.sequence.channels]
-        all_channels_names = [channel for channel in all_channels_names if channel not in seq_channel_names]
-
-        self.channel_combo = QComboBox(self)
-        self.channel_combo.addItems(all_channels_names)
-
-        self.layout.addRow('Channel:', self.channel_combo)
-
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
-        self.layout.addWidget(self.buttons)
-    def get_data(self):
-        return self.channel_combo.currentText()
+from PyQt5.QtWidgets import (
+   QComboBox, QApplication, QHBoxLayout,QToolTip,QGridLayout, QMessageBox,QSizePolicy, QDialog,QLabel,QMenu, QPushButton, QWidget, QVBoxLayout, QScrollArea, QScrollBar,QInputDialog
+)
 
 
 # Add this class to the Dialogs/channel_dialog.py file
@@ -65,13 +44,6 @@ class ChannelDialog(QDialog):
         self.layout.addRow('Max Voltage:', self.max_voltage_edit)
         self.layout.addRow('Min Voltage:', self.min_voltage_edit)
 
-        # Digital-specific fields
-        self.card_id_edit = QLineEdit(self)
-        self.card_id_edit.setValidator(QIntValidator())
-        self.bitpos_edit = QLineEdit(self)
-        self.bitpos_edit.setValidator(QIntValidator())
-        self.layout.addRow('Card ID:', self.card_id_edit)
-        self.layout.addRow('Bit Position:', self.bitpos_edit)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         self.buttons.accepted.connect(self.accept)
@@ -83,13 +55,11 @@ class ChannelDialog(QDialog):
         if index == 0:  # Analog
             self.max_voltage_edit.show()
             self.min_voltage_edit.show()
-            self.card_id_edit.hide()
-            self.bitpos_edit.hide()
+            self.reset_value_edit.show()
         elif index == 1:  # Digital
             self.max_voltage_edit.hide()
             self.min_voltage_edit.hide()
-            self.card_id_edit.show()
-            self.bitpos_edit.show()
+            self.reset_value_edit.hide()
 
     def get_data(self):
         data = {
@@ -97,15 +67,55 @@ class ChannelDialog(QDialog):
             'name': self.name_edit.text(),
             'card_number': int(self.card_number_edit.text()),
             'channel_number': int(self.channel_number_edit.text()),
-            'reset_value': float(self.reset_value_edit.text())
         }
         if data['type'] == 'Analog':
             data['max_voltage'] = float(self.max_voltage_edit.text())
             data['min_voltage'] = float(self.min_voltage_edit.text())
-        elif data['type'] == 'Digital':
-            data['card_id'] = int(self.card_id_edit.text())
-            data['bitpos'] = int(self.bitpos_edit.text())
+            data['reset_value'] = float(self.reset_value_edit.text())
         return data
+
+class CustomDialog(QDialog):
+    def __init__(self, channels, types, parent=None):
+        super().__init__(parent)
+        
+        self.setWindowTitle("Select Channel and Type")
+        
+        layout = QVBoxLayout(self)
+        
+        # Channel selection
+        self.channel_label = QLabel("Channels:")
+        self.channel_combo = QComboBox()
+        self.channel_combo.addItems(channels)
+        
+        layout.addWidget(self.channel_label)
+        layout.addWidget(self.channel_combo)
+        
+        # Type selection
+        self.type_label = QLabel("Type:")
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(types)
+
+        # add numeric input for resolution and assert it's numberic 
+        self.resolution_label = QLabel("Resolution:")
+        self.resolution_edit = QLineEdit(self)
+        self.resolution_edit.setValidator(QDoubleValidator())
+        layout.addWidget(self.resolution_label)
+        layout.addWidget(self.resolution_edit)
+
+        
+        layout.addWidget(self.type_label)
+        layout.addWidget(self.type_combo)
+        
+        # OK and Cancel buttons
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        
+        layout.addWidget(self.button_box)
+    
+    def get_values(self):
+        return self.channel_combo.currentText(), self.type_combo.currentText(), float(self.resolution_edit.text()) if self.resolution_edit.text() else 0.1
+
 
 
 
@@ -156,48 +166,6 @@ class Edit_Analog_Channel(QDialog):
             'min_voltage': float(self.min_voltage_edit.text())
         }
 
-class CustomDialog(QDialog):
-    def __init__(self, channels, types, parent=None):
-        super().__init__(parent)
-        
-        self.setWindowTitle("Select Channel and Type")
-        
-        layout = QVBoxLayout(self)
-        
-        # Channel selection
-        self.channel_label = QLabel("Channels:")
-        self.channel_combo = QComboBox()
-        self.channel_combo.addItems(channels)
-        
-        layout.addWidget(self.channel_label)
-        layout.addWidget(self.channel_combo)
-        
-        # Type selection
-        self.type_label = QLabel("Type:")
-        self.type_combo = QComboBox()
-        self.type_combo.addItems(types)
-
-        # add numeric input for resolution and assert it's numberic 
-        self.resolution_label = QLabel("Resolution:")
-        self.resolution_edit = QLineEdit(self)
-        self.resolution_edit.setValidator(QDoubleValidator())
-        layout.addWidget(self.resolution_label)
-        layout.addWidget(self.resolution_edit)
-
-        
-        layout.addWidget(self.type_label)
-        layout.addWidget(self.type_combo)
-        
-        # OK and Cancel buttons
-        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        self.button_box.accepted.connect(self.accept)
-        self.button_box.rejected.connect(self.reject)
-        
-        layout.addWidget(self.button_box)
-    
-    def get_values(self):
-        return self.channel_combo.currentText(), self.type_combo.currentText(), float(self.resolution_edit.text()) if self.resolution_edit.text() else 0.1
-
 
 # Edit Digital Channel dialog
 class Edit_Digital_Channel(QDialog):
@@ -214,19 +182,10 @@ class Edit_Digital_Channel(QDialog):
         self.channel_number_edit = QLineEdit(self)
         self.channel_number_edit.setValidator(QIntValidator())
         self.channel_number_edit.setText(str(channel.channel_number))
-        self.reset_value_edit = QLineEdit(self)
-        self.reset_value_edit.setValidator(QDoubleValidator())
-        self.reset_value_edit.setText(str(channel.reset_value))
-        self.bitpos_edit = QLineEdit(self)
-        self.bitpos_edit.setValidator(QIntValidator())
-        self.bitpos_edit.setText(str(channel.bitpos))
 
         self.layout.addRow('Name:', self.name_edit)
         self.layout.addRow('Card Number:', self.card_number_edit)
         self.layout.addRow('Channel Number:', self.channel_number_edit)
-        self.layout.addRow('Reset Value:', self.reset_value_edit)
-
-        self.layout.addRow('Bit Position:', self.bitpos_edit)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
         self.buttons.accepted.connect(self.accept)
@@ -238,14 +197,13 @@ class Edit_Digital_Channel(QDialog):
             'name': self.name_edit.text(),
             'card_number': int(self.card_number_edit.text()),
             'channel_number': int(self.channel_number_edit.text()),
-            'reset_value': float(self.reset_value_edit.text()),
-            'bitpos': int(self.bitpos_edit.text())
         }
 
         
 
 
 if __name__ == "__main__":
+    exit()
     app = QApplication(sys.argv)
 
     # Test ChannelDialog for adding a new channel
