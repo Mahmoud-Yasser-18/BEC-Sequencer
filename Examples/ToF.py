@@ -1,7 +1,7 @@
 import sequencer 
 import datetime
 from sequencer.event import Sequence,Jump,Ramp,Event ,Digital_Channel, Analog_Channel,SequenceManager
-from sequencer.ADwin_Modules import ADwin_Driver
+from sequencer.Drivers.ADwin_Modules import ADwin_Driver
 import numpy as np
 # ad = ADwin_Driver() 
 
