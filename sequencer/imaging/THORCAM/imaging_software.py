@@ -7,9 +7,13 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QCheckB
 from PyQt5.QtCore import QTimer, Qt,QPoint, QRect
 from PyQt5.QtGui import QImage, QPixmap,QPainter 
 from PIL import Image
-from thorlabs_tsi_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
-from thorlabs_tsi_sdk.tl_camera_enums import SENSOR_TYPE, OPERATION_MODE
-from thorlabs_tsi_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
+from sequencer.imaging.thorlabs_tsi_sdk.thorlabs_tsi_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
+from sequencer.imaging.thorlabs_tsi_sdk.thorlabs_tsi_sdk.tl_camera_enums import SENSOR_TYPE, OPERATION_MODE
+from sequencer.imaging.thorlabs_tsi_sdk.thorlabs_tsi_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
+
+# from thorlabs_tsi_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
+# from thorlabs_tsi_sdk.tl_camera_enums import SENSOR_TYPE, OPERATION_MODE
+# from thorlabs_tsi_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
 import copy
 from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QFontMetrics
 import numpy as np
