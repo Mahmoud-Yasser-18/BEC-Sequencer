@@ -1,7 +1,7 @@
 import sequencer 
 import datetime
-from sequencer.event import Sequence,Jump,Ramp,Event ,Digital_Channel, Analog_Channel,SequenceManager
-from sequencer.ADwin_Modules import ADwin_Driver
+from sequencer.Sequence.sequence import Sequence,Jump
+from sequencer.Drivers.ADwin_Modules import ADwin_Driver
 import numpy as np
 
 tof = Sequence("Time of Flight Thermometery")
