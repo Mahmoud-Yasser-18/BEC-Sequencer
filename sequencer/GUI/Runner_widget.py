@@ -165,8 +165,7 @@ class Runner(QWidget):
         
         
         self.refreash_sweep_queue()
-        # self.boot_ADwin()
-        # print("Here")
+        self.boot_ADwin()
 
         
         
